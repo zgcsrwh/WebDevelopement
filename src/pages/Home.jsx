@@ -1,1 +1,0 @@
-export const Home = () => <div><h2>Default Main Page</h2><p>Welcome to the SFC Dashboard.</p></div>;

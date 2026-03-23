@@ -7,8 +7,8 @@ const Layout = () => {
       <header style={headerStyle}>
         <div style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>SFC Portal</div>
         <nav style={navStyle}>
-          <Link to="/" style={linkStyle}>Default Home</Link>
-          <Link to="/Todo List" style={linkStyle}>My Todo List</Link>
+          <Link to="/" style={linkStyle}>Home</Link>
+          {/* <Link to="/Todo List" style={linkStyle}>My Todo List</Link> */}
         </nav>
       </header>
 
