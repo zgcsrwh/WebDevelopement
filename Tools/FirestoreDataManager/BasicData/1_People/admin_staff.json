@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Kim Smith",
+    "date_of_birth":  { "_type": "timestamp", "value": "1998-05-20" },
+    "email": "alice@sportcenter.com",
+    "address": "portswood",
+    "role": "staff",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2020-01-22" }
+  },
+  {
+    "name": "Alen White",
+    "date_of_birth":  { "_type": "timestamp", "value": "2002-09-12" },
+    "email": "bob@sportcenter.com",
+    "address": "mayflower",
+    "role": "admin",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2023-02-23" }
+  },
+
+
+  {
+    "name": "James Hudson",
+    "date_of_birth":  { "_type": "timestamp", "value": "1998-05-20" },
+    "email": "alice@sportcenter.com",
+    "address": "portswood",
+    "role": "staff",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2020-01-22" }
+  },
+  {
+    "name": "Anna Brown",
+    "date_of_birth":  { "_type": "timestamp", "value": "2000-08-15" },
+    "email": "bob@sportcenter.com",
+    "address": "mayflower",
+    "role": "staff",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2023-02-23" }
+  },
+  {
+    "name": "Sarah Miller",
+    "date_of_birth": { "_type": "timestamp", "value": "1992-03-15" },
+    "email": "sarah.m@sportcenter.com",
+    "address": "Highfield",
+    "role": "admin",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2018-05-12" }
+  },
+  {
+    "name": "David Chen",
+    "date_of_birth": { "_type": "timestamp", "value": "1995-11-08" },
+    "email": "david.c@sportcenter.com",
+    "address": "City Centre",
+    "role": "staff",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2021-09-01" }
+  },
+  {
+    "name": "Elena Rodriguez",
+    "date_of_birth": { "_type": "timestamp", "value": "1999-07-24" },
+    "email": "elena.r@sportcenter.com",
+    "address": "Shirley",
+    "role": "staff",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2023-02-15" }
+  },
+  {
+    "name": "Robert Taylor",
+    "date_of_birth": { "_type": "timestamp", "value": "1988-12-30" },
+    "email": "robert.t@sportcenter.com",
+    "address": "Swaythling",
+    "role": "admin",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2015-10-10" }
+  },
+  {
+    "name": "Lisa Wang",
+    "date_of_birth": { "_type": "timestamp", "value": "2001-04-05" },
+    "email": "lisa.w@sportcenter.com",
+    "address": "Ocean Village",
+    "role": "staff",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2024-06-20" }
+  }
+
+]

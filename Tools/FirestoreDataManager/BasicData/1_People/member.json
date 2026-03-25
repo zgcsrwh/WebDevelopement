@@ -1,0 +1,79 @@
+[
+  {
+    "name": "Alice",
+    "date_of_birth": { "_type": "timestamp", "value": "2001-01-22" },
+    "email": "alice@gmail.com",
+    "address": "portswood",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2025-09-30" },
+    "profile_ID" : "",
+    "cancel_times": 1,
+    "no_show_times": 0
+  },
+  {
+    "name": "Bob",
+    "date_of_birth": { "_type": "timestamp", "value": "2002-09-12" },
+    "email": "bob@gmail.com",
+    "address": "mayflower",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2026-01-02" },
+    "profile_ID" : "",
+    "cancel_times": 1,
+    "no_show_times": 0
+  },
+  {
+    "name": "James Smith",
+    "date_of_birth": { "_type": "timestamp", "value": "1995-05-12" },
+    "email": "james.s@gmail.com",
+    "address": "Highfield",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2024-11-15" },
+    "profile_ID": "",
+    "cancel_times": 0,
+    "no_show_times": 0
+  },
+  {
+    "name": "Chen Wei",
+    "date_of_birth": { "_type": "timestamp", "value": "1998-08-30" },
+    "email": "chen.wei@gmail.com",
+    "address": "City Centre",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2025-01-10" },
+    "profile_ID": "",
+    "cancel_times": 3,
+    "no_show_times": 1
+  },
+  {
+    "name": "Emma Wilson",
+    "date_of_birth": { "_type": "timestamp", "value": "1992-12-03" },
+    "email": "emma.w@gmail.com",
+    "address": "Shirley",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2023-06-21" },
+    "profile_ID": "",
+    "cancel_times": 1,
+    "no_show_times": 0
+  },
+  {
+    "name": "Liam Brown",
+    "date_of_birth": { "_type": "timestamp", "value": "2003-03-14" },
+    "email": "liam.b@gmail.com",
+    "address": "Swaythling",
+    "status": "suspended",
+    "created_at": { "_type": "timestamp", "value": "2025-02-28" },
+    "profile_ID": "",
+    "cancel_times": 5,
+    "no_show_times": 3
+  },
+  {
+    "name": "Sofia Garcia",
+    "date_of_birth": { "_type": "timestamp", "value": "2000-10-11" },
+    "email": "sofia.g@gmail.com",
+    "address": "Ocean Village",
+    "status": "active",
+    "created_at": { "_type": "timestamp", "value": "2024-08-05" },
+    "profile_ID": "",
+    "cancel_times": 2,
+    "no_show_times": 0
+  }
+]
