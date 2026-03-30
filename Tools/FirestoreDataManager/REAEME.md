@@ -7,7 +7,7 @@ The firebase config is stored in serviceAccountKey.json. Warning : the whole dat
 ## How to use the tool
 (1) Open the shell in FirestoreDataManager folder path, run 'npm install'
 
-(2) To reset the whole database as well as the authentication records, run 'node resetProjectDatabase'.
+(2) To reset the whole database as well as the authentication records, run 'node resetDatabase'.
 
 (3) If you want to remain some information, please change the code in resetProjectDatabase.js or write a new public function. The sub functions will be explained in the following. 
 
