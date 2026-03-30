@@ -18,33 +18,38 @@ import Repair from "./pages/staff/Repair";
 import StaffProfile from "./pages/staff/StaffProfile";
 import AdminStaff from "./pages/admin/AdminStaff";
 import AdminFacilities from "./pages/admin/AdminFacilities";
+import LoginRegister from "./pages/LoginRegister"
+
+import { AuthProvider } from './provider/AuthContext'; // 确保路径正确
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<LoginRegister />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/home" element={<Home />} />
+        <Route path="/facilities" element={<Facilities />} />
+        <Route path="/facilities/:id" element={<FacilityDetail />} />
+        <Route path="/booking/new" element={<BookingNew />} />
+        <Route path="/booking/:id" element={<BookingDetail />} />
+        <Route path="/my-bookings" element={<MyBookings />} />
+        <Route path="/discover" element={<Discover />} />
+        <Route path="/partner" element={<Partner />} />
+        <Route path="/partner/:id" element={<PartnerDetail />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/reports" element={<Reports />} />
 
-      <Route path="/home" element={<Home />} />
-      <Route path="/facilities" element={<Facilities />} />
-      <Route path="/facilities/:id" element={<FacilityDetail />} />
-      <Route path="/booking/new" element={<BookingNew />} />
-      <Route path="/booking/:id" element={<BookingDetail />} />
-      <Route path="/my-bookings" element={<MyBookings />} />
-      <Route path="/discover" element={<Discover />} />
-      <Route path="/partner" element={<Partner />} />
-      <Route path="/partner/:id" element={<PartnerDetail />} />
-      <Route path="/profile" element={<Profile />} />
-      <Route path="/reports" element={<Reports />} />
+        <Route path="/staff/requests" element={<Requests />} />
+        <Route path="/staff/checkin" element={<CheckIn />} />
+        <Route path="/staff/repair" element={<Repair />} />
+        <Route path="/staff/profile" element={<StaffProfile />} />
 
-      <Route path="/staff/requests" element={<Requests />} />
-      <Route path="/staff/checkin" element={<CheckIn />} />
-      <Route path="/staff/repair" element={<Repair />} />
-      <Route path="/staff/profile" element={<StaffProfile />} />
+        <Route path="/admin/staff" element={<AdminStaff />} />
+        <Route path="/admin/facilities" element={<AdminFacilities />} />
+      </Routes>
+    </AuthProvider>
 
-      <Route path="/admin/staff" element={<AdminStaff />} />
-      <Route path="/admin/facilities" element={<AdminFacilities />} />
-    </Routes>
   );
 }
 

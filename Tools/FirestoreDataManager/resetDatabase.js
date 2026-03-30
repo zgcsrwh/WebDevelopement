@@ -40,16 +40,17 @@ async function resetProjectDatabase() {
   await assignMemberToProfile();
   await populateRequestCollections("request");
   await populateRequestCollections("repair");
-  await createFriendsCollection();
   await randomizeMatchingIds();
-  await syncFriendships();
-
+ 
   // Generate supplementary information
+  await createFriendsCollection();
+  await syncFriendships();
   await generateNotification();
-  await syncUsersToAuth();
   await generateTimeSlots();
   await syncRequestsToTimeSlots();
 
+  // Clear and generate authenticartion information
+  await syncUsersToAuth();
   process.exit();
 }
 
@@ -210,47 +211,6 @@ async function populateRequestCollections(CollectionName) {
   }
 }
 
-// 为每个member简历一个friends关联表
-async function createFriendsCollection() {
-  try {
-    console.log('开始为所有成员初始化好友表...');
-
-    // 1. 获取所有 member
-    const memberSnapshot = await db.collection('member').get();
-
-    if (memberSnapshot.empty) {
-      console.log('未发现成员数据。');
-      return;
-    }
-
-    const batch = db.batch();
-    let count = 0;
-
-    memberSnapshot.docs.forEach((doc) => {
-      const memberId = doc.id;
-      
-      // 2. 在 friends 集合中创建一个新文档
-      // 建议：使用与 member 相同的 ID 作为 friends 文档的 ID，方便后续查询
-      const friendRef = db.collection('friends').doc(memberId);
-      
-      batch.set(friendRef, {
-        member_id: memberId,
-        friends_ids: [] // 初始化为空数组 (Array[String])
-      });
-
-      count++;
-
-    });
-
-    // 3. 提交所有更改
-    await batch.commit();
-    console.log(`成功！已为 ${count} 个成员创建了好友关联表。`);
-
-  } catch (error) {
-    console.error('初始化失败:', error);
-  }
-}
-
 // 向matching中填写sender_id和reciever_id
 async function randomizeMatchingIds() {
   try {
@@ -305,6 +265,46 @@ async function randomizeMatchingIds() {
   }
 }
 
+// 为每个member简历一个friends关联表
+async function createFriendsCollection() {
+  try {
+    console.log('开始为所有成员初始化好友表...');
+
+    // 1. 获取所有 member
+    const memberSnapshot = await db.collection('member').get();
+
+    if (memberSnapshot.empty) {
+      console.log('未发现成员数据。');
+      return;
+    }
+
+    const batch = db.batch();
+    let count = 0;
+
+    memberSnapshot.docs.forEach((doc) => {
+      const memberId = doc.id;
+      
+      // 2. 在 friends 集合中创建一个新文档
+      // 建议：使用与 member 相同的 ID 作为 friends 文档的 ID，方便后续查询
+      const friendRef = db.collection('friends').doc(memberId);
+      
+      batch.set(friendRef, {
+        member_id: memberId,
+        friends_ids: [] // 初始化为空数组 (Array[String])
+      });
+
+      count++;
+
+    });
+
+    // 3. 提交所有更改
+    await batch.commit();
+    console.log(`成功！已为 ${count} 个成员创建了好友关联表。`);
+
+  } catch (error) {
+    console.error('初始化失败:', error);
+  }
+}
 async function syncFriendships() {
   console.log('正在监听 matching 集合的状态变更...');
 
@@ -456,16 +456,7 @@ async function syncUsersToAuth() {
       return;
     }
 
-    // 2. 使用 importUsers 进行批量导入 (效率最高)
-    // 注意：importUsers 默认不会检查重复，如果 UID 已存在会报错或覆盖
-    /*const result = await auth.importUsers(usersToImport, {
-      hash: {
-        algorithm: 'SCRYPT', // 初始导入需要指定一种算法，或者直接循环 createUser
-      }
-    });*/
-
-    // 如果由于算法匹配复杂，也可以使用更稳妥的循环方式（自动处理重复）：
-    
+    console.log("success");
     for (const user of usersToImport) {
       try {
         await auth.createUser(user);
@@ -709,5 +700,9 @@ async function deleteQueryBatch(query, resolve) {
     deleteQueryBatch(query, resolve);
   });
 }
+
+
+
+
 
 resetProjectDatabase();

@@ -1,0 +1,415 @@
+/* Whole page setup(including [mainContent, footerExpanded])*/
+.pageWrapper {
+  min-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background-color: #f9fafb;
+}
+
+/* Main containcer(including [carouselContainer, rightPanel])*/
+.mainContent {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  height: calc(100vh - 250px);
+  padding: 0; /* 移除内边距，确保图片贴边 */
+  justify-content: flex-start;
+  
+  /* 关键修改：改为 flex-start，让右侧面板靠上 */
+  align-items: flex-start; 
+  flex-wrap: nowrap;
+  background-color: #ffffff;
+  overflow: hidden;
+  margin: 0;
+}
+
+/* Footer*/
+.footerExpanded {
+  height: 160px;
+  background-color: #002e4f; /* 深蓝色背景，参考图片 */
+  color: #ffffff;            /* 白色文字 */
+  padding: 20px 0px;
+  box-sizing: border-box;
+  border-top: none;
+}
+
+
+.carouselContainer {
+  /* 占用 60% 的宽度，你也可以根据需要调大（如 0.65 或 0.7） */
+  flex: 1 1 75%; 
+  position: relative;
+  height: calc(100vh - 160px); /* 强制高度为视口高度，覆盖至底部边界 */
+  
+  /* 移除圆角和投影 */
+  border-radius: 0; 
+  box-shadow: none;
+  overflow: hidden;
+  background-color: #f3f4f6;
+}
+
+.rightPanel {
+  /* 占用剩余 40% 宽度 */
+  flex: 1;
+  min-width: 450px;
+  display: flex;
+  flex-direction: column;
+  align-items: left;
+  height: calc(100vh - 160px);
+  padding: 0px 40px; 
+  gap: 24px;
+  background-color: #ffffff;
+}
+
+
+.slideImage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* 确保图片不变形填满全屏 */
+}
+
+/* 确保右侧卡片不会被挤压 */
+.authCard {
+  width: 100%;
+  max-width: 450px;
+  background: white;
+  padding: 20px 30px; 
+  border-radius: 0px;
+  border: none;
+  box-shadow: none;
+}
+
+.carouselOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  /* 加大 padding，让文字距离左侧边缘有一定呼吸空间 */
+  padding: 80px 10%; 
+  background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+  color: white;
+}
+
+.carouselOverlay h2 {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+}
+
+/* 轮播图控制按钮 */
+.arrowBtn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 10px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  backdrop-filter: blur(4px);
+  transition: background 0.3s;
+}
+
+.arrowBtn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.prev { left: 40px; } /* 将箭头稍微移向内部 */
+.next { right: 40px; }
+
+.toggleContainer {
+  margin-top: 0;
+  margin-bottom: 30px;
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 50px;
+}
+
+.toggleBtn {
+  flex: 1;
+  border: none;
+  padding: 12px;
+  border-radius: 50px;
+  cursor: pointer;
+  background: transparent;
+  font-weight: 600;
+  color: #666;
+}
+
+.activeToggle {
+  background: white;
+  color: black;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+/* 表单样式 */
+.inputGroup {
+  margin-bottom: 5px;
+}
+
+.inputGroup label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.icon {
+  position: absolute;
+  left: 15px;
+  color: #999;
+}
+
+.inputField {
+  width: 100%;
+  padding: 14px 15px 14px 45px;
+  border: 1px solid #ddd;
+  border-radius: 15px;
+  outline: none;
+  font-size: 16px;
+}
+
+.inputField:focus {
+  border-color: black;
+}
+
+.submitBtn {
+  width: 100%;
+  padding: 16px;
+  background: black;
+  color: white;
+  border: none;
+  border-radius: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+/* 新增：轮播指示点样式 */
+.indicatorContainer {
+  display: flex;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.indicator {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.indicatorActive {
+  width: 30px;
+  background: white;
+}
+
+.indicatorInactive {
+  width: 6px;
+}
+
+/* 角色选择框的小优化 */
+.selectField {
+  appearance: none; /* 去掉原生箭头 */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  background-size: 16px;
+}
+
+
+/* Google 按钮样式 */
+.googleBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+  margin-bottom: 20px;
+}
+
+.googleBtn:hover {
+  background: #f9fafb;
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 12px;
+  margin: 20px 0;
+}
+
+.separator::before, .separator::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.separator span {
+  padding: 0 10px;
+}
+
+
+.authHeader {
+  text-align: left;
+  margin-bottom: 15px;
+}
+
+.authHeader h1 {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.externalGoogleBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.externalGoogleBtn:hover {
+  background-color: rgba(0, 0, 0, 0.03); /* 极淡的灰色悬停效果 */
+  border-color: #d1d5db;
+}
+
+/* 注册网格间距微调 */
+.registrationGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 20px; /* 减小行间距 */
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 450px; /* 与卡片宽度一致 */
+  margin: 10px 0;   /* 上下留出一点间距 */
+  color: #9ca3af;   /* 浅灰色文字 */
+  font-size: 14px;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;          /* 自动填满剩余空间 */
+  height: 1px;
+  background-color: #e5e7eb; /* 横线的颜色 */
+}
+
+/* 文字左右的间距 */
+.divider span {
+  padding: 0 15px;
+  font-weight: 500;
+}
+
+
+/************************************************* FooterStyple ******************************************************/
+.footerContainer {
+  display: flex;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* 左侧列 */
+.footerBrandCol {
+  flex: 0 1 auto;   /* 不强制铺满，根据内容自适应 */
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.brandDesc {
+  color: #cbd5e1;
+  font-size: 14px;
+  max-width: 300px;
+  line-height: 1.6;
+}
+
+.footerLinks {
+  display: flex;
+  gap: 10px;
+}
+
+.footerLinks a {
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 13px;
+}
+.footerLinks a:hover { color: white; }
+
+/* 右侧联系信息列 (核心还原图片样式) */
+.footerContactCol {
+  flex: 0 1 auto;   /* 同样不强制铺满 */
+  display: flex;
+  flex-direction: column;
+  text-align: left; /* 确保文字全部左对齐 */
+  /* 移除之前的 padding-left: 100px，改用 margin-left: auto 确保它靠右排布 */
+  margin-left: 100px; 
+}
+
+.contactTitle {
+  font-family: serif;
+  font-size: 26px;
+  margin: 0 0 15px 0; /* 缩小标题下方的间距 */
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.contactInfoGroup {
+  margin-bottom: 0px; /* 缩小电话区和地址区之间的距离 */
+}
+
+.contactAddressGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 25px;
+}
+
+.contactInfoGroup p,
+.contactAddressGroup p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;    /* 紧凑的行高 */
+  color: #cbd5e1;
+}
+.copyrightText {
+  margin-top: auto;
+  font-size: 12px;
+  color: #64748b;
+}
+

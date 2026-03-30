@@ -12,7 +12,8 @@ import { doc, deleteDoc} from 'firebase/firestore'
 import { runTransaction,updateDoc} from 'firebase/firestore'
 // Firebase数据库-排序+查询+筛选
 import { orderBy, query, where } from 'firebase/firestore'
-
+//
+import {FB_SCHEMAS} from './DatabaseScheme'
 
 const FirestoreFunc = {
   
@@ -24,6 +25,7 @@ const FirestoreFunc = {
         ...data,
         createdAt: serverTimestamp() // 自动补全时间戳
       });
+      
       return { success: true, id: docRef.id };
     } catch (error) {
       console.error(`Error adding to ${collectionName}:`, error);
@@ -39,35 +41,60 @@ const FirestoreFunc = {
  * @param {string} sortField 排序字段，默认为创建时间
  * @param {string} sortOrder 排序方向: 'desc' (降序/最新) 或 'asc' (升序/最早)
  */
-filter: async (collectionName, filters = [], sortField = 'createdAt', sortOrder = 'desc') => {
-  try {
-    const colRef = collection(db, collectionName);
-    let constraints = [];
+  filter: async (collectionName, filters = [], sortField = 'createdAt', sortOrder = 'desc') => {
+    try {
+      const colRef = collection(db, collectionName);
+      let constraints = [];
 
-    // 1. 构建筛选条件
-    if (filters.length > 0) {
-      constraints = filters.map(f => where(f.field, f.operator, f.value));
+      // 1. 构建筛选条件
+      if (filters.length > 0) {
+        constraints = filters.map(f => where(f.field, f.operator, f.value));
+      }
+
+      // 2. 添加排序条件
+      // 注意：如果 filters 中包含对非 sortField 字段的范围查询（如 age > 18），
+      // Firestore 可能会要求建立复合索引。
+      constraints.push(orderBy(sortField, sortOrder));
+
+      // 3. 执行查询
+      const q = query(colRef, ...constraints);
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error(`Error filtering ${collectionName}:`, error);
+      // 如果报错信息包含 "The query requires an index"，点击控制台给出的链接即可自动创建索引
+      throw error;
     }
+  },
 
-    // 2. 添加排序条件
-    // 注意：如果 filters 中包含对非 sortField 字段的范围查询（如 age > 18），
-    // Firestore 可能会要求建立复合索引。
-    constraints.push(orderBy(sortField, sortOrder));
+  // Find out a single doc from firestore
+  filterSingle: async (collectionName, filters = [],) => {
+    try {
+      const colRef = collection(db, collectionName);
+      let constraints = [];
 
-    // 3. 执行查询
-    const q = query(colRef, ...constraints);
-    const querySnapshot = await getDocs(q);
-    
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-  } catch (error) {
-    console.error(`Error filtering ${collectionName}:`, error);
-    // 如果报错信息包含 "The query requires an index"，点击控制台给出的链接即可自动创建索引
-    throw error;
-  }
-},
+      // 1. 构建筛选条件
+      if (filters.length > 0) {
+        constraints = filters.map(f => where(f.field, f.operator, f.value));
+      }
+      // 3. 执行查询
+      const q = query(colRef, ...constraints);
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error(`Error filtering ${collectionName}:`, error);
+      // 如果报错信息包含 "The query requires an index"，点击控制台给出的链接即可自动创建索引
+      throw error;
+    }
+  },
 
   // --- 3. 修改 (Update) ---
   update: async (collectionName, id, updateData) => {
@@ -94,6 +121,9 @@ filter: async (collectionName, filters = [], sortField = 'createdAt', sortOrder 
       throw error;
     }
   }
+
+  /***********************************************  SupplementFunc ***************************************************************** */
+
 };
 
 export default FirestoreFunc;
