@@ -72,7 +72,7 @@ const FirestoreFunc = {
   },
 
   // Find out a single doc from firestore
-  filterSingle: async (collectionName, filters = [],) => {
+  filterSingle: async (collectionName, filters = []) => {
     try {
       const colRef = collection(db, collectionName);
       let constraints = [];
@@ -95,6 +95,26 @@ const FirestoreFunc = {
       throw error;
     }
   },
+
+  queryDocById: async (collectionName, docId) => {
+    try {
+      // 1. 获取文档引用 (doc)
+      const docRef = doc(db, collectionName, docId);
+      
+      // 2. 直接获取快照 (getDoc)
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() };
+      } else {
+        console.log("No such document!");
+        return null;
+      }
+    } catch (error) {
+      console.error(`Error getting document ${docId}:`, error);
+      throw error;
+    }
+  }, 
 
   // --- 3. 修改 (Update) ---
   update: async (collectionName, id, updateData) => {

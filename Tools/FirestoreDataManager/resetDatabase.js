@@ -392,7 +392,7 @@ async function generateNotification() {
           message: requestMessages[data.status],
           status_context: data.status,
           type: "facility_request",
-          created_at: { "_type": "timestamp", "value": new Date().toISOString().split('T')[0] }
+          created_at: new Date()
         });
         notificationCount++;
       }
@@ -409,7 +409,7 @@ async function generateNotification() {
           message: repairMessages[data.status],
           status_context: data.status,
           type: "repair_report",
-          created_at: { "_type": "timestamp", "value": new Date().toISOString().split('T')[0] }
+          created_at: new Date()
         });
         notificationCount++;
       }

@@ -154,12 +154,12 @@ export function AuthProvider({ children }) {
   // A new member need to create a new profile and linked
   async function createProfile(member_id)
    {
+      // Get info structure and set data
       const profileData = FB_SCHEMAS.DB_PROFILE;
       profileData.member_id = member_id;
 
+      // Create new doc by FirestoreFunc
       const {success, id} = await FirestoreFunc.create("profile", profileData);
-      console.log(success);
-      console.log(id);
 
       return {success, id} ;
    }
