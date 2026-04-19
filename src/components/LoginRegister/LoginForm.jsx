@@ -1,77 +1,89 @@
-// src/components/Home/LoginForm.jsx
-
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Mail, Lock } from 'lucide-react';
-import  { useAuth }  from '../../provider/AuthContext';
-import styles from './LoginRegister.module.css';
-import googleIcon from '../../images/google_logo.svg';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Lock, Mail, Shield } from "lucide-react";
+import { useAuth } from "../../provider/AuthContext";
+import styles from "./LoginRegister.module.css";
 
 const LoginForm = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("Member");
+  const [error, setError] = useState("");
   const navigate = useNavigate();
-  const { login, loginWithGoogle, loading } = useAuth();
+  const { login, loading } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
-    try {
-      // 使用 AuthContext 封装好的 login 方法
-      const {userSnap, isMember} = await login(email, password);
-      
-      console.log(userSnap);
-      console.log(isMember);
-      if(userSnap.empty){
-        setError("null");
-      }
-      else if(isMember){
-        navigate('/home');
-      }
-      else{ 
-        if(userSnap.role === 'admin'){
-          navigate('/admin/staff');
-        }
-        else{
-          navigate('/staff/requests');
-        }  
-      }
+    setError("");
 
-    } catch (err) {
-      setError(err.message);
+    if (!email.trim() || !password.trim()) {
+      setError("Please enter both email and password.");
+      return;
     }
-  };
 
-  const handleGoogle = async () => {
     try {
-      // 使用 AuthContext 封装好的 Google 登录
-      await loginWithGoogle();
-      navigate('/home');
+      const context = await login(email, password, role);
+      if (context.role === "Admin") {
+        navigate("/admin/facilities");
+      } else if (context.role === "Staff") {
+        navigate("/staff/requests");
+      } else {
+        navigate("/home");
+      }
     } catch (err) {
-      console.error(err);
+      const message = err?.message || "";
+      if (message.includes("invalid-credential") || message.includes("user-not-found") || message.includes("wrong-password")) {
+        setError("Invalid email or password.");
+      } else if (message.includes("Please verify your email")) {
+        setError("Please verify your email before signing in.");
+      } else if (message.includes("complete your registration details")) {
+        setError("Please finish the registration profile after email verification.");
+      } else if (message.includes("suspended or deactivated")) {
+        setError("This account has been suspended or deactivated by an administrator.");
+      } else if (message.includes("Selected identity does not match")) {
+        setError(message);
+      } else {
+        setError(message || "Unable to sign in right now.");
+      }
     }
   };
 
   return (
-    <div className={styles.authHeader}>
-      <h1 style={{ textAlign: 'left' }}>Welcome</h1>
+    <div className={styles.formBlock}>
+      <div className={styles.authHeader}>
+        <h2>Sign in</h2>
+      </div>
 
       {error && <p className={styles.errorMessage}>{error}</p>}
 
-      <form onSubmit={handleLogin}>
+      <form onSubmit={handleLogin} className={styles.verticalForm}>
+        <div className={styles.inputGroup}>
+          <label>Identity</label>
+          <div className={styles.inputWrapper}>
+            <Shield className={styles.icon} size={18} />
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className={styles.inputField}
+            >
+              <option value="Member">Member</option>
+              <option value="Staff">Staff</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+        </div>
+
         <div className={styles.inputGroup}>
           <label>Email</label>
           <div className={styles.inputWrapper}>
             <Mail className={styles.icon} size={18} />
-            <input 
-              type="email" 
+            <input
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com" 
+              placeholder="Enter your account email"
               className={styles.inputField}
-              required 
+              required
             />
           </div>
         </div>
@@ -80,30 +92,21 @@ const LoginForm = () => {
           <label>Password</label>
           <div className={styles.inputWrapper}>
             <Lock className={styles.icon} size={18} />
-            <input 
-              type="password" 
+            <input
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••" 
+              placeholder="Enter your password"
               className={styles.inputField}
-              required 
+              required
             />
           </div>
         </div>
 
         <button type="submit" className={styles.submitBtn} disabled={loading}>
-          {loading ? 'Authentication...' : `Sign in`}
+          {loading ? "Authenticating..." : "Sign in"}
         </button>
       </form>
-
-      <div className={styles.divider}><span>Or</span></div>
-      
-      <button onClick={handleGoogle} className={styles.externalGoogleBtn} type="button">
-        <img src={googleIcon} width="18" alt="G" />
-        Sign up/in with Google
-      </button>
-
-
     </div>
   );
 };
