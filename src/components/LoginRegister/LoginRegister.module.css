@@ -1,156 +1,272 @@
-/* Whole page setup(including [mainContent, footerExpanded])*/
 .pageWrapper {
-  min-height: 100vh;
-  overflow: hidden;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f9fafb;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(15, 76, 92, 0.14), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(148, 163, 184, 0.18), transparent 24%),
+    linear-gradient(180deg, #f8fbfc 0%, #eef3f6 100%);
 }
 
-/* Main containcer(including [carouselContainer, rightPanel])*/
 .mainContent {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(460px, 0.9fr);
   flex: 1;
   width: 100%;
-  max-width: none;
-  height: calc(100vh - 250px);
-  padding: 0; /* 移除内边距，确保图片贴边 */
-  justify-content: flex-start;
-  
-  /* 关键修改：改为 flex-start，让右侧面板靠上 */
-  align-items: flex-start; 
-  flex-wrap: nowrap;
-  background-color: #ffffff;
-  overflow: hidden;
-  margin: 0;
-}
-
-/* Footer*/
-.footerExpanded {
-  height: 160px;
-  background-color: #002e4f; /* 深蓝色背景，参考图片 */
-  color: #ffffff;            /* 白色文字 */
-  padding: 20px 0px;
+  max-width: 1460px;
+  margin: 0 auto;
+  padding: 18px 24px 12px;
+  gap: 24px;
+  align-items: stretch;
+  min-height: 0;
   box-sizing: border-box;
-  border-top: none;
 }
 
+.visualPanel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.visualPanelInner {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  padding: 0;
+  border-radius: 30px;
+  overflow: hidden;
+  border: 1px solid rgba(217, 226, 232, 0.88);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.08);
+}
+
+.footerExpanded {
+  background-color: #0f172a;
+  color: #ffffff;
+  padding: 10px 24px;
+  box-sizing: border-box;
+  width: 100%;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
 
 .carouselContainer {
-  /* 占用 60% 的宽度，你也可以根据需要调大（如 0.65 或 0.7） */
-  flex: 1 1 75%; 
   position: relative;
-  height: calc(100vh - 160px); /* 强制高度为视口高度，覆盖至底部边界 */
-  
-  /* 移除圆角和投影 */
-  border-radius: 0; 
-  box-shadow: none;
+  width: 100%;
+  min-height: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: 30px;
   overflow: hidden;
   background-color: #f3f4f6;
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.1);
 }
 
 .rightPanel {
-  /* 占用剩余 40% 宽度 */
-  flex: 1;
-  min-width: 450px;
   display: flex;
-  flex-direction: column;
-  align-items: left;
-  height: calc(100vh - 160px);
-  padding: 0px 40px; 
-  gap: 24px;
-  background-color: #ffffff;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
 }
 
+.rightPanelInner {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+  min-height: 0;
+  height: 100%;
+}
+
+.authIntro {
+  padding: 2px 4px 0;
+}
+
+.authIntro h1 {
+  margin: 0;
+  font-size: clamp(1.45rem, 1.9vw, 2.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: #102a33;
+}
 
 .slideImage {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover; /* 确保图片不变形填满全屏 */
+  object-fit: cover;
 }
 
-/* 确保右侧卡片不会被挤压 */
 .authCard {
   width: 100%;
-  max-width: 450px;
-  background: white;
-  padding: 20px 30px; 
-  border-radius: 0px;
-  border: none;
-  box-shadow: none;
+  max-width: 100%;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 18px 18px 16px;
+  border-radius: 26px;
+  border: 1px solid rgba(217, 226, 232, 0.95);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
+  box-sizing: border-box;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .carouselOverlay {
   position: absolute;
-  bottom: 0;
   left: 0;
   right: 0;
-  /* 加大 padding，让文字距离左侧边缘有一定呼吸空间 */
-  padding: 80px 10%; 
-  background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+  bottom: 0;
+  padding: 24px 28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  background: linear-gradient(to top, rgba(8, 15, 30, 0.38) 0%, rgba(8, 15, 30, 0.02) 58%, transparent 100%);
   color: white;
 }
 
-.carouselOverlay h2 {
-  font-size: 2.5rem;
-  margin-bottom: 15px;
-}
-
-/* 轮播图控制按钮 */
 .arrowBtn {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
   border: none;
   color: white;
-  padding: 10px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
+  align-items: center;
+  justify-content: center;
   backdrop-filter: blur(4px);
-  transition: background 0.3s;
+  transition: background 0.2s ease, transform 0.2s ease;
 }
 
 .arrowBtn:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.32);
+  transform: translateY(-50%) scale(1.02);
 }
 
-.prev { left: 40px; } /* 将箭头稍微移向内部 */
-.next { right: 40px; }
+.prev {
+  left: 20px;
+}
+
+.next {
+  right: 20px;
+}
 
 .toggleContainer {
-  margin-top: 0;
-  margin-bottom: 30px;
+  margin-bottom: 16px;
   display: flex;
-  background: #f1f5f9;
+  background: #edf3f6;
   padding: 4px;
   border-radius: 50px;
+  border: 1px solid #dce5eb;
 }
 
 .toggleBtn {
   flex: 1;
   border: none;
-  padding: 12px;
+  padding: 12px 14px;
   border-radius: 50px;
   cursor: pointer;
   background: transparent;
   font-weight: 600;
-  color: #666;
+  color: #61727e;
+  transition: all 0.2s ease;
 }
 
 .activeToggle {
   background: white;
-  color: black;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  color: #14222f;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
-/* 表单样式 */
+.formBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 76, 92, 0.38) transparent;
+}
+
+.formBlock::-webkit-scrollbar {
+  width: 8px;
+}
+
+.formBlock::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.formBlock::-webkit-scrollbar-thumb {
+  background: rgba(15, 76, 92, 0.38);
+  border-radius: 999px;
+}
+
+.verticalForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sectionCard {
+  border: 1px solid #dce5eb;
+  border-radius: 22px;
+  padding: 18px 18px 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbfc 100%);
+}
+
+.sectionLocked {
+  opacity: 0.64;
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sectionHeading h3 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  color: #102a33;
+}
+
+.stepBadge {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #0f4c5c;
+  color: white;
+  font-weight: 700;
+  font-size: 0.88rem;
+  box-shadow: 0 10px 20px rgba(15, 76, 92, 0.18);
+}
+
+.actionRow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .inputGroup {
-  margin-bottom: 5px;
+  margin-bottom: 10px;
 }
 
 .inputGroup label {
@@ -170,42 +286,109 @@
 .icon {
   position: absolute;
   left: 15px;
-  color: #999;
+  color: #7a8b99;
 }
 
 .inputField {
   width: 100%;
   padding: 14px 15px 14px 45px;
-  border: 1px solid #ddd;
-  border-radius: 15px;
+  border: 1px solid #d7e1e8;
+  border-radius: 16px;
   outline: none;
-  font-size: 16px;
+  font-size: 15px;
+  background: #fcfdfe;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.inputFieldWithAction {
+  padding-right: 54px;
+}
+
+.inputField:is(select) {
+  appearance: none;
+  background: #ffffff;
 }
 
 .inputField:focus {
-  border-color: black;
+  border-color: rgba(15, 76, 92, 0.55);
+  box-shadow: 0 0 0 4px rgba(15, 76, 92, 0.08);
+  background: #ffffff;
+}
+
+.inputActionBtn {
+  position: absolute;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #6b7f8d;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.inputActionBtn:hover {
+  background: rgba(15, 76, 92, 0.08);
+  color: #0f4c5c;
 }
 
 .submitBtn {
   width: 100%;
-  padding: 16px;
-  background: black;
+  min-height: 54px;
+  padding: 14px 16px;
+  background: #0f4c5c;
   color: white;
   border: none;
-  border-radius: 15px;
+  border-radius: 16px;
   font-weight: bold;
   cursor: pointer;
-  margin-top: 10px;
+  margin-top: 4px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
-/* 新增：轮播指示点样式 */
+.submitBtn:hover {
+  background: #0a3a46;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px rgba(15, 76, 92, 0.16);
+}
+
+.submitBtn:disabled,
+.ghostBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  transform: none;
+  box-shadow: none;
+}
+
+.ghostBtn {
+  width: 100%;
+  min-height: 50px;
+  padding: 14px 16px;
+  background: #ffffff;
+  color: #17313a;
+  border: 1px solid #d4dde4;
+  border-radius: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.ghostBtn:hover {
+  background: #f7fafb;
+  border-color: #c6d2db;
+}
+
 .indicatorContainer {
   display: flex;
   gap: 8px;
-  margin-top: 24px;
 }
 
 .indicator {
+  border: 0;
   height: 4px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.3);
@@ -221,195 +404,163 @@
   width: 6px;
 }
 
-/* 角色选择框的小优化 */
-.selectField {
-  appearance: none; /* 去掉原生箭头 */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 15px center;
-  background-size: 16px;
-}
-
-
-/* Google 按钮样式 */
-.googleBtn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 12px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background 0.2s;
-  margin-bottom: 20px;
-}
-
-.googleBtn:hover {
-  background: #f9fafb;
-}
-
-.separator {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: #9ca3af;
-  font-size: 12px;
-  margin: 20px 0;
-}
-
-.separator::before, .separator::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.separator span {
-  padding: 0 10px;
-}
-
-
 .authHeader {
   text-align: left;
-  margin-bottom: 15px;
 }
 
-.authHeader h1 {
-  font-size: 24px;
-  margin-bottom: 8px;
+.authHeader h2 {
+  margin: 0;
+  font-size: 1.55rem;
+  color: #102a33;
 }
 
-.externalGoogleBtn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 14px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
+.errorMessage,
+.successMessage {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 
-.externalGoogleBtn:hover {
-  background-color: rgba(0, 0, 0, 0.03); /* 极淡的灰色悬停效果 */
-  border-color: #d1d5db;
+.errorMessage {
+  background: #fff1f2;
+  color: #b91c1c;
+  border: 1px solid #fecdd3;
 }
 
-/* 注册网格间距微调 */
-.registrationGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 20px; /* 减小行间距 */
+.successMessage {
+  background: #ecfdf5;
+  color: #166534;
+  border: 1px solid #bbf7d0;
 }
 
-.divider {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  max-width: 450px; /* 与卡片宽度一致 */
-  margin: 10px 0;   /* 上下留出一点间距 */
-  color: #9ca3af;   /* 浅灰色文字 */
-  font-size: 14px;
-}
-
-.divider::before,
-.divider::after {
-  content: "";
-  flex: 1;          /* 自动填满剩余空间 */
-  height: 1px;
-  background-color: #e5e7eb; /* 横线的颜色 */
-}
-
-/* 文字左右的间距 */
-.divider span {
-  padding: 0 15px;
-  font-weight: 500;
-}
-
-
-/************************************************* FooterStyple ******************************************************/
 .footerContainer {
   display: flex;
   justify-content: space-between;
-  max-width: 1200px;
+  max-width: 1460px;
   margin: 0 auto;
   width: 100%;
+  gap: 18px;
+  align-items: center;
+  box-sizing: border-box;
 }
 
-/* 左侧列 */
-.footerBrandCol {
-  flex: 0 1 auto;   /* 不强制铺满，根据内容自适应 */
+.logoGroupFooter {
   display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.brandDesc {
-  color: #cbd5e1;
-  font-size: 14px;
-  max-width: 300px;
-  line-height: 1.6;
-}
-
-.footerLinks {
-  display: flex;
+  align-items: center;
   gap: 10px;
 }
 
-.footerLinks a {
-  color: #94a3b8;
-  text-decoration: none;
-  font-size: 13px;
-}
-.footerLinks a:hover { color: white; }
-
-/* 右侧联系信息列 (核心还原图片样式) */
-.footerContactCol {
-  flex: 0 1 auto;   /* 同样不强制铺满 */
-  display: flex;
-  flex-direction: column;
-  text-align: left; /* 确保文字全部左对齐 */
-  /* 移除之前的 padding-left: 100px，改用 margin-left: auto 确保它靠右排布 */
-  margin-left: 100px; 
+.logoBox {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #38bdf8, #22c55e);
+  color: #04111c;
+  font-weight: 800;
+  font-size: 0.95rem;
 }
 
-.contactTitle {
-  font-family: serif;
-  font-size: 26px;
-  margin: 0 0 15px 0; /* 缩小标题下方的间距 */
+.logoText {
   font-weight: 700;
-  color: #ffffff;
+  font-size: 0.94rem;
 }
 
-.contactInfoGroup {
-  margin-bottom: 0px; /* 缩小电话区和地址区之间的距离 */
-}
-
-.contactAddressGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 25px;
-}
-
-.contactInfoGroup p,
-.contactAddressGroup p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.4;    /* 紧凑的行高 */
-  color: #cbd5e1;
-}
 .copyrightText {
-  margin-top: auto;
-  font-size: 12px;
-  color: #64748b;
+  font-size: 0.78rem;
+  color: #94a3b8;
 }
 
+@media (max-width: 1040px) {
+  .pageWrapper {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .mainContent {
+    grid-template-columns: 1fr;
+    max-width: 920px;
+    align-items: start;
+    padding: 18px 18px 16px;
+  }
+
+  .visualPanelInner {
+    height: auto;
+  }
+
+  .carouselContainer {
+    min-height: 280px;
+    height: 280px;
+    max-height: 280px;
+    position: relative;
+  }
+
+  .rightPanelInner {
+    min-width: 0;
+    max-width: 620px;
+    margin: 0 auto;
+    height: auto;
+    grid-template-rows: auto auto;
+  }
+
+  .rightPanel {
+    height: auto;
+  }
+
+  .authCard {
+    height: auto;
+    overflow: visible;
+  }
+
+  .formBlock {
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .footerContainer {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 720px) {
+  .mainContent {
+    padding: 16px;
+    gap: 18px;
+  }
+
+  .carouselContainer {
+    min-height: 220px;
+    height: 220px;
+    max-height: 220px;
+    position: relative;
+  }
+
+  .authCard {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .authIntro h1 {
+    font-size: 1.7rem;
+  }
+
+  .rightPanelInner {
+    min-width: 0;
+  }
+
+  .sectionCard {
+    padding: 16px;
+  }
+
+  .footerExpanded {
+    padding: 12px 16px;
+  }
+
+  .footerContainer {
+    gap: 10px;
+  }
+}

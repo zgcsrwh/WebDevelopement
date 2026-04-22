@@ -1,9 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
 
-const config = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDSyXsiFqEH-OLdmHFXR8k_ZtEfhP1dk40",
   authDomain: "learnfire-e5720.firebaseapp.com",
   projectId: "learnfire-e5720",
@@ -13,8 +14,12 @@ const config = {
   measurementId: "G-TD22LFSGHH"
 };
 
-const app = initializeApp(config);
-export const db = getFirestore(app);
+export const app = initializeApp(firebaseConfig);
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+  useFetchStreams: false,
+});
 export const storage = getStorage(app);
 export const auth = getAuth(app);
+export const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();

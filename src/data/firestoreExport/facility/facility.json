@@ -1,0 +1,93 @@
+[
+  {
+    "id": "6zdZxhrcuUwjFGZnrXWn",
+    "name": "Blue Horizon Aquatic Center",
+    "sport_type": "Swimming",
+    "description": "Olympic-sized 50m heated pool with 8 lanes. Features advanced UV water purification and spectator seating.",
+    "usage_guidelines": "Swim caps and proper swimwear are strictly required. Showering is mandatory before entering the pool. Children must be accompanied by an adult.",
+    "capacity": 50,
+    "status": "normal",
+    "start_time": 6,
+    "end_time": 21,
+    "location": "Aquatic Pavilion, Ground floor",
+    "staff_id": "0WBUz5ZyYitFkAdSqEcm"
+  },
+  {
+    "id": "75Z5v1UVRrs602QFsvdj",
+    "name": "Skyline Basketball Arena",
+    "sport_type": "Basketball",
+    "description": "Premium maple hardwood court with professional-grade hoops and electronic scoreboards. Climate-controlled environment.",
+    "usage_guidelines": "No food or colored drinks allowed on the court. Please arrive 15 minutes early for check-in. Wet-ink signature required for team tournament applications.",
+    "capacity": 20,
+    "status": "normal",
+    "start_time": 8,
+    "end_time": 23,
+    "location": "North Wing, Second floor",
+    "staff_id": "1MleS2CdcvhSffXiiYYb"
+  },
+  {
+    "id": "F6Cl37HMdxwfB2evRS9T",
+    "name": "Badminton Court A",
+    "sport_type": "Badminton",
+    "description": "Professional PVC sports flooring with 6 international standard courts. Equipped with shadowless LED lighting.",
+    "usage_guidelines": "Non-marking sports shoes are mandatory. Payment must be confirmed before entry. A typed digital signature is required for the safety waiver.",
+    "capacity": 4,
+    "status": "normal",
+    "start_time": 9,
+    "end_time": 18,
+    "location": "Center Hall, First floor",
+    "staff_id": "EEJMDWyGk8z4BdL8l36i"
+  },
+  {
+    "id": "N9vzrQ4GzQ2lwHCkV2h7",
+    "name": "Grand Slam Tennis Court 1",
+    "sport_type": "Tennis",
+    "description": "Standard hard court with windbreaks and professional net systems. High-visibility ball boy areas provided.",
+    "usage_guidelines": "Maximum of 4 players per court. Please cancel at least 24 hours in advance to receive a full refund. Digital signature accepted for term-time bookings.",
+    "capacity": 4,
+    "status": "normal",
+    "start_time": 7,
+    "end_time": 20,
+    "location": "East Wing Terrace",
+    "staff_id": "FcYJS012Rxjbhb4W2MRF"
+  },
+  {
+    "id": "PzTQl0mLMCUghme2Wtlw",
+    "name": "Evergreen Soccer Pitch",
+    "sport_type": "Soccer",
+    "description": "Full-size 11-a-side outdoor pitch with high-quality synthetic turf and floodlights for night matches.",
+    "usage_guidelines": "Only turf shoes or molded cleats allowed (no metal spikes). Booking is only valid after the 'Payment Received' status is shown in the app.",
+    "capacity": 30,
+    "status": "normal",
+    "start_time": 9,
+    "end_time": 22,
+    "location": "Outdoor Complex, Zone B",
+    "staff_id": "ORF3jHhKNxytQKUMbLZr"
+  },
+  {
+    "id": "qWrCoe9kzOrsIHl0YEM0",
+    "name": "Badminton Court B",
+    "sport_type": "Badminton",
+    "description": "Professional PVC sports flooring with 6 international standard courts. Equipped with shadowless LED lighting.",
+    "usage_guidelines": "Non-marking sports shoes are mandatory. Payment must be confirmed before entry. A typed digital signature is required for the safety waiver.",
+    "capacity": 4,
+    "status": "normal",
+    "start_time": 9,
+    "end_time": 18,
+    "location": "Center Hall, First floor",
+    "staff_id": "PeS2QAr0OpqAYCr2mCrW"
+  },
+  {
+    "id": "w2oQBFvwtUtQoQL4ohaf",
+    "name": "Badminton Court C",
+    "sport_type": "Badminton",
+    "description": "Professional PVC sports flooring with 6 international standard courts. Equipped with shadowless LED lighting.",
+    "usage_guidelines": "Non-marking sports shoes are mandatory. Payment must be confirmed before entry. A typed digital signature is required for the safety waiver.",
+    "capacity": 4,
+    "status": "normal",
+    "start_time": 9,
+    "end_time": 18,
+    "location": "Center Hall, First floor",
+    "staff_id": "0WBUz5ZyYitFkAdSqEcm"
+  }
+]

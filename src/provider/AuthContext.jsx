@@ -1,211 +1,294 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  reload,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
-  sendEmailVerification,
-  onAuthStateChanged,
-} from 'firebase/auth'
+} from "firebase/auth";
+import { auth, googleProvider } from "./FirebaseConfig";
+import {
+  createUserProfile,
+  getRegistrationEligibility,
+  getUserContext,
+  getUserContextOnLogin,
+  normalizeUserContextPayload,
+} from "../services/authService";
 
-import { doc, setDoc, getDoc, serverTimestamp, query } from 'firebase/firestore'
-// 请确保路径指向你的 firebase 配置文件
-import { auth, googleProvider, db } from './FirebaseConfig' 
-import FirestoreFunc from './FirebaseFunc';
-import {FB_SCHEMAS} from './DatabaseScheme'
+const AuthContext = createContext(null);
 
-const AuthContext = createContext(null)
-
-// 自定义 Hook 方便调用
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    throw new Error("useAuth must be used within AuthProvider");
   }
-  return context
+  return context;
+}
+
+async function signInAndLoad(email, password) {
+  const credential = await signInWithEmailAndPassword(auth, email, password);
+  await reload(credential.user);
+  return credential.user;
+}
+
+async function assertEmailAvailableForMemberRegistration(email) {
+  const context = await getRegistrationEligibility(email);
+  if (context.canRegister) {
+    return;
+  }
+
+  if (context.role === "Member") {
+    throw new Error("An account already exists for this email. Please sign in instead.");
+  }
+
+  throw new Error("This email is already used by a staff or admin account.");
+}
+
+function normalizeSessionContext(context = {}) {
+  return normalizeUserContextPayload(context, context.role || "Member");
 }
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null)
-  const [userData, setUserData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [sessionRole, setSessionRole] = useState("Member");
+  const [sessionProfile, setSessionProfile] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [registrationPending, setRegistrationPending] = useState(false);
 
-  // 1. 注册逻辑
-  async function signup(name, email, password, address, date_of_birth) {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-    const user = userCredential.user
+  const resetSession = useCallback(() => {
+    setSessionProfile(null);
+    setSessionRole("Member");
+  }, []);
 
-    memberData = FB_SCHEMAS.DB_MEMBER
-    memberData.name = name;
-    memberData.date_of_birth = date_of_birth;
-    memberData.email = email;
-    memberData.address = address;
+  const clearRegistrationPending = useCallback(() => {
+    setRegistrationPending(false);
+  }, []);
 
-    // 保存用户数据到 Firestore
-    await setDoc(doc(db, 'member', user.uid), {
-      name,
-      email,
-      address,
-      date_of_birth,
-      createdAt: serverTimestamp(), // 使用服务器时间戳更准确
-      cancel_times : 0,
-      no_show_times : 0,
-      profile_ID : "",
-      status : "non_verified"
-    })
-
-    // 发送邮箱验证邮件
-    await sendEmailVerification(user)
-
-    // 注册后强制登出，要求用户先去邮箱验证
-    await signOut(auth)
+  async function beginEmailVerification(email, password) {
+    setAuthLoading(true);
+    try {
+      await assertEmailAvailableForMemberRegistration(email);
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(credential.user);
+      setRegistrationPending(true);
+      return { success: true };
+    } finally {
+      setAuthLoading(false);
+    }
   }
 
-  // 2. 邮箱密码登录逻辑
-  async function login(email, password) {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password)
-    const user = userCredential.user
-
-    // 检查邮箱是否已验证
-    if (!user.emailVerified) {
-      await signOut(auth)
-      throw new Error('请先验证您的邮箱后再登录。请检查您的收件箱。')
-    }
-
-    const { userSnap, isMember } = await findRole(email);
-
-    // NewRegister member : Create profile and change status
-    if(isMember){
-      if(userSnap.status === "non_verified"){
-        userSnap.status = "active";   
-        const {success, id}  = await createProfile(userSnap.id);
-        if(success)
-        {
-          FirestoreFunc.update("member", userSnap.id, { status: "active" , profile_ID: id });     
-        }
-        else{
-          throw new Error('Failed to generation new user profile. Please contact customer service for help');
-        }       
+  async function resendRegistrationVerification(email, password) {
+    setAuthLoading(true);
+    try {
+      let user = auth.currentUser;
+      if (!user || user.email !== email) {
+        await assertEmailAvailableForMemberRegistration(email);
+        user = await signInAndLoad(email, password);
+      } else {
+        await reload(user);
       }
+      if (user.emailVerified) {
+        setRegistrationPending(true);
+        return { success: true, verified: true };
+      }
+      await sendEmailVerification(user);
+      setRegistrationPending(true);
+      return { success: true, verified: false };
+    } finally {
+      setAuthLoading(false);
     }
-    return { userSnap, isMember };
   }
 
-  // 3. Google 登录逻辑
+  async function checkRegistrationVerification(email, password) {
+    setAuthLoading(true);
+    try {
+      let user = auth.currentUser;
+      if (!user || user.email !== email) {
+        user = await signInAndLoad(email, password);
+      } else {
+        await reload(user);
+      }
+      const verified = Boolean(user.emailVerified);
+      setRegistrationPending(true);
+      return { success: true, verified };
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function signup(name, email, password, address, dateOfBirth) {
+    setAuthLoading(true);
+    try {
+      await assertEmailAvailableForMemberRegistration(email);
+      const user = await signInAndLoad(email, password);
+      if (!user.emailVerified) {
+        await signOut(auth);
+        throw new Error("Please verify your email before completing registration.");
+      }
+      await createUserProfile({
+        name,
+        email,
+        password,
+        address,
+        dateOfBirth,
+      });
+      clearRegistrationPending();
+      await signOut(auth);
+      return { success: true };
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  const discardPendingRegistration = useCallback(async () => {
+    if (auth.currentUser) {
+      await signOut(auth);
+    }
+    clearRegistrationPending();
+    resetSession();
+  }, [clearRegistrationPending, resetSession]);
+
+  async function login(email, password, expectedRole = "") {
+    setAuthLoading(true);
+    try {
+      const user = await signInAndLoad(email, password);
+      const context = normalizeSessionContext(
+        await getUserContextOnLogin(email, email.split("@")[0] || "Member"),
+      );
+      if ((context.role === "Member" || !context.isProfileComplete) && !user.emailVerified) {
+        await signOut(auth);
+        throw new Error("Please verify your email before signing in.");
+      }
+      if (!context.isProfileComplete) {
+        await signOut(auth);
+        throw new Error("Please complete your registration details before signing in.");
+      }
+      if (String(context.status || "").toLowerCase() !== "active") {
+        await signOut(auth);
+        throw new Error("This account has been suspended or deactivated by an administrator.");
+      }
+      if (expectedRole && context.role !== expectedRole) {
+        await signOut(auth);
+        throw new Error(`Selected identity does not match this account. Please sign in as ${context.role}.`);
+      }
+      setSessionRole(context.role);
+      setSessionProfile(context.profile);
+      return context;
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
   async function loginWithGoogle() {
-    const userCredential = await signInWithPopup(auth, googleProvider)
-    const user = userCredential.user
-
-    // 检查用户是否已存在于数据库
-    const userDoc = await getDoc(doc(db, 'member', user.uid))
-    const isExistMember = userDoc.exists();
-    if (!isExistMember) {
-      // 新用户 - 初始化用户文档
-      await setDoc(doc(db, 'member', user.uid), {
-        name: user.displayName,
-        email: user.email,
-        address: "",
-        date_of_birth: '',
-        createdAt: serverTimestamp(),
-        cancel_times : 0,
-        no_show_times : 0,
-        profile_ID : "",
-        status : "active"
-      })  
-    }
-    const { userSnap, isMember } = await findRole(user.email);
-    if(!isExistMember)
-    {
-      const { success, id}  = await createProfile(userSnap.id);
-      if(success){
-        FirestoreFunc.update("member", userSnap.id, { profile_ID: id });     
+    setAuthLoading(true);
+    try {
+      const credential = await signInWithPopup(auth, googleProvider);
+      const context = normalizeSessionContext(
+        await getUserContextOnLogin(
+          credential.user.email || "member@example.com",
+          credential.user.displayName || "Google User",
+        ),
+      );
+      if (!context.isProfileComplete) {
+        await signOut(auth);
+        throw new Error("Please complete your registration details before signing in.");
       }
-      else{
-        throw new Error('Failed to generation new user profile. Please contact customer service for help');
+      if (String(context.status || "").toLowerCase() !== "active") {
+        await signOut(auth);
+        throw new Error("This account has been suspended or deactivated by an administrator.");
       }
+      setSessionRole(context.role);
+      setSessionProfile(context.profile);
+      return context;
+    } finally {
+      setAuthLoading(false);
     }
-
-    return { userSnap, isMember };
   }
 
-  // Find out who is the logging person
-  async function findRole(email){
+  const logout = useCallback(async () => {
+    clearRegistrationPending();
+    resetSession();
+    await signOut(auth);
+  }, [clearRegistrationPending, resetSession]);
 
-      // Find
-    const memberSnap = await FirestoreFunc.filterSingle("member", [{ field: "email", operator: "==", value: email }]);
-    const adminStaffSnap = await FirestoreFunc.filterSingle("admin_staff", [{ field: "email", operator: "==", value: email }]);
-
-    let userSnap = null;
-    let isMember = false;
-    if (memberSnap.length > 0){
-      userSnap = memberSnap[0];
-      isMember = true;
-    }
-    else if(adminStaffSnap.length > 0){
-      userSnap = adminStaffSnap[0];
-      isMember = false;
-    }
-    else{   
-    }
-
-    return{userSnap, isMember};
-  }
-
-  // A new member need to create a new profile and linked
-  async function createProfile(member_id)
-   {
-      // Get info structure and set data
-      const profileData = FB_SCHEMAS.DB_PROFILE;
-      profileData.member_id = member_id;
-
-      // Create new doc by FirestoreFunc
-      const {success, id} = await FirestoreFunc.create("profile", profileData);
-
-      return {success, id} ;
-   }
-
-  // 4. 登出逻辑
-  async function logout() {
-    setUserData(null)
-    await signOut(auth)
-  }
-
-  // 5. 监听用户认证状态变化
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user)
-      if (user) {
-        // 如果用户已登录，获取其 Firestore 中的详细数据
-        const userDoc = await getDoc(doc(db, 'users', user.uid))
-        if (userDoc.exists()) {
-          const data = userDoc.data()
-          setUserData(data)
-        }
-      } else {
-        setUserData(null)
+      setCurrentUser(user);
+      if (!user?.email) {
+        clearRegistrationPending();
+        resetSession();
+        setAuthReady(true);
+        return;
       }
-      
-      setLoading(false)
-    })
 
-    return unsubscribe
-  }, [])
+      try {
+        const context = normalizeSessionContext(await getUserContext(user.email, user.displayName || "Member"));
+        const requiresVerifiedEmail = context.role === "Member" || !context.isProfileComplete;
+        if (!context.isProfileComplete) {
+          setRegistrationPending(true);
+          resetSession();
+        } else if (requiresVerifiedEmail && !user.emailVerified) {
+          clearRegistrationPending();
+          resetSession();
+          await signOut(auth);
+          setCurrentUser(null);
+        } else if (String(context.status || "").toLowerCase() !== "active") {
+          clearRegistrationPending();
+          resetSession();
+          await signOut(auth);
+          setCurrentUser(null);
+        } else {
+          clearRegistrationPending();
+          setSessionRole(context.role);
+          setSessionProfile(context.profile);
+        }
+      } catch (error) {
+        console.error("Unable to resolve the signed-in user context:", error);
+        clearRegistrationPending();
+        resetSession();
+      }
+      setAuthReady(true);
+    });
 
-  const value = {
-    currentUser,
-    userData,
-    loading,
-    signup,
-    login,
-    loginWithGoogle,
-    logout,
-  }
+    return unsubscribe;
+  }, [clearRegistrationPending, resetSession]);
 
-  return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
-    </AuthContext.Provider>
-  )
+  const isAuthenticated = Boolean(currentUser && sessionProfile && !registrationPending);
+
+  const value = useMemo(
+    () => ({
+      currentUser,
+      authReady,
+      isAuthenticated,
+      sessionRole,
+      sessionProfile,
+      registrationPending,
+      loading: authLoading,
+      beginEmailVerification,
+      resendRegistrationVerification,
+      checkRegistrationVerification,
+      discardPendingRegistration,
+      signup,
+      login,
+      loginWithGoogle,
+      logout,
+    }),
+    [
+      currentUser,
+      authReady,
+      isAuthenticated,
+      sessionRole,
+      sessionProfile,
+      registrationPending,
+      authLoading,
+      discardPendingRegistration,
+      logout,
+    ],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-export default AuthProvider;
