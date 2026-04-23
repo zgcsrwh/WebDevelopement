@@ -443,6 +443,42 @@ function MatchInfoModal({ item, detail, loading, error, onClose }) {
   );
 }
 
+function StaffNotificationModal({ item, onClose }) {
+  return (
+    <ModalShell
+      title="Staff Notification"
+      description="Review this staff update without leaving the current page."
+      onClose={onClose}
+    >
+      <NotificationSummaryCard item={item}>
+        <strong>{item.message || "Staff update"}</strong>
+        <div className="notification-bell__applicationBox">
+          <span>Message</span>
+          <p>{item.message || "No additional message was provided."}</p>
+        </div>
+        <div className="notification-bell__detailGrid">
+          <div>
+            <span>Received At</span>
+            <strong>{item.createdAt || "Not available"}</strong>
+          </div>
+          {item.referenceId ? (
+            <div>
+              <span>Reference ID</span>
+              <strong>{item.referenceId}</strong>
+            </div>
+          ) : null}
+        </div>
+      </NotificationSummaryCard>
+
+      <div className="notification-bell__modalActions">
+        <button className="btn-secondary" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
 export default function NotificationBell({ variant = "member" }) {
   const { sessionProfile, sessionRole } = useAuth();
   const [notifications, setNotifications] = useState([]);
@@ -459,6 +495,8 @@ export default function NotificationBell({ variant = "member" }) {
   const [matchRespondMessage, setMatchRespondMessage] = useState("");
   const [matchDecisionPending, setMatchDecisionPending] = useState(false);
   const containerRef = useRef(null);
+  const isMemberVariant = variant === "member";
+  const isStaffVariant = variant === "staff";
 
   useEffect(() => {
     let unsubscribeNotifications = () => {};
@@ -487,32 +525,36 @@ export default function NotificationBell({ variant = "member" }) {
       unsubscribeNotifications = unsubscribe;
     });
 
-    subscribeToMatchRequests(
-      sessionProfile,
-      (items) => {
-        if (!cancelled) {
-          setMatchRequests(items);
+    if (sessionRole === "Member" && !isStaffVariant) {
+      subscribeToMatchRequests(
+        sessionProfile,
+        (items) => {
+          if (!cancelled) {
+            setMatchRequests(items);
+          }
+        },
+        () => {
+          if (!cancelled) {
+            setMatchRequests([]);
+          }
+        },
+      ).then((unsubscribe) => {
+        if (cancelled) {
+          unsubscribe();
+          return;
         }
-      },
-      () => {
-        if (!cancelled) {
-          setMatchRequests([]);
-        }
-      },
-    ).then((unsubscribe) => {
-      if (cancelled) {
-        unsubscribe();
-        return;
-      }
-      unsubscribeMatches = unsubscribe;
-    });
+        unsubscribeMatches = unsubscribe;
+      });
+    } else {
+      setMatchRequests([]);
+    }
 
     return () => {
       cancelled = true;
       unsubscribeNotifications();
       unsubscribeMatches();
     };
-  }, [sessionProfile]);
+  }, [sessionProfile, sessionRole, isStaffVariant]);
 
   useEffect(() => {
     if (!panelOpen) {
@@ -582,8 +624,8 @@ export default function NotificationBell({ variant = "member" }) {
   }, [matchRequests, notificationItems, sessionRole, syntheticReadKeys]);
 
   const allItems = useMemo(
-    () => sortByNewest([...notificationItems, ...syntheticMatchItems]),
-    [notificationItems, syntheticMatchItems],
+    () => sortByNewest(isStaffVariant ? notificationItems : [...notificationItems, ...syntheticMatchItems]),
+    [notificationItems, syntheticMatchItems, isStaffVariant],
   );
 
   const unreadCount = useMemo(
@@ -592,6 +634,10 @@ export default function NotificationBell({ variant = "member" }) {
   );
 
   const visibleItems = useMemo(() => {
+    if (isStaffVariant) {
+      return allItems;
+    }
+
     if (activeTab === "all") {
       return allItems;
     }
@@ -601,7 +647,7 @@ export default function NotificationBell({ variant = "member" }) {
     }
 
     return allItems.filter((item) => item.group === activeTab);
-  }, [activeTab, allItems]);
+  }, [activeTab, allItems, isStaffVariant]);
 
   function markSyntheticItemRead(item) {
     if (!item?.syntheticReadKey) {
@@ -740,6 +786,16 @@ export default function NotificationBell({ variant = "member" }) {
     }
   }
 
+  function openStaffNotification(item) {
+    setActiveModal({ kind: "staff-info", item });
+    setModalDetail(null);
+    setModalError("");
+    setModalLoading(false);
+    setMatchRespondMessage("");
+    setMatchDecisionPending(false);
+    void markItemRead(item);
+  }
+
   async function handleMatchDecision(nextStatus) {
     if (!activeModal?.item) {
       return;
@@ -850,6 +906,10 @@ export default function NotificationBell({ variant = "member" }) {
       );
     }
 
+    if (activeModal.kind === "staff-info") {
+      return <StaffNotificationModal item={activeModal.item} onClose={closeModal} />;
+    }
+
     return (
       <MatchInfoModal
         item={activeModal.item}
@@ -860,8 +920,6 @@ export default function NotificationBell({ variant = "member" }) {
       />
     );
   }
-
-  const isMemberVariant = variant === "member";
 
   return (
     <div className={`notification-bell ${isMemberVariant ? "notification-bell--member" : "notification-bell--shell"}`} ref={containerRef}>
@@ -912,26 +970,46 @@ export default function NotificationBell({ variant = "member" }) {
             <div className="notification-bell__panelMessage notification-bell__panelMessage--success">{panelMessage}</div>
           ) : null}
 
-          <div className="notification-bell__tabs">
-            {NOTIFICATION_TABS.map((tab) => (
-              <button
-                key={tab.key}
-                className={`notification-bell__tab ${activeTab === tab.key ? "is-active" : ""}`}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          {!isStaffVariant ? (
+            <div className="notification-bell__tabs">
+              {NOTIFICATION_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  className={`notification-bell__tab ${activeTab === tab.key ? "is-active" : ""}`}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="notification-bell__list">
             {visibleItems.length > 0 ? (
               visibleItems.map((item) => (
-                <article key={item.id} className={`notification-bell__item ${item.isRead ? "" : "is-unread"}`}>
-                  <div className={`notification-bell__icon notification-bell__icon--${item.group}`}>
-                    {getTypeIcon(item.type)}
-                  </div>
+                <article
+                  key={item.id}
+                  className={`notification-bell__item ${item.isRead ? "" : "is-unread"} ${isStaffVariant ? "notification-bell__item--staff" : ""}`}
+                  onClick={isStaffVariant ? () => openStaffNotification(item) : undefined}
+                  role={isStaffVariant ? "button" : undefined}
+                  tabIndex={isStaffVariant ? 0 : undefined}
+                  onKeyDown={
+                    isStaffVariant
+                      ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            openStaffNotification(item);
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  {!isStaffVariant ? (
+                    <div className={`notification-bell__icon notification-bell__icon--${item.group}`}>
+                      {getTypeIcon(item.type)}
+                    </div>
+                  ) : null}
 
                   <div className="notification-bell__content">
                     <div className="notification-bell__meta">
@@ -953,25 +1031,30 @@ export default function NotificationBell({ variant = "member" }) {
                   </div>
 
                   <div className="notification-bell__actions">
-                    {item.group === "booking" ? (
+
+                    {!isStaffVariant && item.group === "booking" ? (
                       <button className="btn-secondary" type="button" onClick={() => openBookingDetails(item)}>
                         View Details
                       </button>
                     ) : null}
 
-                    {item.group === "repair" ? (
+                    {!isStaffVariant && item.group === "repair" ? (
                       <button className="btn-secondary" type="button" onClick={() => openRepairDetails(item)}>
                         View Details
                       </button>
                     ) : null}
 
-                    {item.group === "match" && String(item.statusContext || "").trim().toLowerCase() === "pending" ? (
+                    {!isStaffVariant &&
+                    item.group === "match" &&
+                    String(item.statusContext || "").trim().toLowerCase() === "pending" ? (
                       <button className="btn" type="button" onClick={() => openMatchReview(item)}>
                         Review Request
                       </button>
                     ) : null}
 
-                    {item.group === "match" && String(item.statusContext || "").trim().toLowerCase() !== "pending" ? (
+                    {!isStaffVariant &&
+                    item.group === "match" &&
+                    String(item.statusContext || "").trim().toLowerCase() !== "pending" ? (
                       <button className="btn-secondary" type="button" onClick={() => openMatchInfo(item)}>
                         Open Details
                       </button>
@@ -982,7 +1065,7 @@ export default function NotificationBell({ variant = "member" }) {
             ) : (
               <div className="notification-bell__empty">
                 <ShieldAlert size={18} />
-                <span>No notifications match the selected tab.</span>
+                <span>{isStaffVariant ? "No staff notifications yet." : "No notifications match the selected tab."}</span>
               </div>
             )}
           </div>

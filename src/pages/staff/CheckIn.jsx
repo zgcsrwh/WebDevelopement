@@ -12,45 +12,10 @@ import {
 import { useAuth } from "../../provider/AuthContext";
 import { getErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
+import { formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 
 const ALL_STATUS_VALUE = "all";
 const CHECK_IN_PAGE_STATUSES = new Set(["accepted", "in_progress", "no_show"]);
-
-function toDateInputValue(value = "") {
-  if (!value) {
-    return "";
-  }
-
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-    return value.slice(0, 10);
-  }
-
-  const parsed = new Date(String(value));
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  return parsed.toISOString().slice(0, 10);
-}
-
-function formatStoredDateTime(value = "") {
-  if (!value) {
-    return "";
-  }
-
-  const parsed = new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function formatDateLabel(value = "") {
   if (!value) {
@@ -136,11 +101,11 @@ function getHistoryEntries(item, pageStatus) {
   const entries = [];
 
   if (item.createdAt) {
-    entries.push(`Request submitted on ${formatStoredDateTime(item.createdAt)}`);
+    entries.push(`Request submitted on ${formatStaffDateTime(item.createdAt)}`);
   }
 
   if (item.completedAt) {
-    entries.push(`Staff last updated this booking on ${formatStoredDateTime(item.completedAt)}`);
+    entries.push(`Staff last updated this booking on ${formatStaffDateTime(item.completedAt)}`);
   }
 
   if (pageStatus === "in_progress") {
@@ -189,11 +154,7 @@ export default function CheckIn() {
     () => toDateInputValue(sessionProfile?.created_at || sessionProfile?.createdAt),
     [sessionProfile?.createdAt, sessionProfile?.created_at],
   );
-  const maxFilterDate = useMemo(() => {
-    const next = new Date();
-    next.setDate(next.getDate() + 7);
-    return next.toISOString().slice(0, 10);
-  }, []);
+  const maxFilterDate = useMemo(() => getDateInputMaxValue(0), []);
 
   async function refresh(preferredId = "") {
     try {

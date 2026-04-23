@@ -1,0 +1,339 @@
+.staff-repair-page {
+  display: grid;
+  gap: 22px;
+  overflow-x: hidden;
+}
+
+.staff-repair-page__hero h1 {
+  margin: 0 0 8px;
+  color: #18232c;
+  font-size: clamp(2rem, 3vw, 2.5rem);
+  letter-spacing: -0.03em;
+}
+
+.staff-repair-page__hero p {
+  margin: 0;
+  color: #6b7d88;
+  line-height: 1.55;
+}
+
+.staff-repair-banner,
+.staff-repair-inlineError {
+  padding: 18px 22px;
+  border: 1px solid #dde6ec;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(18, 33, 46, 0.05);
+}
+
+.staff-repair-banner strong,
+.staff-repair-inlineError strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.staff-repair-banner p,
+.staff-repair-inlineError p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.staff-repair-banner--error,
+.staff-repair-inlineError {
+  border-color: #f0beb8;
+  background: #fff1f0;
+  color: #a53d3a;
+}
+
+.staff-repair-banner--success {
+  border-color: #b9e5c1;
+  background: #eefaf0;
+  color: #247244;
+}
+
+.staff-repair-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 24px 26px;
+  border: 1px solid #dde6ec;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(18, 33, 46, 0.05);
+}
+
+.staff-repair-filters__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.staff-repair-filters__field {
+  display: grid;
+  gap: 10px;
+}
+
+.staff-repair-filters__field label {
+  color: #405360;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.staff-repair-filters__field input,
+.staff-repair-filters__field select {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 18px;
+  border: 1px solid #d8e2e8;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #20333f;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.staff-repair-filters__button {
+  min-width: 128px;
+  min-height: 68px;
+  border-radius: 18px;
+}
+
+.staff-repair-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.88fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.staff-repair-list {
+  display: grid;
+  gap: 20px;
+}
+
+.staff-repair-card {
+  padding: 28px 34px;
+  border: 1px solid #dbe4ea;
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(18, 33, 46, 0.05);
+  display: grid;
+  gap: 14px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.staff-repair-card:hover,
+.staff-repair-card.is-active {
+  border-color: #718c9c;
+  box-shadow: 0 16px 32px rgba(18, 33, 46, 0.08);
+}
+
+.staff-repair-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.staff-repair-card__header h3 {
+  margin: 0;
+  color: #18232c;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.staff-repair-card__headerMeta {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+}
+
+.staff-repair-card__ticketId {
+  margin: 0;
+  color: #7a8e9a;
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.staff-repair-card__summary,
+.staff-repair-card__footer {
+  margin: 0;
+}
+
+.staff-repair-card__summary {
+  color: #40545f;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.staff-repair-card__footer {
+  color: #7b8d99;
+  font-size: 0.92rem;
+}
+
+.staff-repair-detail__card,
+.staff-repair-empty {
+  padding: 28px 32px;
+  border: 1px solid #dde6ec;
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(18, 33, 46, 0.05);
+}
+
+.staff-repair-detail__card {
+  display: grid;
+  gap: 20px;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+
+.staff-repair-empty p {
+  margin: 0;
+  color: #718390;
+  line-height: 1.55;
+}
+
+.staff-repair-detail__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e8eef2;
+}
+
+.staff-repair-detail__head h2 {
+  margin: 0 0 8px;
+  color: #18232c;
+  font-size: 1.25rem;
+}
+
+.staff-repair-detail__ticketId {
+  margin: 0;
+  color: #7a8e9a;
+  font-size: 0.98rem;
+}
+
+.staff-repair-detail__section {
+  display: grid;
+  gap: 10px;
+}
+
+.staff-repair-detail__section h3 {
+  margin: 0;
+  color: #70838f;
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.staff-repair-detail__section p {
+  margin: 0;
+  color: #40545f;
+  line-height: 1.7;
+}
+
+.staff-repair-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.staff-repair-detail__grid > div {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #f9fbfc;
+  border: 1px solid #e0e8ee;
+}
+
+.staff-repair-detail__grid span {
+  color: #70838f;
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.staff-repair-detail__grid strong {
+  color: #1a2730;
+  font-size: 0.98rem;
+}
+
+.staff-repair-detail__actions {
+  display: grid;
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.staff-repair-detail__action {
+  min-height: 62px;
+  border-radius: 18px;
+  font-size: 1.02rem;
+}
+
+.staff-repair-detail__readonly {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #f7fafc;
+  border: 1px solid #dbe6ec;
+  color: #607583;
+}
+
+@media (max-width: 1080px) {
+  .staff-repair-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-repair-detail__card {
+    max-height: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .staff-repair-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-repair-filters__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-repair-filters__button {
+    width: 100%;
+    min-height: 56px;
+  }
+}
+
+@media (max-width: 720px) {
+  .staff-repair-detail__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-repair-card,
+  .staff-repair-detail__card,
+  .staff-repair-empty {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .staff-repair-card__header,
+  .staff-repair-detail__head {
+    flex-direction: column;
+  }
+
+  .staff-repair-card__headerMeta {
+    width: 100%;
+    justify-items: start;
+  }
+}

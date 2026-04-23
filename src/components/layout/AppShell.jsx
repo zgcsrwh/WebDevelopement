@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { CalendarRange, ClipboardList, House, LogOut, ShieldCheck, UserRound, Wrench } from "lucide-react";
+import { CalendarRange, ClipboardList, UserRound, Wrench } from "lucide-react";
 import { useAuth } from "../../provider/AuthContext";
 import { getAvatarForActor, subscribeToAvatarChanges } from "../../utils/avatar";
 import { ROUTE_PATHS, getDefaultRouteForRole, getProfileRouteForRole } from "../../constants/routes";
@@ -35,13 +35,21 @@ const navConfig = {
     { to: ROUTE_PATHS.STAFF_REPORTS, label: "Reported Issues", icon: Wrench, matches: [ROUTE_PATHS.STAFF_REPORTS] },
   ],
   Admin: [
-    { to: ROUTE_PATHS.ADMIN_FACILITIES, label: "Facilities", icon: House },
-    { to: ROUTE_PATHS.ADMIN_STAFF, label: "Staff", icon: ShieldCheck },
+    {
+      to: ROUTE_PATHS.ADMIN_FACILITIES,
+      label: "Facility Management",
+      matches: [{ path: ROUTE_PATHS.ADMIN_FACILITIES, exact: true }],
+    },
+    {
+      to: ROUTE_PATHS.ADMIN_STAFF,
+      label: "Staff Management",
+      matches: [{ path: ROUTE_PATHS.ADMIN_STAFF, exact: true }],
+    },
   ],
 };
 
 function AppShell({ children }) {
-  const { sessionRole, sessionProfile, logout } = useAuth();
+  const { sessionRole, sessionProfile } = useAuth();
   const location = useLocation();
   const links = navConfig[sessionRole] || navConfig.Member;
   const profilePath = getProfileRouteForRole(sessionRole);
@@ -51,6 +59,7 @@ function AppShell({ children }) {
   useEffect(() => subscribeToAvatarChanges(() => setAvatarVersion((value) => value + 1)), []);
 
   const profileAvatar = getAvatarForActor(sessionProfile, sessionProfile?.name || "User");
+  const profileInitial = String(sessionProfile?.name || "S").trim().charAt(0).toUpperCase() || "S";
 
   function isLinkActive(link) {
     const matches = Array.isArray(link.matches) && link.matches.length ? link.matches : [link.to];
@@ -71,7 +80,28 @@ function AppShell({ children }) {
     });
   }
 
-  if (sessionRole === "Member" || sessionRole === "Staff") {
+  if (sessionRole === "Member" || sessionRole === "Staff" || sessionRole === "Admin") {
+    const isStaff = sessionRole === "Staff";
+    const isAdmin = sessionRole === "Admin";
+    const usesFixedLetterAvatar = isStaff || isAdmin;
+    const roleBadgeLabel = isStaff ? "Staff" : isAdmin ? "Admin" : "";
+    const avatarLinkClass = isStaff
+      ? "member-shell__profileLink member-shell__profileLink--staff"
+      : isAdmin
+        ? "member-shell__profileLink member-shell__profileLink--admin"
+        : "member-shell__profileLink";
+    const avatarClass = isStaff
+      ? "member-shell__avatar member-shell__avatar--staff"
+      : isAdmin
+        ? "member-shell__avatar member-shell__avatar--admin"
+        : "member-shell__avatar";
+    const avatarInitialClass = isStaff
+      ? "member-shell__avatarInitial member-shell__avatarInitial--staff"
+      : "member-shell__avatarInitial member-shell__avatarInitial--admin";
+    const avatarBadgeClass = isAdmin
+      ? "member-shell__avatarBadge member-shell__avatarBadge--admin"
+      : "member-shell__avatarBadge";
+
     return (
       <div className="member-shell">
         <header className="member-shell__topbar">
@@ -79,7 +109,11 @@ function AppShell({ children }) {
             <Link className="member-shell__brand" to={homePath}>
               Sports Center Booking System
             </Link>
-            {sessionRole === "Staff" ? <span className="member-shell__roleBadge">Staff</span> : null}
+            {roleBadgeLabel ? (
+              <span className={`member-shell__roleBadge ${isAdmin ? "member-shell__roleBadge--admin" : ""}`}>
+                {roleBadgeLabel}
+              </span>
+            ) : null}
           </div>
 
           <nav className="member-shell__nav">
@@ -95,82 +129,37 @@ function AppShell({ children }) {
           </nav>
 
           <div className="member-shell__actions">
-            <NotificationBell variant="member" />
+            {!isAdmin ? <NotificationBell variant={isStaff ? "staff" : "member"} /> : null}
 
-            <Link className="member-shell__profileLink" to={profilePath} aria-label="Open profile">
-              <div className="member-shell__avatar">
-                <img key={avatarVersion} src={profileAvatar} alt={sessionProfile?.name || "User"} />
+            <Link
+              className={avatarLinkClass}
+              to={profilePath}
+              aria-label={
+                isStaff ? "Open staff profile" : isAdmin ? "Open admin profile" : "Open profile"
+              }
+            >
+              <div className={avatarClass}>
+                {usesFixedLetterAvatar ? (
+                  <span className={avatarInitialClass} aria-hidden="true">
+                    {profileInitial}
+                  </span>
+                ) : (
+                  <img key={avatarVersion} src={profileAvatar} alt={sessionProfile?.name || "User"} />
+                )}
               </div>
+              {usesFixedLetterAvatar ? <span className={avatarBadgeClass}>{roleBadgeLabel}</span> : null}
             </Link>
           </div>
         </header>
 
-        <main className={`member-shell__main ${sessionRole === "Staff" ? "member-shell__main--staff" : ""}`}>
+        <main
+          className={`member-shell__main ${isStaff ? "member-shell__main--staff" : ""} ${isAdmin ? "member-shell__main--admin" : ""}`}
+        >
           {children}
         </main>
       </div>
     );
   }
-
-  return (
-    <div className="shell">
-      <aside className="shell__sidebar">
-        <div className="shell__brand">
-          <div className="shell__logo">SC</div>
-          <div>
-            <p className="shell__eyebrow">System</p>
-            <h1>Sports Centre Booking System</h1>
-          </div>
-        </div>
-
-        <nav className="shell__nav">
-          {links.map((link) => {
-            const NavIcon = link.icon;
-            return (
-              <Link
-                key={link.to}
-                to={link.to}
-                className={`shell__link ${location.pathname === link.to ? "is-active" : ""}`}
-              >
-                <NavIcon size={18} />
-                <span>{link.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <button className="shell__logout" onClick={logout} type="button">
-          <LogOut size={18} />
-          <span>Log out</span>
-        </button>
-      </aside>
-
-      <div className="shell__content">
-        <header className="shell__topbar">
-          <div>
-            <p className="shell__eyebrow">Signed in as</p>
-            <h2>{sessionRole}</h2>
-          </div>
-
-          <div className="shell__topbarRight">
-            <NotificationBell variant="shell" />
-
-            <Link className="shell__profile shell__profileLink" to={profilePath}>
-              <div className="shell__avatar">
-                <img key={avatarVersion} src={profileAvatar} alt={sessionProfile?.name || "User"} />
-              </div>
-              <div>
-                <strong>{sessionProfile?.name || "User"}</strong>
-                <p>{sessionProfile?.email || "member@sports.local"}</p>
-              </div>
-            </Link>
-          </div>
-        </header>
-
-        <main className="shell__main">{children}</main>
-      </div>
-    </div>
-  );
 }
 
 export default AppShell;

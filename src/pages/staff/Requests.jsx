@@ -3,7 +3,6 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import "../pageStyles.css";
 import "./Requests.css";
 import {
-  getStaffManagedFacilities,
   getStaffRequestConflictSummary,
   getStaffRequestPageStatus,
   getStaffRequests,
@@ -12,48 +11,13 @@ import {
 import { useAuth } from "../../provider/AuthContext";
 import { getErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
+import { formatStaffCardTimestamp, formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 import { hasMeaningfulText } from "../../utils/text";
 
 const STATUS_DISPLAY_ORDER = ["pending", "accepted", "rejected", "alternative suggested", "cancelled"];
 
 function sortStaffRequests(items = []) {
   return [...items].sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
-}
-
-function toDateInputValue(value = "") {
-  if (!value) {
-    return "";
-  }
-
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-    return value.slice(0, 10);
-  }
-
-  const parsed = new Date(String(value));
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  return parsed.toISOString().slice(0, 10);
-}
-
-function formatStoredDateTime(value = "") {
-  if (!value) {
-    return "";
-  }
-
-  const parsed = new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function toDateLabel(value = "") {
@@ -73,15 +37,15 @@ function toDateLabel(value = "") {
 }
 
 function getCardFooterLabel(item) {
-  return item.completedAt ? formatStoredDateTime(item.completedAt) : "Pending";
+  return formatStaffCardTimestamp(item.createdAt);
 }
 
 function getDetailTimestampLabel(item) {
   if (item.completedAt) {
-    return `Request ID: ${item.id} / Completed ${formatStoredDateTime(item.completedAt)}`;
+    return `Request ID: ${item.id} / Completed ${formatStaffDateTime(item.completedAt)}`;
   }
 
-  return `Request ID: ${item.id} / Submitted ${formatStoredDateTime(item.createdAt)}`;
+  return `Request ID: ${item.id} / Submitted ${formatStaffDateTime(item.createdAt)}`;
 }
 
 function getParticipants(item) {
@@ -102,6 +66,12 @@ function toPageItem(item) {
     ...item,
     pageStatus: getStaffRequestPageStatus(item.status),
   };
+}
+
+function getFacilityOptions(items = []) {
+  return [...new Set(items.map((item) => item.facilityName).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right))
+    .map((facilityName) => ({ id: facilityName, name: facilityName }));
 }
 
 export default function Requests() {
@@ -129,18 +99,14 @@ export default function Requests() {
     () => toDateInputValue(sessionProfile?.created_at || sessionProfile?.createdAt),
     [sessionProfile?.createdAt, sessionProfile?.created_at],
   );
+  const maxFilterDate = useMemo(() => getDateInputMaxValue(7), []);
 
   async function refresh(preferredId = "") {
     setLoading(true);
     try {
-      const [nextRequests, nextFacilities] = await Promise.all([
-        getStaffRequests(sessionProfile),
-        getStaffManagedFacilities(sessionProfile),
-      ]);
-
-      const mappedRequests = sortStaffRequests(nextRequests.map(toPageItem));
+      const mappedRequests = sortStaffRequests((await getStaffRequests(sessionProfile)).map(toPageItem));
       setItems(mappedRequests);
-      setFacilityOptions(nextFacilities);
+      setFacilityOptions(getFacilityOptions(mappedRequests));
 
       setSelectedId((current) => {
         const candidate = preferredId || current;
@@ -161,17 +127,14 @@ export default function Requests() {
 
     async function loadPage() {
       try {
-        const [nextRequests, nextFacilities] = await Promise.all([
-          getStaffRequests(sessionProfile),
-          getStaffManagedFacilities(sessionProfile),
-        ]);
+        const nextRequests = await getStaffRequests(sessionProfile);
         if (cancelled) {
           return;
         }
 
         const mappedRequests = sortStaffRequests(nextRequests.map(toPageItem));
         setItems(mappedRequests);
-        setFacilityOptions(nextFacilities);
+        setFacilityOptions(getFacilityOptions(mappedRequests));
         setSelectedId("");
         setPageError("");
       } catch (loadError) {
@@ -390,7 +353,7 @@ export default function Requests() {
               id="staff-request-date"
               type="date"
               min={staffCreatedDate}
-              max={new Date().toISOString().slice(0, 10)}
+              max={maxFilterDate}
               value={draftDate}
               onChange={(event) => setDraftDate(event.target.value)}
             />

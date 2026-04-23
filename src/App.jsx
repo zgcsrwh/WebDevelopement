@@ -16,20 +16,9 @@ import Requests from "./pages/staff/Requests";
 import CheckIn from "./pages/staff/CheckIn";
 import Repair from "./pages/staff/Repair";
 import StaffProfile from "./pages/staff/StaffProfile";
+import AdminProfile from "./pages/admin/AdminProfile";
 import AdminStaff from "./pages/admin/AdminStaff";
 import AdminFacilities from "./pages/admin/AdminFacilities";
-import PreviewMemberShell from "./pages/preview/PreviewMemberShell";
-import PreviewBookings from "./pages/preview/PreviewBookings";
-import PreviewReports from "./pages/preview/PreviewReports";
-import PreviewPartnerDiscover from "./pages/preview/PreviewPartnerDiscover";
-import PreviewPartnerDetail from "./pages/preview/PreviewPartnerDetail";
-import PreviewProfile from "./pages/preview/PreviewProfile";
-import PreviewBookingNew from "./pages/preview/PreviewBookingNew";
-import PreviewNotificationsBell from "./pages/preview/PreviewNotificationsBell";
-import PreviewStaffShell from "./pages/preview/PreviewStaffShell";
-import PreviewStaffRequests from "./pages/preview/PreviewStaffRequests";
-import PreviewStaffCheckIn from "./pages/preview/PreviewStaffCheckIn";
-import PreviewStaffPlaceholder from "./pages/preview/PreviewStaffPlaceholder";
 import { ROUTE_PATHS, getDefaultRouteForRole } from "./constants/routes";
 
 function ProtectedRoute({ children, allowedRoles }) {
@@ -58,103 +47,12 @@ function ShellRoute({ children, allowedRoles }) {
   );
 }
 
-function PreviewShellRoute({ children, activeSection }) {
-  return <PreviewMemberShell activeSection={activeSection}>{children}</PreviewMemberShell>;
-}
-
-function PreviewStaffShellRoute({ children, activeSection }) {
-  return <PreviewStaffShell activeSection={activeSection}>{children}</PreviewStaffShell>;
-}
-
 function AppRoutes() {
   return (
     <Routes>
       <Route path={ROUTE_PATHS.ROOT} element={<Navigate to={ROUTE_PATHS.LOGIN} replace />} />
       <Route path={ROUTE_PATHS.LOGIN} element={<LoginRegister initialMode="login" />} />
       <Route path={ROUTE_PATHS.REGISTER} element={<LoginRegister initialMode="register" />} />
-      <Route
-        path={ROUTE_PATHS.PREVIEW_BOOKINGS}
-        element={
-          <PreviewShellRoute activeSection="bookings">
-            <PreviewBookings />
-          </PreviewShellRoute>
-        }
-      />
-      <Route
-        path={ROUTE_PATHS.PREVIEW_REPORTS}
-        element={
-          <PreviewShellRoute activeSection="reports">
-            <PreviewReports />
-          </PreviewShellRoute>
-        }
-      />
-      <Route
-        path={ROUTE_PATHS.PREVIEW_PARTNER_DISCOVER}
-        element={
-          <PreviewShellRoute activeSection="partner">
-            <PreviewPartnerDiscover />
-          </PreviewShellRoute>
-        }
-      />
-      <Route
-        path={ROUTE_PATHS.PREVIEW_PARTNER_DETAIL}
-        element={
-          <PreviewShellRoute activeSection="partner">
-            <PreviewPartnerDetail />
-          </PreviewShellRoute>
-        }
-      />
-      <Route
-        path={ROUTE_PATHS.PREVIEW_PROFILE}
-        element={
-          <PreviewShellRoute activeSection="">
-            <PreviewProfile />
-          </PreviewShellRoute>
-        }
-      />
-      <Route
-        path={ROUTE_PATHS.PREVIEW_BOOKING_NEW}
-        element={
-          <PreviewShellRoute activeSection="">
-            <PreviewBookingNew />
-          </PreviewShellRoute>
-        }
-      />
-      <Route
-        path={ROUTE_PATHS.PREVIEW_NOTIFICATIONS_BELL}
-        element={
-          <PreviewShellRoute activeSection="">
-            <PreviewNotificationsBell />
-          </PreviewShellRoute>
-        }
-      />
-      <Route
-        path={ROUTE_PATHS.PREVIEW_STAFF_REQUESTS}
-        element={
-          <PreviewStaffShellRoute activeSection="requests">
-            <PreviewStaffRequests />
-          </PreviewStaffShellRoute>
-        }
-      />
-        <Route
-          path={ROUTE_PATHS.PREVIEW_STAFF_BOOKINGS}
-          element={
-            <PreviewStaffShellRoute activeSection="checkin">
-              <PreviewStaffCheckIn />
-            </PreviewStaffShellRoute>
-          }
-        />
-      <Route
-        path={ROUTE_PATHS.PREVIEW_STAFF_REPORTS}
-        element={
-          <PreviewStaffShellRoute activeSection="reports">
-            <PreviewStaffPlaceholder
-              title="Reported Issues"
-              description="Preview navigation only. The employee reported issues preview will be added later."
-            />
-          </PreviewStaffShellRoute>
-        }
-      />
 
       <Route
         path={ROUTE_PATHS.HOME}
@@ -281,8 +179,16 @@ function AppRoutes() {
       <Route
         path={ROUTE_PATHS.STAFF_PROFILE}
         element={
-          <ShellRoute allowedRoles={["Staff", "Admin"]}>
+          <ShellRoute allowedRoles={["Staff"]}>
             <StaffProfile />
+          </ShellRoute>
+        }
+      />
+      <Route
+        path={ROUTE_PATHS.ADMIN_PROFILE}
+        element={
+          <ShellRoute allowedRoles={["Admin"]}>
+            <AdminProfile />
           </ShellRoute>
         }
       />

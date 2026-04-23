@@ -18,18 +18,9 @@ export const ROUTE_PATHS = {
   STAFF_BOOKINGS: "/staff/bookings",
   STAFF_REPORTS: "/staff/reports",
   STAFF_PROFILE: "/staff/profile",
+  ADMIN_PROFILE: "/admin/profile",
   ADMIN_STAFF: "/admin/staff",
   ADMIN_FACILITIES: "/admin/facilities",
-  PREVIEW_BOOKINGS: "/preview/bookings",
-  PREVIEW_REPORTS: "/preview/reports",
-  PREVIEW_PARTNER_DISCOVER: "/preview/partner-discover",
-  PREVIEW_PARTNER_DETAIL: "/preview/partner-detail",
-  PREVIEW_PROFILE: "/preview/profile",
-  PREVIEW_BOOKING_NEW: "/preview/booking-new",
-  PREVIEW_NOTIFICATIONS_BELL: "/preview/notifications-bell",
-  PREVIEW_STAFF_REQUESTS: "/preview/staff-requests",
-  PREVIEW_STAFF_BOOKINGS: "/preview/staff-checkin",
-  PREVIEW_STAFF_REPORTS: "/preview/staff-reported-issues",
 };
 
 export function getFacilityDetailRoute(id) {
@@ -72,5 +63,13 @@ export function getDefaultRouteForRole(role) {
 }
 
 export function getProfileRouteForRole(role) {
-  return role === "Member" ? ROUTE_PATHS.PROFILE : ROUTE_PATHS.STAFF_PROFILE;
+  if (role === "Admin") {
+    return ROUTE_PATHS.ADMIN_PROFILE;
+  }
+
+  if (role === "Staff") {
+    return ROUTE_PATHS.STAFF_PROFILE;
+  }
+
+  return ROUTE_PATHS.PROFILE;
 }

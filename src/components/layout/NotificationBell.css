@@ -171,6 +171,26 @@
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
 }
 
+.notification-bell__item--staff {
+  cursor: pointer;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "content state"
+    "actions actions";
+}
+
+.notification-bell__item--staff .notification-bell__content strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notification-bell__item--staff .notification-bell__actions {
+  display: none;
+}
+
 .notification-bell__icon {
   grid-area: icon;
   width: 42px;
