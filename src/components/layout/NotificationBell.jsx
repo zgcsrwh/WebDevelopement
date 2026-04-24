@@ -32,16 +32,18 @@ function sortByNewest(items = []) {
 }
 
 function getNotificationGroup(type = "") {
-  if (type === "facility_request") return "booking";
-  if (type === "repair_report") return "repair";
-  if (type === "match_request" || type === "friend") return "match";
+  const value = String(type || "").trim().toLowerCase();
+  if (value === "facility_request") return "booking";
+  if (value === "repair_report") return "repair";
+  if (["match_request", "friend", "match", "matching", "partner_request"].includes(value)) return "match";
   return "all";
 }
 
 function getTypeLabel(type = "") {
-  if (type === "facility_request") return "Booking";
-  if (type === "repair_report") return "Repair";
-  if (type === "match_request" || type === "friend") return "Match";
+  const value = String(type || "").trim().toLowerCase();
+  if (value === "facility_request") return "Booking";
+  if (value === "repair_report") return "Repair";
+  if (["match_request", "friend", "match", "matching", "partner_request"].includes(value)) return "Match";
   return toTitleText(type || "notification");
 }
 
@@ -52,16 +54,17 @@ function getStatusLabel(status = "") {
 
 function getTypeIcon(type = "") {
   const props = { size: 18, strokeWidth: 2.2 };
+  const value = String(type || "").trim().toLowerCase();
 
-  if (type === "facility_request") {
+  if (value === "facility_request") {
     return <CalendarDays {...props} />;
   }
 
-  if (type === "repair_report") {
+  if (value === "repair_report") {
     return <Wrench {...props} />;
   }
 
-  if (type === "match_request" || type === "friend") {
+  if (["match_request", "friend", "match", "matching", "partner_request"].includes(value)) {
     return <Users {...props} />;
   }
 
@@ -706,6 +709,7 @@ export default function NotificationBell({ variant = "member" }) {
   }
 
   function openModal(kind, item) {
+    setPanelOpen(false);
     setActiveModal({ kind, item });
     setModalDetail(null);
     setModalError("");
@@ -787,6 +791,7 @@ export default function NotificationBell({ variant = "member" }) {
   }
 
   function openStaffNotification(item) {
+    setPanelOpen(false);
     setActiveModal({ kind: "staff-info", item });
     setModalDetail(null);
     setModalError("");
@@ -927,16 +932,17 @@ export default function NotificationBell({ variant = "member" }) {
         className={
           isMemberVariant
             ? "member-shell__iconButton notification-bell__trigger"
-            : "shell__notification notification-bell__trigger notification-bell__trigger--shell"
+            : `notification-bell__trigger notification-bell__trigger--shell ${panelOpen ? "is-open" : ""}`
         }
         type="button"
         aria-label="Notifications"
+        aria-pressed={panelOpen}
         onClick={() => {
           setPanelOpen((current) => !current);
           setPanelMessage("");
         }}
       >
-        <Bell size={isMemberVariant ? 24 : 18} />
+        <Bell size={isMemberVariant ? 24 : 28} />
         {unreadCount > 0 ? <span className="notification-bell__badge">{unreadCount}</span> : null}
       </button>
 

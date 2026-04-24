@@ -168,10 +168,10 @@ export default function PartnerDetail() {
                 the matching API.
               </p>
             </div>
-            <div className="member-hero__actions">
-              <Link className="btn-secondary" to={ROUTE_PATHS.PARTNER}>
-                Back to partner profile
-              </Link>
+              <div className="member-hero__actions">
+                <Link className="member-back-link" to={ROUTE_PATHS.PARTNER}>
+                  ← Back to partner profile
+                </Link>
               <Link className="btn-secondary" to={ROUTE_PATHS.PARTNER_DISCOVER}>
                 Browse discover page
               </Link>
@@ -349,9 +349,9 @@ export default function PartnerDetail() {
   if (error && !profile) {
     return (
       <div className="member-workspace">
-        <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
-          Back to Partner Recommendations
-        </Link>
+          <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
+            ← Back to Partner Recommendations
+          </Link>
         <section className="member-alert member-alert--error">
           <strong>Profile unavailable</strong>
           <p>{error}</p>
@@ -370,9 +370,9 @@ export default function PartnerDetail() {
   if (!profile) {
     return (
       <div className="member-workspace">
-        <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
-          Back to Partner Recommendations
-        </Link>
+          <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
+            ← Back to Partner Recommendations
+          </Link>
         <div className="member-empty">
           <p>No active partner profile was found for this request.</p>
         </div>
@@ -382,9 +382,9 @@ export default function PartnerDetail() {
 
   return (
     <div className="member-workspace">
-      <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
-        Back to Partner Recommendations
-      </Link>
+        <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
+          ← Back to Partner Recommendations
+        </Link>
 
       {error ? (
         <section className="member-alert member-alert--error">

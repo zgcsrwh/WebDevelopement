@@ -14,7 +14,14 @@ import { statusTone } from "../../utils/presentation";
 import { formatStaffCardTimestamp, formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 import { hasMeaningfulText } from "../../utils/text";
 
-const STATUS_DISPLAY_ORDER = ["pending", "accepted", "rejected", "alternative suggested", "cancelled"];
+const STATUS_FILTER_OPTIONS = [
+  { value: "no show", label: "no show" },
+  { value: "pending", label: "pending" },
+  { value: "completed", label: "complete" },
+  { value: "in progress", label: "in-progress" },
+  { value: "rejected", label: "rejected" },
+  { value: "alternative suggested", label: "alternative suggested" },
+];
 
 function sortStaffRequests(items = []) {
   return [...items].sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
@@ -156,11 +163,6 @@ export default function Requests() {
       cancelled = true;
     };
   }, [sessionProfile]);
-
-  const statusOptions = useMemo(() => {
-    const availableStatuses = new Set(items.map((item) => item.pageStatus).filter(Boolean));
-    return STATUS_DISPLAY_ORDER.filter((status) => availableStatuses.has(status));
-  }, [items]);
 
   const visibleItems = useMemo(() => {
     return sortStaffRequests(
@@ -383,9 +385,9 @@ export default function Requests() {
               onChange={(event) => setDraftStatus(event.target.value)}
             >
               <option value="">All Status</option>
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status}
+              {STATUS_FILTER_OPTIONS.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
                 </option>
               ))}
             </select>

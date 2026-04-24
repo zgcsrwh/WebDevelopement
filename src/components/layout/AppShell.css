@@ -166,49 +166,48 @@
 }
 
 .member-shell__profileLink--staff {
-  background: linear-gradient(180deg, #eef5f8 0%, #dfeaf0 100%);
-  border: 1px solid #ccd9e1;
-  box-shadow: 0 10px 20px rgba(34, 54, 66, 0.12);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .member-shell__avatar--staff {
-  padding: 4px;
+  padding: 0;
   box-sizing: border-box;
   border-radius: 18px;
-  background: linear-gradient(135deg, #547180, #2f4b59);
+  background: #2f4b59;
 }
 
 .member-shell__avatar--staff img {
-  border-radius: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
 }
 
 .member-shell__avatarInitial--staff {
-  border-radius: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  background: linear-gradient(135deg, #547180, #2f4b59);
+  border-radius: 18px;
+  border: 0;
+  background: #2f4b59;
   color: #ffffff;
   font-size: 1.5rem;
   letter-spacing: 0.02em;
 }
 
 .member-shell__profileLink--admin {
-  background: linear-gradient(180deg, #f3ecfb 0%, #e7dcfa 100%);
-  border: 1px solid #dccbf5;
-  box-shadow: 0 10px 20px rgba(91, 56, 143, 0.14);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .member-shell__avatar--admin {
-  padding: 4px;
+  padding: 0;
   box-sizing: border-box;
   border-radius: 18px;
-  background: linear-gradient(135deg, #9258df, #6030b7);
+  background: #5c31ab;
 }
 
 .member-shell__avatarInitial--admin {
-  border-radius: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.92);
-  background: linear-gradient(135deg, #9258df, #6030b7);
+  border-radius: 18px;
+  border: 0;
+  background: #5c31ab;
   color: #ffffff;
   font-size: 1.5rem;
   letter-spacing: 0.02em;

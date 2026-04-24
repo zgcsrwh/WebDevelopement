@@ -13,7 +13,7 @@ import { getCurrentMatchProfile, getFriendProfiles } from "../../services/partne
 import { ROUTE_PATHS, getFacilityDetailRoute } from "../../constants/routes";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
-import { hasMeaningfulText } from "../../utils/text";
+import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
 
 function parseSlot(slot = "") {
   const parts = String(slot).split(" - ");
@@ -272,6 +272,7 @@ export default function BookingNew() {
     const selectedIds = new Set(form.invitedPartners);
     return friends.filter((friend) => selectedIds.has(friend.id));
   }, [form.invitedPartners, friends]);
+  const descriptionCount = countMeaningfulCharacters(form.activityDescription);
 
   const ruleItems = useMemo(() => {
     const baseRules = ["Booking duration is fixed to 1 hour."];
@@ -287,6 +288,14 @@ export default function BookingNew() {
       [key]: value,
     }));
     setError("");
+  }
+
+  function handleDescriptionChange(nextValue) {
+    if (countMeaningfulCharacters(nextValue) > 100) {
+      return;
+    }
+
+    setFormValue("activityDescription", nextValue);
   }
 
   function handleFriendToggle(friendId) {
@@ -353,6 +362,10 @@ export default function BookingNew() {
       setError("Please enter a short activity description before submitting the booking request.");
       return;
     }
+    if (descriptionCount > 100) {
+      setError("Activity description cannot exceed 100 characters.");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -378,15 +391,15 @@ export default function BookingNew() {
 
   return (
     <div className="booking-new-page">
-      <button
-        className="booking-new__back"
-        type="button"
-        onClick={() =>
-          navigate(requestedFacilityId ? getFacilityDetailRoute(requestedFacilityId) : ROUTE_PATHS.FACILITIES)
-        }
-      >
-        Back to Details
-      </button>
+        <button
+          className="member-back-link booking-new__back"
+          type="button"
+          onClick={() =>
+            navigate(requestedFacilityId ? getFacilityDetailRoute(requestedFacilityId) : ROUTE_PATHS.FACILITIES)
+          }
+        >
+          ← Back to Facility Details
+        </button>
 
       <section className="booking-new__intro">
         <h1>New Booking</h1>
@@ -577,9 +590,12 @@ export default function BookingNew() {
               <textarea
                 id="booking-description"
                 value={form.activityDescription}
-                onChange={(event) => setFormValue("activityDescription", event.target.value)}
+                onChange={(event) => handleDescriptionChange(event.target.value)}
                 placeholder="Briefly describe your activity (e.g. casual match, practicing drills)..."
               />
+              <div className="booking-new__fieldFoot">
+                <span className="booking-new__counter">{descriptionCount}/100</span>
+              </div>
             </div>
           </div>
 

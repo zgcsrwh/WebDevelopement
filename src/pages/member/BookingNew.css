@@ -187,9 +187,31 @@
   transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
+.booking-new__field input,
+.booking-new__field textarea {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
+}
+
 .booking-new__field textarea {
   min-height: 116px;
   resize: vertical;
+}
+
+.booking-new__fieldFoot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 18px;
+}
+
+.booking-new__counter {
+  color: #8a98a3;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .booking-new__field input:focus,

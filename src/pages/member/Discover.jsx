@@ -5,10 +5,7 @@ import "../pageStyles.css";
 import "./memberWorkspace.css";
 import "./Discover.css";
 import { useAuth } from "../../provider/AuthContext";
-import {
-  getPartnerDetailRoute,
-  ROUTE_PATHS,
-} from "../../constants/routes";
+import { ROUTE_PATHS } from "../../constants/routes";
 import { getFacilitySportTypes } from "../../services/bookingService";
 import {
   getCurrentMatchProfile,
@@ -78,6 +75,7 @@ export default function Discover() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [requestTarget, setRequestTarget] = useState(null);
+  const [detailTarget, setDetailTarget] = useState(null);
   const [requestDraft, setRequestDraft] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
 
@@ -195,7 +193,7 @@ export default function Discover() {
 
       <section className="member-card discover-page__filters">
         <div className="discover-page__filtersGrid">
-          <label className="form-field">
+          <label className="form-field discover-page__field">
             <span>Sport</span>
             <select
               value={filters.sport}
@@ -209,7 +207,7 @@ export default function Discover() {
               ))}
             </select>
           </label>
-          <label className="form-field">
+          <label className="form-field discover-page__field">
             <span>Day</span>
             <select
               value={filters.day}
@@ -222,7 +220,7 @@ export default function Discover() {
               ))}
             </select>
           </label>
-          <label className="form-field">
+          <label className="form-field discover-page__field">
             <span>Time</span>
             <select
               value={filters.time}
@@ -307,9 +305,13 @@ export default function Discover() {
                 </div>
 
                 <div className="discover-card__actions">
-                  <Link className="btn btn-secondary" to={getPartnerDetailRoute(profile.id)}>
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => setDetailTarget(profile)}
+                  >
                     View Details
-                  </Link>
+                  </button>
                   <button
                     className="btn btn-primary"
                     type="button"
@@ -344,6 +346,78 @@ export default function Discover() {
         }}
         onConfirm={handleSendRequest}
       />
+
+      {detailTarget ? (
+        <div className="member-modal-overlay" role="presentation" onClick={() => setDetailTarget(null)}>
+          <div
+            className="member-modal discover-detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="discover-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="discover-detail-modal__header">
+              <div className="discover-detail-modal__identity">
+                <img
+                  alt={detailTarget.nickname}
+                  className="discover-detail-modal__avatar"
+                  src={getAvatarForActor(detailTarget)}
+                />
+                <div className="discover-detail-modal__identityText">
+                  <h2 id="discover-detail-title">{detailTarget.nickname}</h2>
+                  <span className="discover-card__status">MATCH READY</span>
+                </div>
+              </div>
+              <button
+                className="discover-detail-modal__close"
+                type="button"
+                aria-label="Close details"
+                onClick={() => setDetailTarget(null)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="discover-detail-modal__section">
+              <p className="member-card__eyebrow">About Me</p>
+              <p>
+                {detailTarget.description ||
+                  detailTarget.selfDescription ||
+                  detailTarget.bio ||
+                  "No self-description provided."}
+              </p>
+            </div>
+
+            <div className="discover-detail-modal__section">
+              <p className="member-card__eyebrow">Sports Interests</p>
+              <div className="discover-detail-modal__chips">
+                {(detailTarget.interests || []).map((interest) => (
+                  <span className="discover-detail-modal__chip" key={`${detailTarget.id}-${interest}`}>
+                    {toTitleText(interest)}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="discover-detail-modal__section">
+              <p className="member-card__eyebrow">Availability</p>
+              <div className="discover-detail-modal__availability">
+                {(detailTarget.availableTime || []).map((entry) => (
+                  <div className="discover-detail-modal__availabilityItem" key={`${detailTarget.id}-${entry}`}>
+                    {parseAvailabilityEntry(entry).label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="member-modal__actions">
+              <button className="btn btn-secondary" type="button" onClick={() => setDetailTarget(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

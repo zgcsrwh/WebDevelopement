@@ -308,14 +308,16 @@
 .member-back-link {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  color: var(--color-primary);
-  font-weight: 700;
+  width: fit-content;
+  color: #7b8b97;
+  font-size: 0.96rem;
+  font-weight: 600;
   text-decoration: none;
 }
 
 .member-back-link:hover {
-  text-decoration: underline;
+  color: #5e798a;
+  text-decoration: none;
 }
 
 .member-avatar-large,
@@ -437,13 +439,15 @@
 
 .member-modal {
   width: min(620px, 100%);
-  background: var(--color-surface);
+  background: #ffffff;
   border: 1px solid var(--color-border);
   border-radius: 26px;
-  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.24);
   padding: 24px 26px;
   display: grid;
   gap: 18px;
+  opacity: 1;
+  backdrop-filter: none;
 }
 
 .member-modal__actions {

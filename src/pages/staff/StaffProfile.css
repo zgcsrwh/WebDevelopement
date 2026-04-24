@@ -39,9 +39,9 @@
 }
 
 .staff-profile__heroAvatarLink--admin {
-  background: linear-gradient(180deg, #f4eefc 0%, #ece3fb 100%);
-  border-color: #dcccf5;
-  box-shadow: 0 14px 28px rgba(93, 58, 148, 0.14);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .staff-profile__heroAvatarFrame {
@@ -55,7 +55,8 @@
 }
 
 .staff-profile__heroAvatarFrame--admin {
-  background: linear-gradient(135deg, #9258df, #6030b7);
+  background: #5c31ab;
+  border: 0;
 }
 
 .staff-profile__heroAvatarInitial {
@@ -71,7 +72,7 @@
 }
 
 .staff-profile__heroAvatarInitial--admin {
-  background: linear-gradient(135deg, #9258df, #6030b7);
+  background: #5c31ab;
 }
 
 .staff-profile__heroAvatarBadge {

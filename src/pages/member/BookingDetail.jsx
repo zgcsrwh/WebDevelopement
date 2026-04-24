@@ -184,9 +184,9 @@ export default function BookingDetail() {
   if (error) {
     return (
       <div className="member-workspace">
-        <Link className="member-back-link" to={ROUTE_PATHS.BOOKINGS}>
-          Back to my bookings
-        </Link>
+          <Link className="member-back-link" to={ROUTE_PATHS.BOOKINGS}>
+            ← Back to my bookings
+          </Link>
         <section className="member-alert member-alert--error">
           <strong>Booking detail unavailable</strong>
           <p>{error}</p>
@@ -198,9 +198,9 @@ export default function BookingDetail() {
   if (!booking) {
     return (
       <div className="member-workspace">
-        <Link className="member-back-link" to={ROUTE_PATHS.BOOKINGS}>
-          Back to my bookings
-        </Link>
+          <Link className="member-back-link" to={ROUTE_PATHS.BOOKINGS}>
+            ← Back to my bookings
+          </Link>
         <div className="member-empty">
           <p>No booking detail could be found for this request.</p>
         </div>
@@ -210,9 +210,9 @@ export default function BookingDetail() {
 
   return (
     <div className="member-workspace booking-detail-page">
-      <Link className="member-back-link" to={ROUTE_PATHS.BOOKINGS}>
-        Back to my bookings
-      </Link>
+        <Link className="member-back-link" to={ROUTE_PATHS.BOOKINGS}>
+          ← Back to my bookings
+        </Link>
 
       <header className="booking-detail-page__header">
         <h1>Booking Details</h1>

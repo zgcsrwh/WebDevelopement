@@ -174,7 +174,7 @@ export default function FacilityDetail() {
     return (
       <div className="facility-detail-page">
         <Link className="facility-detail__back" to={ROUTE_PATHS.FACILITIES}>
-          Back to Facilities
+          ← Back to Facilities
         </Link>
         <section className="member-facilities-feedback member-facilities-feedback--error">
           <h2>Facility details are unavailable</h2>

@@ -199,14 +199,39 @@
   box-sizing: border-box;
   border: 1px solid rgba(203, 214, 223, 0.95);
   border-radius: 0.95rem;
-  background: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbfd 100%);
   color: #1c313c;
+  box-shadow: 0 10px 22px rgba(22, 42, 56, 0.05);
 }
 
 .partner-formField input,
 .partner-formField select {
   min-height: 2.9rem;
+}
+
+.partner-formField input {
   padding: 0.82rem 0.95rem;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
+}
+
+.partner-formField select {
+  padding: 0.82rem 2.85rem 0.82rem 0.95rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #617786 50%),
+    linear-gradient(135deg, #617786 50%, transparent 50%),
+    linear-gradient(180deg, #ffffff 0%, #f7fbfd 100%);
+  background-position:
+    calc(100% - 20px) calc(50% - 3px),
+    calc(100% - 14px) calc(50% - 3px),
+    0 0;
+  background-size: 6px 6px, 6px 6px, 100% 100%;
+  background-repeat: no-repeat;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
 }
 
 .partner-formField textarea {
@@ -214,6 +239,10 @@
   padding: 0.9rem 0.95rem;
   resize: vertical;
   line-height: 1.55;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
 }
 
 .partner-formField__head {
@@ -269,6 +298,33 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
+}
+
+.partner-availabilityControls select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.9rem;
+  padding: 0.82rem 2.85rem 0.82rem 0.95rem;
+  border: 1px solid rgba(203, 214, 223, 0.95);
+  border-radius: 0.95rem;
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #617786 50%),
+    linear-gradient(135deg, #617786 50%, transparent 50%),
+    linear-gradient(180deg, #ffffff 0%, #f7fbfd 100%);
+  background-position:
+    calc(100% - 20px) calc(50% - 3px),
+    calc(100% - 14px) calc(50% - 3px),
+    0 0;
+  background-size: 6px 6px, 6px 6px, 100% 100%;
+  background-repeat: no-repeat;
+  color: #1c313c;
+  font: inherit;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  box-shadow: 0 10px 22px rgba(22, 42, 56, 0.05);
 }
 
 .partner-addOption {

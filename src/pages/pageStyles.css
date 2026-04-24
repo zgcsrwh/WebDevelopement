@@ -225,6 +225,15 @@
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
+.field-grid input,
+.field-grid textarea,
+.filter-grid input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
+}
+
 .field-grid textarea {
   min-height: 130px;
   resize: vertical;
