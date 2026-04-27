@@ -34,4 +34,7 @@ ________________________________________________________________________________
 _______________________________________________________________________________________________________________________________________________
 ## 2026.4.27 Update
 
-  (1) Merge the code from branch into main branch, and deciding this version as V1.0
+  (1) Merge the code from branch into main branch, and deciding this version as V1.0.
+  (2) Adjust the registration process from two steps intp one step.
+  (3) Add the interface of google account sign in / sign up
+  (4) Add description for the slide images. 
