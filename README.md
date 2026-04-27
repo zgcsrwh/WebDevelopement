@@ -13,20 +13,25 @@ The React Compiler is not enabled on this template because of its impact on dev 
 
 ## Run Guidance
 
-环境依赖node 24版本。
+Environment requires node 24。
 
-(1) 本地目录打开SHELL
+(1) Open cmd in directory
 
 (2) npm install
 
 (3) npm run dev 
 
 _______________________________________________________________________________________________________________________________________________
-## 2026.3.30-31 更新
-  (1) src/pages中增加LoginRegister.jsx作为登录首页，App.jsx的导航页修改为LoginRegister
+## 2026.3.30-31 Update
+  (1) Adding LoginRegister.jsx in src/pages as the first page，the route in App.jsx changed as LoginRegister
   
-  (2) 登录页的使用部件新增src/components/LoginRegister中的‘Carousel.jsx’,‘InitFooter.jsx’,‘LoginForm.jsx’,‘RegisterForm.jsx’文件，并添加LoginRegister.moudle.css样式文件
+  (2) Adding src/components/LoginRegister : ‘Carousel.jsx’,‘InitFooter.jsx’,‘LoginForm.jsx’,‘RegisterForm.jsx’文件，and LoginRegister.moudle.css
+
+  (3) Adding src/provider/Authcontextand src/provider/DatabaseScheme files, supplement with FirebaseFunc and README.md
   
-  (3) 新增src/provider/Authcontext和src/provider/DatabaseScheme文件, 补充FirebaseFunc功能以及新增使用说明README.md
-  
-  (4) 数据库生成工具Tools/FirestoreDataManager新增使用说明, 并修复部分问题。
+  (4) Adding a database generation tool in Tools/FirestoreDataManager
+
+_______________________________________________________________________________________________________________________________________________
+## 2026.4.27 Update
+
+  (1) Merge the code from branch into main branch, and deciding this version as V1.0
