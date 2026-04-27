@@ -5,6 +5,7 @@ import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import styles from "./LoginRegister.module.css";
+import googleIcon from '../../images/google_logo.svg';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,7 +16,7 @@ const LoginForm = () => {
   const [role, setRole] = useState("Member");
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const { login, loading } = useAuth();
+  const { login, loginWithGoogle, loading } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -62,6 +63,16 @@ const LoginForm = () => {
         } else {
           setError(message || "Unable to sign in right now.");
         }
+    }
+  };
+
+  const handleGoogle = async () => {
+    try {
+      // 使用 AuthContext 封装好的 Google 登录
+      await loginWithGoogle();
+      navigate('/home');
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -132,6 +143,14 @@ const LoginForm = () => {
           {loading ? "Authenticating..." : "Sign in"}
         </button>
       </form>
+
+      <div className={styles.divider}><span>Or</span></div>
+      
+      <button onClick={handleGoogle} className={styles.externalGoogleBtn} type="button">
+        <img src={googleIcon} width="18" alt="G" />
+        Sign up / in with Google
+      </button>
+
     </div>
   );
 };

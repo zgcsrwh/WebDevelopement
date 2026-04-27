@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Calendar, CheckCircle, Eye, EyeOff, Lock, Mail, MapPin, User } from "lucide-react";
 import styles from "./LoginRegister.module.css";
 import { useAuth } from "../../provider/AuthContext";
@@ -16,34 +16,118 @@ function resolveVerificationError(err, fallbackMessage) {
   if (message.includes("quota-exceeded") || message.includes("too-many-requests")) {
     return "Too many verification attempts. Please wait about a minute and try again.";
   }
-
   if (message.includes("invalid-credential") || message.includes("wrong-password")) {
     return "The password does not match this email address.";
   }
-
   if (message.includes("invalid-email")) {
     return "Invalid email format.";
   }
-
   return fallbackMessage || message || "Unable to complete email verification right now.";
 }
 
+function mapSignupError(err) {
+  const code = getErrorCode(err);
+  const message = err?.message || "";
+  const normalizedMessage = getErrorMessage(err, "Registration failed. Please try again.");
+
+  if (message.includes("already exists for this email")) {
+    return "An account already exists for this email. Please log in.";
+  }
+  if (message.includes("staff or admin account")) {
+    return "This email belongs to a staff or admin account and cannot be used for member registration.";
+  }
+  if (code === "already-exists") {
+    return "This email is already registered. Please log in.";
+  }
+  if (code === "internal" || code === "unavailable" || normalizedMessage.toLowerCase() === "internal") {
+    return "Registration failed. Please try again.";
+  }
+  return normalizedMessage;
+}
+
+function mapVerificationError(err) {
+  const code = getErrorCode(err);
+  const message = err?.message || "";
+  const normalizedMessage = getErrorMessage(err, "Unable to send verification email.");
+
+  if (message.includes("already exists for this email")) {
+    return "An account already exists for this email. Please log in.";
+  }
+  if (message.includes("staff or admin account")) {
+    return "This email belongs to a staff or admin account and cannot be used for member registration.";
+  }
+  if (message.includes("weak-password")) {
+    return "Password must be at least 8 characters with letters and numbers.";
+  }
+  if (code === "internal" || code === "unavailable" || normalizedMessage.toLowerCase() === "internal") {
+    return "Unable to send verification email. Please try again.";
+  }
+  return resolveVerificationError(err, "Unable to send verification email.");
+}
+
+// Reusable input field component
+function FormInput({ label, icon: Icon, type = "text", disabled, ...inputProps }) {
+  return (
+    <div className={styles.inputGroup}>
+      <label>{label}</label>
+      <div className={styles.inputWrapper}>
+        <Icon className={styles.icon} size={14} />
+        <input
+          type={type}
+          className={styles.inputField}
+          disabled={disabled}
+          {...inputProps}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Password input with toggle visibility
+function PasswordInput({ label, icon: Icon, showPassword, onToggle, disabled, ...inputProps }) {
+  return (
+    <div className={styles.inputGroup}>
+      <label>{label}</label>
+      <div className={styles.inputWrapper}>
+        <Icon className={styles.icon} size={14} />
+        <input
+          type={showPassword ? "text" : "password"}
+          className={`${styles.inputField} ${styles.inputFieldWithAction}`}
+          disabled={disabled}
+          {...inputProps}
+        />
+        <button
+          type="button"
+          className={styles.inputActionBtn}
+          onClick={onToggle}
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const RegisterForm = ({ onSwitch }) => {
-  const [name, setUserName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [address, setAddress] = useState("");
-  const [dateOfBirth, setBirthday] = useState("");
-  const [emailStepCompleted, setEmailStepCompleted] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    address: "",
+    dateOfBirth: "",
+  });
   const [verificationSent, setVerificationSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [showPasswords, setShowPasswords] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [sendingVerification, setSendingVerification] = useState(false);
-  const [submittingRegistration, setSubmittingRegistration] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [checkingVerification, setCheckingVerification] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
+  const [hasInitialized, setHasInitialized] = useState(false);
+
   const {
     currentUser,
     registrationPending,
@@ -53,47 +137,59 @@ const RegisterForm = ({ onSwitch }) => {
     discardPendingRegistration,
     signup,
   } = useAuth();
-  const [hasInitialized, setHasInitialized] = useState(false);
 
-  function resetLocalState() {
-    setUserName("");
-    setEmail("");
-    setPassword("");
-    setConfirmPassword("");
-    setAddress("");
-    setBirthday("");
-    setEmailStepCompleted(false);
+  const resetLocalState = useCallback(() => {
+    setFormData({ name: "", email: "", password: "", confirmPassword: "", address: "", dateOfBirth: "" });
     setVerificationSent(false);
+    setEmailVerified(false);
     setShowPasswords(false);
     setError("");
     setSuccess("");
-    setSendingVerification(false);
-    setSubmittingRegistration(false);
+    setSubmitting(false);
     setCheckingVerification(false);
     setResendCountdown(0);
-  }
+  }, []);
 
-  function showError(message) {
+  const showError = useCallback((message) => {
     setError(message);
     setSuccess("");
-  }
+  }, []);
 
-  function showSuccess(message) {
+  const showSuccess = useCallback((message) => {
     setSuccess(message);
     setError("");
-  }
+  }, []);
 
-  function validateEmailStage() {
-    if (!email.trim()) {
-      showError("Please enter your email address first.");
-      return false;
+  const updateField = useCallback((field) => (e) => {
+    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+  }, []);
+
+  const resetVerificationProgress = useCallback(async () => {
+    setVerificationSent(false);
+    setEmailVerified(false);
+    setResendCountdown(0);
+    setSuccess("");
+    setError("");
+    await discardPendingRegistration();
+  }, [discardPendingRegistration]);
+
+  // Reset verification when credentials change
+  const handleCredentialChange = useCallback((field) => async (e) => {
+    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+    if (verificationSent || emailVerified) {
+      await resetVerificationProgress();
     }
-    if (!emailPattern.test(email.trim())) {
+  }, [verificationSent, emailVerified, resetVerificationProgress]);
+
+  function validateForm() {
+    const { email, password, confirmPassword, name, dateOfBirth, address } = formData;
+    
+    if (!email.trim() || !emailPattern.test(email.trim())) {
       showError("Please enter a valid email address.");
       return false;
     }
     if (!password.trim() || !confirmPassword.trim()) {
-      showError("Please enter and confirm your password before email verification.");
+      showError("Please enter and confirm your password.");
       return false;
     }
     if (password !== confirmPassword) {
@@ -101,403 +197,295 @@ const RegisterForm = ({ onSwitch }) => {
       return false;
     }
     if (!isStrongPassword(password)) {
-      showError("Password must be at least 8 characters and include both letters and numbers.");
+      showError("Password must be at least 8 characters with letters and numbers.");
+      return false;
+    }
+    if (!name.trim()) {
+      showError("Please enter your name.");
+      return false;
+    }
+    if (!dateOfBirth) {
+      showError("Please select your date of birth.");
+      return false;
+    }
+    if (!address.trim()) {
+      showError("Please enter your address.");
       return false;
     }
     return true;
   }
 
-  async function resetVerificationProgress() {
-    setVerificationSent(false);
-    setEmailStepCompleted(false);
-    setResendCountdown(0);
-    setSuccess("");
-    setError("");
-    await discardPendingRegistration();
-  }
-
+  // Initialize
   useEffect(() => {
-    if (hasInitialized) {
-      return;
-    }
-
+    if (hasInitialized) return;
     setHasInitialized(true);
     resetLocalState();
-
     if (currentUser || registrationPending) {
       discardPendingRegistration().catch(() => null);
     }
-  }, [currentUser, discardPendingRegistration, hasInitialized, registrationPending]);
+  }, [currentUser, discardPendingRegistration, hasInitialized, registrationPending, resetLocalState]);
 
-  async function handleEmailChange(e) {
-    setEmail(e.target.value);
-    if (verificationSent || emailStepCompleted) {
-      await resetVerificationProgress();
+  // Complete registration helper
+  const completeRegistration = useCallback(async () => {
+    const { name, email, password, address, dateOfBirth } = formData;
+    setSubmitting(true);
+    try {
+      await signup(name, email, password, address, dateOfBirth);
+      showSuccess("Registration successful! Redirecting to login...");
+      resetLocalState();
+      setTimeout(() => onSwitch?.(), 1500);
+    } catch (err) {
+      showError(mapSignupError(err));
+    } finally {
+      setSubmitting(false);
     }
-  }
+  }, [formData, signup, showSuccess, showError, resetLocalState, onSwitch]);
 
-  async function handlePasswordChange(e) {
-    setPassword(e.target.value);
-    if (verificationSent || emailStepCompleted) {
-      await resetVerificationProgress();
-    }
-  }
-
-  async function handleConfirmPasswordChange(e) {
-    setConfirmPassword(e.target.value);
-    if (verificationSent || emailStepCompleted) {
-      await resetVerificationProgress();
-    }
-  }
-
+  // Monitor email verification status
   useEffect(() => {
-    if (!verificationSent || emailStepCompleted || !email.trim() || !password.trim()) {
-      return undefined;
-    }
+    const { email, password } = formData;
+    if (!verificationSent || emailVerified || !email.trim() || !password.trim()) return;
 
     let cancelled = false;
 
-    const checkVerificationOnce = async () => {
+    const checkOnce = async () => {
       try {
         setCheckingVerification(true);
         const response = await checkRegistrationVerification(email, password);
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
         if (response.verified) {
-          setEmailStepCompleted(true);
+          setEmailVerified(true);
           setVerificationSent(false);
           setResendCountdown(0);
-          showSuccess("Email verified.");
+          showSuccess("Email verified! Completing registration...");
+          await completeRegistration();
         }
-      } catch (err) {
-        // This is only a passive status refresh after the cooldown ends.
-        // If the user has not clicked the email verification link yet,
-        // the page should stay quiet instead of showing an error banner.
+      } catch {
+        // Silent polling error
       } finally {
-        if (!cancelled) {
-          setCheckingVerification(false);
-        }
+        if (!cancelled) setCheckingVerification(false);
       }
     };
 
-    checkVerificationOnce();
-
-    const timer = window.setInterval(checkVerificationOnce, 4000);
-    const handleFocus = () => {
-      checkVerificationOnce();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        checkVerificationOnce();
-      }
-    };
+    checkOnce();
+    const timer = setInterval(checkOnce, 4000);
+    const handleFocus = () => checkOnce();
+    const handleVisibility = () => document.visibilityState === "visible" && checkOnce();
 
     window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      clearInterval(timer);
       window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [checkRegistrationVerification, email, emailStepCompleted, password, verificationSent]);
+  }, [checkRegistrationVerification, formData, emailVerified, verificationSent, showSuccess, completeRegistration]);
 
+  // Monitor currentUser verification
   useEffect(() => {
-    if (!currentUser?.emailVerified || emailStepCompleted) {
-      return;
-    }
-
-    setEmailStepCompleted(true);
+    if (!currentUser?.emailVerified || emailVerified) return;
+    setEmailVerified(true);
     setVerificationSent(false);
     setResendCountdown(0);
-    showSuccess("Email verified.");
-  }, [currentUser?.emailVerified, emailStepCompleted]);
+    showSuccess("Email verified! Completing registration...");
+    completeRegistration();
+  }, [currentUser?.emailVerified, emailVerified, showSuccess, completeRegistration]);
 
+  // Resend countdown timer
   useEffect(() => {
-    if (resendCountdown <= 0) {
-      return undefined;
-    }
-
-    const timer = window.setInterval(() => {
-      setResendCountdown((value) => {
-        if (value <= 1) {
-          window.clearInterval(timer);
-          return 0;
-        }
-        return value - 1;
-      });
+    if (resendCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCountdown((v) => (v <= 1 ? 0 : v - 1));
     }, 1000);
-
-    return () => window.clearInterval(timer);
+    return () => clearInterval(timer);
   }, [resendCountdown]);
 
-  function startResendCountdown() {
-    setResendCountdown(60);
-  }
-
-  function togglePasswords() {
-    setShowPasswords((value) => !value);
-  }
-
-  async function handleSendVerification() {
-    if (sendingVerification || emailStepCompleted || resendCountdown > 0) {
-      return;
-    }
-
-    setError("");
-    setSuccess("");
-
-    if (!validateEmailStage()) {
-      return;
-    }
-
-    setSendingVerification(true);
-    try {
-      await beginEmailVerification(email, password);
-      setVerificationSent(true);
-      startResendCountdown();
-      showSuccess("Verification email sent. Please check your inbox.");
-    } catch (err) {
-      const code = getErrorCode(err);
-      const normalizedMessage = getErrorMessage(err, "Unable to send verification email.");
-      if (err?.message?.includes("email-already-in-use")) {
-        try {
-          const response = await resendRegistrationVerification(email, password);
-          if (response.verified) {
-            setEmailStepCompleted(true);
-            setVerificationSent(false);
-            showSuccess("Email verified.");
-          } else {
-            setVerificationSent(true);
-            startResendCountdown();
-            showSuccess("Verification email sent. Please check your inbox.");
-          }
-        } catch (resendError) {
-          showError(resolveVerificationError(resendError, "Unable to resend the verification email."));
-        }
-      } else if (err?.message?.includes("already exists for this email")) {
-        showError("This email already has a completed member account. Please sign in instead.");
-        } else if (err?.message?.includes("staff or admin account")) {
-          showError("This email belongs to a staff or admin account and cannot be used for member registration.");
-        } else if (err?.message?.includes("weak-password")) {
-          showError("Password must be at least 8 characters and include both letters and numbers.");
-        } else if (code === "internal" || code === "unavailable" || normalizedMessage.toLowerCase() === "internal") {
-          showError("Unable to complete email verification right now. Please try again.");
-        } else {
-          showError(resolveVerificationError(err, "Unable to send verification email."));
-        }
-    } finally {
-      setSendingVerification(false);
-    }
-  }
-
-  async function handleRegister(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setSuccess("");
 
-    if (!emailStepCompleted) {
-      showError("Please complete email verification before filling the rest of the form.");
+    if (!validateForm()) return;
+
+    if (emailVerified) {
+      await completeRegistration();
       return;
     }
 
-    if (!name.trim()) {
-      showError("Please enter your full name before completing registration.");
-      return;
-    }
+    const { email, password } = formData;
+    setSubmitting(true);
 
-    if (!dateOfBirth) {
-      showError("Please choose your date of birth before completing registration.");
-      return;
-    }
-
-    if (!address.trim()) {
-      showError("Please enter your address before completing registration.");
-      return;
-    }
-
-    setSubmittingRegistration(true);
     try {
-      await signup(name, email, password, address, dateOfBirth);
-      showSuccess("Registration completed.");
-      resetLocalState();
-      if (onSwitch) {
-        onSwitch();
-      }
+      await beginEmailVerification(email, password);
+      setVerificationSent(true);
+      setResendCountdown(60);
+      showSuccess("Verification email sent. Please check your inbox and click the link. Registration will complete automatically after verification.");
     } catch (err) {
-      const code = getErrorCode(err);
-      const normalizedMessage = getErrorMessage(err, "Registration failed. Please try again.");
-
-      if (err?.message?.includes("already exists for this email")) {
-        showError("This email already has a completed member account. Please sign in instead.");
-        } else if (err?.message?.includes("staff or admin account")) {
-          showError("This email belongs to a staff or admin account and cannot be used for member registration.");
-        } else if (code === "already-exists") {
-          showError("This email address is already registered. Please sign in instead.");
-        } else if (code === "internal" || code === "unavailable" || normalizedMessage.toLowerCase() === "internal") {
-          showError("Registration failed. Please try again.");
-        } else {
-          showError(normalizedMessage);
+      if (err?.message?.includes("email-already-in-use")) {
+        try {
+          const response = await resendRegistrationVerification(email, password);
+          if (response.verified) {
+            setEmailVerified(true);
+            setVerificationSent(false);
+            showSuccess("Email verified! Completing registration...");
+            await completeRegistration();
+          } else {
+            setVerificationSent(true);
+            setResendCountdown(60);
+            showSuccess("Verification email sent. Please check your inbox.");
+          }
+        } catch (resendErr) {
+          showError(resolveVerificationError(resendErr, "Unable to resend verification email."));
         }
+      } else {
+        showError(mapVerificationError(err));
+      }
     } finally {
-      setSubmittingRegistration(false);
+      setSubmitting(false);
     }
   }
+
+  async function handleResendVerification() {
+    if (submitting || resendCountdown > 0) return;
+
+    const { email, password } = formData;
+    setError("");
+    setSuccess("");
+    setSubmitting(true);
+
+    try {
+      const response = await resendRegistrationVerification(email, password);
+      if (response.verified) {
+        setEmailVerified(true);
+        setVerificationSent(false);
+        showSuccess("Email verified! Completing registration...");
+        await completeRegistration();
+      } else {
+        setResendCountdown(60);
+        showSuccess("Verification email resent. Please check your inbox.");
+      }
+    } catch (err) {
+      showError(resolveVerificationError(err, "Unable to resend verification email."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const isDisabled = verificationSent || submitting;
+  const { name, email, password, confirmPassword, address, dateOfBirth } = formData;
 
   return (
     <div className={styles.formBlock}>
       <div className={styles.authHeader}>
-        <h2>Create member account</h2>
+        <h2>Create Member Account</h2>
       </div>
 
       {error && <p className={styles.errorMessage}>{error}</p>}
       {success && <p className={styles.successMessage}>{success}</p>}
 
-      <form onSubmit={handleRegister} className={styles.verticalForm}>
-        <div className={styles.sectionCard}>
-          <div className={styles.sectionHeading}>
-            <span className={styles.stepBadge}>1</span>
-            <div>
-              <h3>Email verification</h3>
-            </div>
-          </div>
+      <form onSubmit={handleSubmit} className={styles.verticalForm}>
+        <FormInput
+          label="Email"
+          icon={Mail}
+          type="email"
+          name="email"
+          placeholder="example@mail.com"
+          value={email}
+          onChange={handleCredentialChange("email")}
+          disabled={isDisabled}
+          required
+        />
 
-          <div className={styles.inputGroup}>
-            <label>Email</label>
-            <div className={styles.inputWrapper}>
-              <Mail className={styles.icon} size={14} />
-              <input
-                name="email"
-                type="email"
-                placeholder="example@mail.com"
-                className={styles.inputField}
-                value={email}
-                onChange={handleEmailChange}
-                required
-              />
-            </div>
-          </div>
+        <PasswordInput
+          label="Password"
+          icon={Lock}
+          name="password"
+          placeholder="At least 8 characters with letters and numbers"
+          value={password}
+          onChange={handleCredentialChange("password")}
+          showPassword={showPasswords}
+          onToggle={() => setShowPasswords((v) => !v)}
+          disabled={isDisabled}
+          required
+        />
 
-          <div className={styles.inputGroup}>
-            <label>Password</label>
-            <div className={styles.inputWrapper}>
-              <Lock className={styles.icon} size={14} />
-              <input
-                name="password"
-                type={showPasswords ? "text" : "password"}
-                placeholder="At least 8 characters, with letters and numbers"
-                className={`${styles.inputField} ${styles.inputFieldWithAction}`}
-                value={password}
-                onChange={handlePasswordChange}
-                required
-              />
-              <button
-                type="button"
-                className={styles.inputActionBtn}
-                onClick={togglePasswords}
-                aria-label={showPasswords ? "Hide password" : "Show password"}
-              >
-                {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
+        <PasswordInput
+          label="Confirm Password"
+          icon={CheckCircle}
+          name="confirmPassword"
+          placeholder="Re-enter password"
+          value={confirmPassword}
+          onChange={handleCredentialChange("confirmPassword")}
+          showPassword={showPasswords}
+          onToggle={() => setShowPasswords((v) => !v)}
+          disabled={isDisabled}
+          required
+        />
 
-          <div className={styles.inputGroup}>
-            <label>Confirm password</label>
-            <div className={styles.inputWrapper}>
-              <CheckCircle className={styles.icon} size={14} />
-              <input
-                name="confirmPassword"
-                type={showPasswords ? "text" : "password"}
-                value={confirmPassword}
-                onChange={handleConfirmPasswordChange}
-                required
-                placeholder="Confirm password"
-                className={styles.inputField}
-              />
-            </div>
-          </div>
+        <FormInput
+          label="Name"
+          icon={User}
+          name="name"
+          placeholder="Your name"
+          value={name}
+          onChange={updateField("name")}
+          disabled={isDisabled}
+          required
+        />
 
-          <div className={styles.actionRow}>
+        <FormInput
+          label="Date of Birth"
+          icon={Calendar}
+          type="date"
+          name="date_of_birth"
+          value={dateOfBirth}
+          onChange={updateField("dateOfBirth")}
+          disabled={isDisabled}
+          required
+        />
+
+        <FormInput
+          label="Address"
+          icon={MapPin}
+          name="address"
+          placeholder="Street, City"
+          value={address}
+          onChange={updateField("address")}
+          disabled={isDisabled}
+          required
+        />
+
+        {!verificationSent ? (
+          <button type="submit" className={styles.submitBtn} disabled={submitting}>
+            {submitting ? "Processing..." : "Register"}
+          </button>
+        ) : (
+          <div className={styles.verificationActions}>
+            <p className={styles.verificationHint}>
+              {checkingVerification
+                ? "Checking verification status..."
+                : "Waiting for email verification. Registration will complete automatically..."}
+            </p>
             <button
               type="button"
               className={styles.submitBtn}
-              onClick={handleSendVerification}
-              disabled={sendingVerification || checkingVerification || emailStepCompleted || resendCountdown > 0}
+              onClick={handleResendVerification}
+              disabled={submitting || resendCountdown > 0}
             >
-              {emailStepCompleted
-                ? "Email verified"
-                : sendingVerification
-                  ? "Sending..."
-                  : resendCountdown > 0
-                    ? `Send verification email (${resendCountdown}s)`
-                    : "Send verification email"}
+              {resendCountdown > 0 ? `Resend Email (${resendCountdown}s)` : "Resend Verification Email"}
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={resetVerificationProgress}
+              disabled={submitting}
+            >
+              Edit Information
             </button>
           </div>
-        </div>
-
-        <div className={`${styles.sectionCard} ${!emailStepCompleted ? styles.sectionLocked : ""}`}>
-          <div className={styles.sectionHeading}>
-            <span className={styles.stepBadge}>2</span>
-            <div>
-              <h3>Member details</h3>
-            </div>
-          </div>
-
-          <div className={styles.inputGroup}>
-            <label>Name</label>
-            <div className={styles.inputWrapper}>
-              <User className={styles.icon} size={14} />
-              <input
-                name="name"
-                placeholder="Your full name"
-                className={styles.inputField}
-                value={name}
-                onChange={(e) => setUserName(e.target.value)}
-                disabled={!emailStepCompleted}
-                required
-              />
-            </div>
-          </div>
-
-          <div className={styles.inputGroup}>
-            <label>Date of birth</label>
-            <div className={styles.inputWrapper}>
-              <Calendar className={styles.icon} size={14} />
-              <input
-                name="date_of_birth"
-                type="date"
-                className={styles.inputField}
-                value={dateOfBirth}
-                onChange={(e) => setBirthday(e.target.value)}
-                disabled={!emailStepCompleted}
-                required
-              />
-            </div>
-          </div>
-
-          <div className={styles.inputGroup}>
-            <label>Address</label>
-            <div className={styles.inputWrapper}>
-              <MapPin className={styles.icon} size={14} />
-              <input
-                name="address"
-                placeholder="Street, City"
-                className={styles.inputField}
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                disabled={!emailStepCompleted}
-                required
-              />
-            </div>
-          </div>
-
-          <button type="submit" className={styles.submitBtn} disabled={submittingRegistration || !emailStepCompleted}>
-            {submittingRegistration ? "Completing registration..." : "Complete member registration"}
-          </button>
-        </div>
+        )}
       </form>
     </div>
   );

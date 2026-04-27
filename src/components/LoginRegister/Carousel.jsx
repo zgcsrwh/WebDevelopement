@@ -6,7 +6,23 @@ import slide2 from "../../images/Slide_2.jpg";
 import slide3 from "../../images/Slide_3.jpg";
 
 const Carousel = () => {
-  const slides = [slide1, slide2, slide3];
+  const slides = [
+    {
+      url: slide1,
+      title: "State-of-the-Art Facilities",
+      desc: "Experience sports like never before with our brand-new equipment and professionally maintained courts designed for peak performance."
+    },
+    {
+      url: slide2,
+      title: "Empowering Local Communities",
+      desc: "The perfect venue for club activities and team bookings. We provide the space; you bring the passion and team spirit."
+    },
+    {
+      url: slide3,
+      title: "Connect Through Sports",
+      desc: "More than just a game. Join a vibrant community, meet fellow enthusiasts, and find your next favorite workout partner."
+    }
+  ];
 
   const [currentSlide, setCurrentSlide] = useState(0);
 
@@ -25,9 +41,10 @@ const Carousel = () => {
 
   return (
     <section className={styles.carouselContainer}>
-      <img src={slides[currentSlide]} className={styles.slideImage} alt="Sports Centre Booking System" />
+      <img src={slides[currentSlide].url} className={styles.slideImage} alt="Sports Centre Booking System" />
 
       <div className={styles.carouselOverlay}>
+        <h1>{slides[currentSlide].title}</h1>
         <div className={styles.indicatorContainer}>
           {slides.map((_, index) => (
             <button

@@ -474,6 +474,50 @@
   color: #94a3b8;
 }
 
+.divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 600px; /* 与卡片宽度一致 */
+  margin: 10px 0;   /* 上下留出一点间距 */
+  color: #9ca3af;   /* 浅灰色文字 */
+  font-size: 14px;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;          /* 自动填满剩余空间 */
+  height: 1px;
+  background-color: #e5e7eb; /* 横线的颜色 */
+}
+
+.divider span {
+  padding: 0 15px;
+  font-weight: 500;
+}
+
+.externalGoogleBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.externalGoogleBtn:hover {
+  background-color: rgba(0, 0, 0, 0.03); /* 极淡的灰色悬停效果 */
+  border-color: #d1d5db;
+}
+
 @media (max-width: 1040px) {
   .pageWrapper {
     height: auto;
