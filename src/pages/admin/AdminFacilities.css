@@ -1,0 +1,462 @@
+.admin-facilities-page {
+  display: grid;
+  gap: 28px;
+}
+
+.admin-facilities-page__hero,
+.admin-facilities-page__tableCard {
+  background: #ffffff;
+  border: 1px solid #e1e8ec;
+  border-radius: 30px;
+  box-shadow: 0 12px 34px rgba(21, 35, 43, 0.06);
+}
+
+.admin-facilities-page__hero {
+  padding: 30px 30px 24px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+}
+
+.admin-facilities-page__hero h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 2.8vw, 3rem);
+  line-height: 1;
+  color: #172231;
+}
+
+.admin-facilities-page__hero p {
+  margin: 0;
+  font-size: 1rem;
+  color: #667989;
+}
+
+.admin-facilities-page__toolbar {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.admin-facilities-page__search {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.admin-facilities-page__search input {
+  width: clamp(210px, 20vw, 300px);
+  min-width: 210px;
+  min-height: 58px;
+  border-radius: 18px;
+  border: 1px solid #d7e0e6;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  padding: 0 18px;
+  color: #203040;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.admin-facilities-page__searchButton,
+.admin-facilities-page__addButton {
+  min-height: 58px;
+  padding-inline: 22px;
+  border-radius: 18px;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.admin-facilities-page__addButton {
+  min-width: 220px;
+}
+
+.admin-facilities-page__tableCard {
+  overflow: hidden;
+}
+
+.admin-facilities-page__tableWrap {
+  overflow-x: auto;
+}
+
+.admin-facilities-page__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-facilities-page__table th,
+.admin-facilities-page__table td {
+  padding: 28px 28px;
+  text-align: left;
+  border-bottom: 1px solid #ecf0f3;
+  vertical-align: middle;
+}
+
+.admin-facilities-page__table thead th {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #647585;
+  background: #ffffff;
+}
+
+.admin-facilities-page__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-facilities-page__nameCell {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #162232;
+}
+
+.admin-facilities-page__staffChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: #edf2f5;
+  border: 1px solid #d8e0e6;
+  color: #647585;
+  font-weight: 700;
+}
+
+.admin-facilities-page__none {
+  color: #778792;
+}
+
+.admin-facilities-page__actions {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.admin-facilities-page__editButton,
+.admin-facilities-page__deleteButton {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-facilities-page__editButton {
+  color: #0e7bc3;
+}
+
+.admin-facilities-page__editButton:hover {
+  color: #0a659f;
+}
+
+.admin-facilities-page__deleteButton {
+  color: #d13b3b;
+}
+
+.admin-facilities-page__deleteButton:hover {
+  color: #b82626;
+}
+
+.admin-facilities-page__editButton:disabled,
+.admin-facilities-page__deleteButton:disabled {
+  color: #9aa7b2;
+  cursor: not-allowed;
+}
+
+.admin-facilities-page__empty {
+  padding: 42px 28px;
+  color: #6d7d88;
+}
+
+.admin-facilities-page__drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 30, 38, 0.38);
+  backdrop-filter: blur(3px);
+  z-index: 40;
+}
+
+.admin-facilities-page__drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(760px, calc(100vw - 28px));
+  background: #ffffff;
+  border-left: 1px solid #dfe6eb;
+  box-shadow: -18px 0 42px rgba(18, 32, 40, 0.14);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-facilities-page__drawerHead,
+.admin-facilities-page__drawerFooter {
+  padding: 28px 32px;
+}
+
+.admin-facilities-page__drawerHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e8edf1;
+}
+
+.admin-facilities-page__drawerHead h2 {
+  margin: 0;
+  color: #172231;
+  font-size: 2.1rem;
+}
+
+.admin-facilities-page__closeButton {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: #95a4ae;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.admin-facilities-page__closeButton:hover {
+  color: #5d6f7b;
+}
+
+.admin-facilities-page__drawerBody {
+  padding: 28px 32px;
+  display: grid;
+  gap: 22px;
+  overflow-y: auto;
+}
+
+.admin-facilities-page__field {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-facilities-page__field label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #4f6372;
+}
+
+.admin-facilities-page__field input,
+.admin-facilities-page__field select,
+.admin-facilities-page__field textarea {
+  min-height: 72px;
+  border-radius: 18px;
+  border: 1px solid #d8e0e6;
+  background: #ffffff;
+  padding: 0 24px;
+  font: inherit;
+  font-size: 1.05rem;
+  color: #172231;
+}
+
+.admin-facilities-page__field textarea {
+  min-height: 140px;
+  padding-block: 20px;
+  resize: vertical;
+}
+
+.admin-facilities-page__fieldError {
+  margin: 0;
+  color: #b64a4a;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.admin-facilities-page__fieldHint {
+  margin: -2px 0 0;
+  color: #7b8d99;
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.admin-facilities-page__timeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.admin-facilities-page__helper {
+  margin: -4px 0 0;
+  color: #5f7484;
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.admin-facilities-page__summaryCard {
+  padding: 20px 22px;
+  border-radius: 22px;
+  border: 1px solid #dde6eb;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+}
+
+.admin-facilities-page__summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.admin-facilities-page__summaryGrid div {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-facilities-page__summaryLabel {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #718492;
+}
+
+.admin-facilities-page__summaryGrid strong {
+  color: #172231;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.admin-facilities-page__drawerFooter {
+  border-top: 1px solid #e8edf1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.admin-facilities-page__drawerFooter .btn,
+.admin-facilities-page__drawerFooter .btn-secondary {
+  min-width: 160px;
+  min-height: 60px;
+  border-radius: 18px;
+}
+
+.admin-facilities-page__confirmCard {
+  width: min(560px, calc(100vw - 32px));
+  background: #ffffff;
+  border-radius: 26px;
+  border: 1px solid #dfe6eb;
+  box-shadow: 0 28px 64px rgba(18, 32, 40, 0.2);
+  padding: 28px 28px 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.admin-facilities-page__confirmCard h2 {
+  margin: 0;
+  color: #172231;
+  font-size: 2rem;
+}
+
+.admin-facilities-page__confirmText,
+.admin-facilities-page__confirmNote {
+  margin: 0;
+  color: #617381;
+  line-height: 1.6;
+}
+
+.admin-facilities-page__confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.admin-facilities-page__confirmActions .btn-secondary,
+.admin-facilities-page__confirmActions .btn-danger {
+  min-width: 160px;
+  min-height: 60px;
+  border-radius: 18px;
+}
+
+.admin-facilities-page .status-pill {
+  text-transform: uppercase;
+}
+
+@media (max-width: 1080px) {
+  .admin-facilities-page__hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-facilities-page__toolbar {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .admin-facilities-page__search {
+    flex: 1 1 100%;
+  }
+
+  .admin-facilities-page__search input,
+  .admin-facilities-page__addButton {
+    width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-facilities-page__hero,
+  .admin-facilities-page__table th,
+  .admin-facilities-page__table td,
+  .admin-facilities-page__drawerHead,
+  .admin-facilities-page__drawerBody,
+  .admin-facilities-page__drawerFooter,
+  .admin-facilities-page__confirmCard {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .admin-facilities-page__search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-facilities-page__search input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-facilities-page__searchButton,
+  .admin-facilities-page__addButton {
+    width: 100%;
+  }
+
+  .admin-facilities-page__timeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-facilities-page__summaryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-facilities-page__table th,
+  .admin-facilities-page__table td {
+    padding-top: 20px;
+    padding-bottom: 20px;
+  }
+
+  .admin-facilities-page__drawer {
+    width: min(100vw, 100%);
+  }
+
+  .admin-facilities-page__drawerFooter,
+  .admin-facilities-page__confirmActions {
+    flex-direction: column-reverse;
+  }
+
+  .admin-facilities-page__drawerFooter .btn,
+  .admin-facilities-page__drawerFooter .btn-secondary,
+  .admin-facilities-page__confirmActions .btn-secondary,
+  .admin-facilities-page__confirmActions .btn-danger {
+    width: 100%;
+  }
+}

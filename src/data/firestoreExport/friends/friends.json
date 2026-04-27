@@ -1,0 +1,44 @@
+[
+  {
+    "id": "fjJBlI8A5Z096xkTrrCW",
+    "member_id": "fjJBlI8A5Z096xkTrrCW",
+    "friends_ids": []
+  },
+  {
+    "id": "hF9X5jdPrPdGTMTD6sz0",
+    "member_id": "hF9X5jdPrPdGTMTD6sz0",
+    "friends_ids": []
+  },
+  {
+    "id": "kzuG4o8s0NTPnQN8Rnta",
+    "member_id": "kzuG4o8s0NTPnQN8Rnta",
+    "friends_ids": [
+      "xrYOwWczhMCTSP0ITYwN"
+    ]
+  },
+  {
+    "id": "mhrkvgidUpidLxD3roBN",
+    "member_id": "mhrkvgidUpidLxD3roBN",
+    "friends_ids": []
+  },
+  {
+    "id": "xrYOwWczhMCTSP0ITYwN",
+    "member_id": "xrYOwWczhMCTSP0ITYwN",
+    "friends_ids": [
+      "y4xKFVcdkPjjpChkH1EA",
+      "kzuG4o8s0NTPnQN8Rnta"
+    ]
+  },
+  {
+    "id": "xvhKfJs35W7n47BKgWiW",
+    "member_id": "xvhKfJs35W7n47BKgWiW",
+    "friends_ids": []
+  },
+  {
+    "id": "y4xKFVcdkPjjpChkH1EA",
+    "member_id": "y4xKFVcdkPjjpChkH1EA",
+    "friends_ids": [
+      "xrYOwWczhMCTSP0ITYwN"
+    ]
+  }
+]

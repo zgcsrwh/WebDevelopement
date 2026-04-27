@@ -1,0 +1,82 @@
+[
+  {
+    "id": "1C1cIxW9BN2DhQqRt9hq",
+    "member_id": "mhrkvgidUpidLxD3roBN",
+    "message": "Great news! The issue you reported has been resolved. Thanks for your patience.",
+    "status_context": "resolved",
+    "type": "repair_report",
+    "created_at": "2026-03-31T09:46:05.321Z"
+  },
+  {
+    "id": "LFHkMoJSl2MuerCW033I",
+    "member_id": "hF9X5jdPrPdGTMTD6sz0",
+    "message": "Your facility request has been uploaded and is waiting to be checked.",
+    "status_context": "pending",
+    "type": "facility_request",
+    "created_at": "2026-03-31T09:46:04.998Z"
+  },
+  {
+    "id": "NOdDgUUxHAivcTSGmXiL",
+    "member_id": "fjJBlI8A5Z096xkTrrCW",
+    "message": "Your repair report is received. Our maintenance team will look into it shortly.",
+    "status_context": "pending",
+    "type": "repair_report",
+    "created_at": "2026-03-31T09:46:05.320Z"
+  },
+  {
+    "id": "VgmsyhjiwkSudBaWnrl4",
+    "member_id": "mhrkvgidUpidLxD3roBN",
+    "message": "Sorry, your facility request has been rejected. Please check the staff response for details.",
+    "status_context": "rejected",
+    "type": "facility_request",
+    "created_at": "2026-03-31T09:46:04.998Z"
+  },
+  {
+    "id": "a7YYSW2a37uSJXYdFxLL",
+    "member_id": "kzuG4o8s0NTPnQN8Rnta",
+    "message": "Your facility request has been accepted.",
+    "status_context": "accepted",
+    "type": "facility_request",
+    "created_at": "2026-03-31T09:46:04.998Z"
+  },
+  {
+    "id": "hD8UhtCmsqG81Bax58Ww",
+    "member_id": "xrYOwWczhMCTSP0ITYwN",
+    "message": "Your facility request has been uploaded and is waiting to be checked.",
+    "status_context": "pending",
+    "type": "facility_request",
+    "created_at": "2026-03-31T09:46:04.998Z"
+  },
+  {
+    "id": "mChIWwkWjClloHhbSgey",
+    "member_id": "xrYOwWczhMCTSP0ITYwN",
+    "message": "Your repair report is received. Our maintenance team will look into it shortly.",
+    "status_context": "pending",
+    "type": "repair_report",
+    "created_at": "2026-03-31T09:46:05.321Z"
+  },
+  {
+    "id": "pBImIkYliSSbOUfdHGty",
+    "member_id": "fjJBlI8A5Z096xkTrrCW",
+    "message": "Your facility request has been accepted.",
+    "status_context": "accepted",
+    "type": "facility_request",
+    "created_at": "2026-03-31T09:46:04.998Z"
+  },
+  {
+    "id": "paim1jukoVzRndolbuzs",
+    "member_id": "kzuG4o8s0NTPnQN8Rnta",
+    "message": "Your repair report is received. Our maintenance team will look into it shortly.",
+    "status_context": "pending",
+    "type": "repair_report",
+    "created_at": "2026-03-31T09:46:05.321Z"
+  },
+  {
+    "id": "xP1J0H1fOEPrUZCECj2S",
+    "member_id": "hF9X5jdPrPdGTMTD6sz0",
+    "message": "Great news! The issue you reported has been resolved. Thanks for your patience.",
+    "status_context": "resolved",
+    "type": "repair_report",
+    "created_at": "2026-03-31T09:46:05.321Z"
+  }
+]

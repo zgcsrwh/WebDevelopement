@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Mail, Shield } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 import { useAuth } from "../../provider/AuthContext";
+import { ROUTE_PATHS } from "../../constants/routes";
+import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import styles from "./LoginRegister.module.css";
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState("Member");
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -21,30 +26,42 @@ const LoginForm = () => {
       return;
     }
 
+    if (!emailPattern.test(email.trim())) {
+      setError("Please enter a valid email address before signing in.");
+      return;
+    }
+
     try {
       const context = await login(email, password, role);
       if (context.role === "Admin") {
-        navigate("/admin/facilities");
+        navigate(ROUTE_PATHS.ADMIN_FACILITIES);
       } else if (context.role === "Staff") {
-        navigate("/staff/requests");
+        navigate(ROUTE_PATHS.STAFF_REQUESTS);
       } else {
-        navigate("/home");
+        navigate(ROUTE_PATHS.FACILITIES);
       }
     } catch (err) {
-      const message = err?.message || "";
-      if (message.includes("invalid-credential") || message.includes("user-not-found") || message.includes("wrong-password")) {
+      const code = getErrorCode(err);
+      const message = getErrorMessage(err, "Unable to sign in right now.");
+      const loweredMessage = message.toLowerCase();
+
+      if (loweredMessage.includes("incorrect") || loweredMessage.includes("invalid email or password")) {
         setError("Invalid email or password.");
-      } else if (message.includes("Please verify your email")) {
-        setError("Please verify your email before signing in.");
-      } else if (message.includes("complete your registration details")) {
-        setError("Please finish the registration profile after email verification.");
-      } else if (message.includes("suspended or deactivated")) {
-        setError("This account has been suspended or deactivated by an administrator.");
-      } else if (message.includes("Selected identity does not match")) {
-        setError(message);
-      } else {
-        setError(message || "Unable to sign in right now.");
-      }
+        } else if (code === "permission-denied") {
+          setError("This account has been suspended. Please contact the administrator.");
+        } else if (message.includes("Please verify your email")) {
+          setError("Please verify your email before signing in.");
+        } else if (message.includes("complete your registration details")) {
+          setError("Please finish the registration profile after email verification.");
+        } else if (message.includes("suspended or deactivated")) {
+          setError("This account has been suspended or deactivated by an administrator.");
+        } else if (message.includes("Selected identity does not match")) {
+          setError(message);
+        } else if (code === "internal" || code === "unavailable" || message.toLowerCase() === "internal") {
+          setError("Login error. Please try again.");
+        } else {
+          setError(message || "Unable to sign in right now.");
+        }
     }
   };
 
@@ -93,13 +110,21 @@ const LoginForm = () => {
           <div className={styles.inputWrapper}>
             <Lock className={styles.icon} size={18} />
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              className={styles.inputField}
+              className={`${styles.inputField} ${styles.inputFieldWithAction}`}
               required
             />
+            <button
+              type="button"
+              className={styles.inputActionBtn}
+              onClick={() => setShowPassword((value) => !value)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
         </div>
 

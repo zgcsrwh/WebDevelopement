@@ -1,7 +1,32 @@
 import { useEffect, useState } from "react";
-import { Calendar, CheckCircle, Lock, Mail, MapPin, User } from "lucide-react";
+import { Calendar, CheckCircle, Eye, EyeOff, Lock, Mail, MapPin, User } from "lucide-react";
 import styles from "./LoginRegister.module.css";
 import { useAuth } from "../../provider/AuthContext";
+import { getErrorCode, getErrorMessage } from "../../utils/errors";
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isStrongPassword(value) {
+  return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(String(value || ""));
+}
+
+function resolveVerificationError(err, fallbackMessage) {
+  const message = String(err?.message || "");
+
+  if (message.includes("quota-exceeded") || message.includes("too-many-requests")) {
+    return "Too many verification attempts. Please wait about a minute and try again.";
+  }
+
+  if (message.includes("invalid-credential") || message.includes("wrong-password")) {
+    return "The password does not match this email address.";
+  }
+
+  if (message.includes("invalid-email")) {
+    return "Invalid email format.";
+  }
+
+  return fallbackMessage || message || "Unable to complete email verification right now.";
+}
 
 const RegisterForm = ({ onSwitch }) => {
   const [name, setUserName] = useState("");
@@ -12,63 +37,116 @@ const RegisterForm = ({ onSwitch }) => {
   const [dateOfBirth, setBirthday] = useState("");
   const [emailStepCompleted, setEmailStepCompleted] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [sendingVerification, setSendingVerification] = useState(false);
   const [submittingRegistration, setSubmittingRegistration] = useState(false);
   const [checkingVerification, setCheckingVerification] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
   const {
+    currentUser,
+    registrationPending,
     beginEmailVerification,
     resendRegistrationVerification,
     checkRegistrationVerification,
+    discardPendingRegistration,
     signup,
   } = useAuth();
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  function resetLocalState() {
+    setUserName("");
+    setEmail("");
+    setPassword("");
+    setConfirmPassword("");
+    setAddress("");
+    setBirthday("");
+    setEmailStepCompleted(false);
+    setVerificationSent(false);
+    setShowPasswords(false);
+    setError("");
+    setSuccess("");
+    setSendingVerification(false);
+    setSubmittingRegistration(false);
+    setCheckingVerification(false);
+    setResendCountdown(0);
+  }
+
+  function showError(message) {
+    setError(message);
+    setSuccess("");
+  }
+
+  function showSuccess(message) {
+    setSuccess(message);
+    setError("");
+  }
 
   function validateEmailStage() {
     if (!email.trim()) {
-      setError("Please enter your email address first.");
+      showError("Please enter your email address first.");
+      return false;
+    }
+    if (!emailPattern.test(email.trim())) {
+      showError("Please enter a valid email address.");
       return false;
     }
     if (!password.trim() || !confirmPassword.trim()) {
-      setError("Please enter and confirm your password before email verification.");
+      showError("Please enter and confirm your password before email verification.");
       return false;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      showError("Passwords do not match.");
       return false;
     }
-    if (password.length < 6) {
-      setError("Password should be at least 6 characters.");
+    if (!isStrongPassword(password)) {
+      showError("Password must be at least 8 characters and include both letters and numbers.");
       return false;
     }
     return true;
   }
 
-  function resetVerificationProgress() {
+  async function resetVerificationProgress() {
     setVerificationSent(false);
     setEmailStepCompleted(false);
+    setResendCountdown(0);
     setSuccess("");
     setError("");
+    await discardPendingRegistration();
   }
 
-  function handleEmailChange(e) {
+  useEffect(() => {
+    if (hasInitialized) {
+      return;
+    }
+
+    setHasInitialized(true);
+    resetLocalState();
+
+    if (currentUser || registrationPending) {
+      discardPendingRegistration().catch(() => null);
+    }
+  }, [currentUser, discardPendingRegistration, hasInitialized, registrationPending]);
+
+  async function handleEmailChange(e) {
     setEmail(e.target.value);
     if (verificationSent || emailStepCompleted) {
-      resetVerificationProgress();
+      await resetVerificationProgress();
     }
   }
 
-  function handlePasswordChange(e) {
+  async function handlePasswordChange(e) {
     setPassword(e.target.value);
     if (verificationSent || emailStepCompleted) {
-      resetVerificationProgress();
+      await resetVerificationProgress();
     }
   }
 
-  function handleConfirmPasswordChange(e) {
+  async function handleConfirmPasswordChange(e) {
     setConfirmPassword(e.target.value);
     if (verificationSent || emailStepCompleted) {
-      resetVerificationProgress();
+      await resetVerificationProgress();
     }
   }
 
@@ -79,7 +157,7 @@ const RegisterForm = ({ onSwitch }) => {
 
     let cancelled = false;
 
-    const pollVerification = async () => {
+    const checkVerificationOnce = async () => {
       try {
         setCheckingVerification(true);
         const response = await checkRegistrationVerification(email, password);
@@ -89,13 +167,13 @@ const RegisterForm = ({ onSwitch }) => {
         if (response.verified) {
           setEmailStepCompleted(true);
           setVerificationSent(false);
-          setSuccess("Email verified.");
-          setError("");
+          setResendCountdown(0);
+          showSuccess("Email verified.");
         }
       } catch (err) {
-        if (!cancelled && err?.message && !err.message.includes("verify your email")) {
-          setError(err.message);
-        }
+        // This is only a passive status refresh after the cooldown ends.
+        // If the user has not clicked the email verification link yet,
+        // the page should stay quiet instead of showing an error banner.
       } finally {
         if (!cancelled) {
           setCheckingVerification(false);
@@ -103,16 +181,71 @@ const RegisterForm = ({ onSwitch }) => {
       }
     };
 
-    pollVerification();
-    const timer = setInterval(pollVerification, 4000);
+    checkVerificationOnce();
+
+    const timer = window.setInterval(checkVerificationOnce, 4000);
+    const handleFocus = () => {
+      checkVerificationOnce();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkVerificationOnce();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      window.clearInterval(timer);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [checkRegistrationVerification, email, emailStepCompleted, password, verificationSent]);
 
+  useEffect(() => {
+    if (!currentUser?.emailVerified || emailStepCompleted) {
+      return;
+    }
+
+    setEmailStepCompleted(true);
+    setVerificationSent(false);
+    setResendCountdown(0);
+    showSuccess("Email verified.");
+  }, [currentUser?.emailVerified, emailStepCompleted]);
+
+  useEffect(() => {
+    if (resendCountdown <= 0) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      setResendCountdown((value) => {
+        if (value <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+        return value - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendCountdown]);
+
+  function startResendCountdown() {
+    setResendCountdown(60);
+  }
+
+  function togglePasswords() {
+    setShowPasswords((value) => !value);
+  }
+
   async function handleSendVerification() {
+    if (sendingVerification || emailStepCompleted || resendCountdown > 0) {
+      return;
+    }
+
     setError("");
     setSuccess("");
 
@@ -124,51 +257,37 @@ const RegisterForm = ({ onSwitch }) => {
     try {
       await beginEmailVerification(email, password);
       setVerificationSent(true);
-      setSuccess("Verification email sent.");
+      startResendCountdown();
+      showSuccess("Verification email sent. Please check your inbox.");
     } catch (err) {
+      const code = getErrorCode(err);
+      const normalizedMessage = getErrorMessage(err, "Unable to send verification email.");
       if (err?.message?.includes("email-already-in-use")) {
-        const response = await resendRegistrationVerification(email, password);
-        if (response.verified) {
-          setEmailStepCompleted(true);
-          setVerificationSent(false);
-          setSuccess("Email verified.");
-        } else {
-          setVerificationSent(true);
-          setSuccess("Verification email sent.");
+        try {
+          const response = await resendRegistrationVerification(email, password);
+          if (response.verified) {
+            setEmailStepCompleted(true);
+            setVerificationSent(false);
+            showSuccess("Email verified.");
+          } else {
+            setVerificationSent(true);
+            startResendCountdown();
+            showSuccess("Verification email sent. Please check your inbox.");
+          }
+        } catch (resendError) {
+          showError(resolveVerificationError(resendError, "Unable to resend the verification email."));
         }
-      } else if (err?.message?.includes("invalid-email")) {
-        setError("Invalid email format.");
-      } else if (err?.message?.includes("weak-password")) {
-        setError("Weak password.");
-      } else {
-        setError(err?.message || "Unable to send verification email.");
-      }
-    } finally {
-      setSendingVerification(false);
-    }
-  }
-
-  async function handleResendVerification() {
-    setError("");
-    setSuccess("");
-
-    if (!validateEmailStage()) {
-      return;
-    }
-
-    setSendingVerification(true);
-    try {
-      const response = await resendRegistrationVerification(email, password);
-      if (response.verified) {
-        setEmailStepCompleted(true);
-        setVerificationSent(false);
-        setSuccess("Email verified.");
-      } else {
-        setVerificationSent(true);
-        setSuccess("Verification email sent.");
-      }
-    } catch (err) {
-      setError(err?.message || "Unable to resend the verification email.");
+      } else if (err?.message?.includes("already exists for this email")) {
+        showError("This email already has a completed member account. Please sign in instead.");
+        } else if (err?.message?.includes("staff or admin account")) {
+          showError("This email belongs to a staff or admin account and cannot be used for member registration.");
+        } else if (err?.message?.includes("weak-password")) {
+          showError("Password must be at least 8 characters and include both letters and numbers.");
+        } else if (code === "internal" || code === "unavailable" || normalizedMessage.toLowerCase() === "internal") {
+          showError("Unable to complete email verification right now. Please try again.");
+        } else {
+          showError(resolveVerificationError(err, "Unable to send verification email."));
+        }
     } finally {
       setSendingVerification(false);
     }
@@ -180,24 +299,48 @@ const RegisterForm = ({ onSwitch }) => {
     setSuccess("");
 
     if (!emailStepCompleted) {
-      setError("Please complete email verification before filling the rest of the form.");
+      showError("Please complete email verification before filling the rest of the form.");
       return;
     }
 
-    if (!name.trim() || !address.trim() || !dateOfBirth) {
-      setError("Please complete all remaining profile fields.");
+    if (!name.trim()) {
+      showError("Please enter your full name before completing registration.");
+      return;
+    }
+
+    if (!dateOfBirth) {
+      showError("Please choose your date of birth before completing registration.");
+      return;
+    }
+
+    if (!address.trim()) {
+      showError("Please enter your address before completing registration.");
       return;
     }
 
     setSubmittingRegistration(true);
     try {
       await signup(name, email, password, address, dateOfBirth);
-      setSuccess("Registration completed.");
+      showSuccess("Registration completed.");
+      resetLocalState();
       if (onSwitch) {
         onSwitch();
       }
     } catch (err) {
-      setError(err?.message || "Registration failed. Please try again.");
+      const code = getErrorCode(err);
+      const normalizedMessage = getErrorMessage(err, "Registration failed. Please try again.");
+
+      if (err?.message?.includes("already exists for this email")) {
+        showError("This email already has a completed member account. Please sign in instead.");
+        } else if (err?.message?.includes("staff or admin account")) {
+          showError("This email belongs to a staff or admin account and cannot be used for member registration.");
+        } else if (code === "already-exists") {
+          showError("This email address is already registered. Please sign in instead.");
+        } else if (code === "internal" || code === "unavailable" || normalizedMessage.toLowerCase() === "internal") {
+          showError("Registration failed. Please try again.");
+        } else {
+          showError(normalizedMessage);
+        }
     } finally {
       setSubmittingRegistration(false);
     }
@@ -243,13 +386,21 @@ const RegisterForm = ({ onSwitch }) => {
               <Lock className={styles.icon} size={14} />
               <input
                 name="password"
-                type="password"
-                placeholder="At least 6 characters"
-                className={styles.inputField}
+                type={showPasswords ? "text" : "password"}
+                placeholder="At least 8 characters, with letters and numbers"
+                className={`${styles.inputField} ${styles.inputFieldWithAction}`}
                 value={password}
                 onChange={handlePasswordChange}
                 required
               />
+              <button
+                type="button"
+                className={styles.inputActionBtn}
+                onClick={togglePasswords}
+                aria-label={showPasswords ? "Hide password" : "Show password"}
+              >
+                {showPasswords ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
@@ -259,11 +410,11 @@ const RegisterForm = ({ onSwitch }) => {
               <CheckCircle className={styles.icon} size={14} />
               <input
                 name="confirmPassword"
-                type="password"
+                type={showPasswords ? "text" : "password"}
                 value={confirmPassword}
                 onChange={handleConfirmPasswordChange}
                 required
-                placeholder="Re-enter password"
+                placeholder="Confirm password"
                 className={styles.inputField}
               />
             </div>
@@ -274,23 +425,15 @@ const RegisterForm = ({ onSwitch }) => {
               type="button"
               className={styles.submitBtn}
               onClick={handleSendVerification}
-              disabled={sendingVerification || emailStepCompleted}
+              disabled={sendingVerification || checkingVerification || emailStepCompleted || resendCountdown > 0}
             >
               {emailStepCompleted
                 ? "Email verified"
                 : sendingVerification
                   ? "Sending..."
-                  : checkingVerification && verificationSent
-                    ? "Checking verification..."
+                  : resendCountdown > 0
+                    ? `Send verification email (${resendCountdown}s)`
                     : "Send verification email"}
-            </button>
-            <button
-              type="button"
-              className={styles.ghostBtn}
-              onClick={handleResendVerification}
-              disabled={sendingVerification || !verificationSent || emailStepCompleted}
-            >
-              Resend email
             </button>
           </div>
         </div>
@@ -299,7 +442,7 @@ const RegisterForm = ({ onSwitch }) => {
           <div className={styles.sectionHeading}>
             <span className={styles.stepBadge}>2</span>
             <div>
-              <h3>Member profile details</h3>
+              <h3>Member details</h3>
             </div>
           </div>
 

@@ -6,6 +6,7 @@ import { getRepairTickets } from "../../services/reportService";
 import { getNotifications } from "../../services/notificationService";
 import { getMatchRequests } from "../../services/partnerService";
 import { useAuth } from "../../provider/AuthContext";
+import { ROUTE_PATHS } from "../../constants/routes";
 
 export default function Home() {
   const { sessionProfile } = useAuth();
@@ -23,9 +24,9 @@ export default function Home() {
 
   const stats = useMemo(() => {
     return {
-      upcoming: bookings.filter((item) => ["accepted", "in_progress"].includes(item.status)).length,
+      upcoming: bookings.filter((item) => item.status === "upcoming").length,
       pending: bookings.filter((item) => item.status === "pending").length,
-      repairs: reports.filter((item) => item.status === "pending").length,
+      repairs: reports.filter((item) => !["resolved", "terminated"].includes(item.status)).length,
       matches: matchRequests.filter((item) => item.status === "pending").length,
     };
   }, [bookings, reports, matchRequests]);
@@ -40,8 +41,8 @@ export default function Home() {
           </p>
         </div>
         <div className="hero-actions">
-          <Link className="btn" to="/facilities">Browse facilities</Link>
-          <Link className="btn-secondary" to="/bookings">View my bookings</Link>
+          <Link className="btn" to={ROUTE_PATHS.FACILITIES}>Browse facilities</Link>
+          <Link className="btn-secondary" to={ROUTE_PATHS.BOOKINGS}>View my bookings</Link>
         </div>
       </section>
 
@@ -80,9 +81,9 @@ export default function Home() {
         <article className="page-panel">
           <h2>Quick links</h2>
           <div className="card-list">
-            <Link className="mini-card" to="/reports">Submit a repair report</Link>
-            <Link className="mini-card" to="/partner">Update partner profile</Link>
-            <Link className="mini-card" to="/profile">Edit personal information</Link>
+            <Link className="mini-card" to={ROUTE_PATHS.REPORTS}>Submit a repair report</Link>
+            <Link className="mini-card" to={ROUTE_PATHS.PARTNER}>Update partner profile</Link>
+            <Link className="mini-card" to={ROUTE_PATHS.PROFILE}>Edit personal information</Link>
           </div>
         </article>
       </section>

@@ -1,354 +1,449 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Search, X } from "lucide-react";
 import "../pageStyles.css";
-import {
-  buildStaffEmailPreview,
-  createStaffAccount,
-  disableStaffAccount,
-  getAdminStaff,
-  updateStaffAccount,
-} from "../../services/adminService";
+import "../workspaceStyles.css";
+import "./AdminStaff.css";
+import { createStaffAccount, disableStaffAccount, getAdminStaff } from "../../services/adminService";
 import { useAuth } from "../../provider/AuthContext";
-import { getErrorMessage } from "../../utils/errors";
-import { formatRole, statusTone } from "../../utils/presentation";
+import { getErrorCode, getErrorMessage } from "../../utils/errors";
+import { statusTone } from "../../utils/presentation";
 
-function getEmptyForm() {
+const DEFAULT_PASSWORD = "Staff1234";
+
+function getEmptyCreateForm() {
   return {
-    staff_id: "",
     name: "",
-    date_of_birth: "1998-01-01",
-    address: "",
     email: "",
-    password: "",
+    date_of_birth: "",
+    address: "",
+    password: DEFAULT_PASSWORD,
   };
 }
 
 function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
 function isValidPassword(value) {
-  return value.length >= 8;
+  return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(String(value || ""));
+}
+
+function formatJoinedDate(value) {
+  if (!value) {
+    return "Not available";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function getManagedFacilityNames(item) {
+  if (!item?.managedFacilityCount) {
+    return [];
+  }
+
+  return String(item.managedFacility || "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+function getCreateErrorMessage(error) {
+  const code = getErrorCode(error);
+  if (code === "already-exists") {
+    return "This email address is already registered.";
+  }
+  return getErrorMessage(error, "Unable to create this staff account.");
+}
+
+function getDeactivateErrorMessage(error) {
+  const code = getErrorCode(error);
+  if (code === "not-found") {
+    return "The selected staff account could not be found.";
+  }
+  if (code === "failed-precondition") {
+    return "This staff member still manages facilities. Please transfer those facilities before deactivating.";
+  }
+  return getErrorMessage(error, "Unable to deactivate this staff account.");
 }
 
 export default function AdminStaff() {
   const { sessionProfile } = useAuth();
   const [items, setItems] = useState([]);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [filters, setFilters] = useState({
-    role: "All",
-    search: "",
-    status: "All",
-  });
-  const [form, setForm] = useState(getEmptyForm());
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState("");
+  const [pageMessage, setPageMessage] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState(getEmptyCreateForm());
+  const [createErrors, setCreateErrors] = useState({});
+  const [createError, setCreateError] = useState("");
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [deactivateError, setDeactivateError] = useState("");
+  const [deactivateSubmitting, setDeactivateSubmitting] = useState(false);
 
-  const refresh = async () => {
-    try {
-      setItems(await getAdminStaff(sessionProfile));
-    } catch (loadError) {
-      setError(getErrorMessage(loadError, "Unable to load staff accounts."));
+  async function refreshStaff({ showLoader = false } = {}) {
+    if (showLoader) {
+      setLoading(true);
     }
-  };
+
+    try {
+      const nextItems = await getAdminStaff(sessionProfile);
+      setItems(nextItems.filter((item) => String(item.role || "").toLowerCase() === "staff"));
+      setPageError("");
+    } catch (loadError) {
+      setPageError(getErrorMessage(loadError, "Unable to load staff accounts."));
+    } finally {
+      if (showLoader) {
+        setLoading(false);
+      }
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadPage() {
-      try {
-        const nextItems = await getAdminStaff(sessionProfile);
-        if (!cancelled) {
-          setItems(nextItems);
-        }
-      } catch (loadError) {
-        if (!cancelled) {
-          setError(getErrorMessage(loadError, "Unable to load staff accounts."));
-        }
-      }
-    }
-
-    loadPage();
-    return () => {
-      cancelled = true;
-    };
+    refreshStaff({ showLoader: true });
   }, [sessionProfile]);
 
-  const filteredItems = items.filter((item) => {
-    const roleMatch = filters.role === "All" || formatRole(item.role) === filters.role;
-    const statusMatch = filters.status === "All" || item.status === filters.status;
-    const searchMatch =
-      !filters.search ||
-      item.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-      item.email.toLowerCase().includes(filters.search.toLowerCase()) ||
-      item.managedFacility.toLowerCase().includes(filters.search.toLowerCase());
-    return roleMatch && statusMatch && searchMatch;
-  });
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = appliedSearch.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return items;
+    }
 
-  function loadForEdit(item) {
-    setError("");
-    setMessage("");
-    setForm({
-      staff_id: item.id,
-      name: item.name || "",
-      date_of_birth: item.dateOfBirth || "1998-01-01",
-      address: item.address || "",
-      email: item.email || "",
-      password: "",
-    });
+    return items.filter((item) => String(item.name || "").toLowerCase().includes(normalizedQuery));
+  }, [appliedSearch, items]);
+
+  function applySearch() {
+    setAppliedSearch(searchInput.trim());
   }
 
-  async function handleSave() {
-    setError("");
-    setMessage("");
+  function openCreateModal() {
+    setCreateForm(getEmptyCreateForm());
+    setCreateErrors({});
+    setCreateError("");
+    setCreateOpen(true);
+  }
 
-    if (!form.name.trim()) {
-      setError("Please complete the staff member's name before saving.");
+  function closeCreateModal() {
+    setCreateOpen(false);
+    setCreateForm(getEmptyCreateForm());
+    setCreateErrors({});
+    setCreateError("");
+  }
+
+  function openDeactivateModal(item) {
+    setDeactivateTarget(item);
+    setDeactivateError("");
+  }
+
+  function closeDeactivateModal() {
+    if (deactivateSubmitting) {
+      return;
+    }
+    setDeactivateTarget(null);
+    setDeactivateError("");
+  }
+
+  function validateCreateForm() {
+    const nextErrors = {};
+
+    if (!createForm.name.trim()) {
+      nextErrors.name = "Full name is required.";
+    }
+
+    if (!createForm.email.trim()) {
+      nextErrors.email = "Email address is required.";
+    } else if (!isValidEmail(createForm.email)) {
+      nextErrors.email = "Please enter a valid email address.";
+    }
+
+    if (!createForm.date_of_birth) {
+      nextErrors.date_of_birth = "Date of birth is required.";
+    }
+
+    if (!createForm.address.trim()) {
+      nextErrors.address = "Address is required.";
+    }
+
+    if (!isValidPassword(createForm.password)) {
+      nextErrors.password = "Temporary password must contain at least 8 characters and include both letters and numbers.";
+    }
+
+    return nextErrors;
+  }
+
+  async function handleCreateSubmit() {
+    setCreateError("");
+    setPageError("");
+    setPageMessage("");
+
+    const nextErrors = validateCreateForm();
+    setCreateErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
       return;
     }
 
+    setCreateSubmitting(true);
     try {
-      if (form.staff_id) {
-        await updateStaffAccount(form, sessionProfile);
-        setMessage(`Staff profile updated for ${form.email}.`);
-      } else {
-        if (!form.email.trim() || !form.password.trim()) {
-          setError("Please complete name, email, and initial password before creating the employee account.");
-          return;
-        }
-
-        if (!isValidEmail(form.email)) {
-          setError("Please enter a valid employee email address.");
-          return;
-        }
-
-        if (!isValidPassword(form.password)) {
-          setError("Initial password must contain at least 8 characters.");
-          return;
-        }
-
-        await createStaffAccount(form, sessionProfile);
-        setMessage(`Staff account created for ${form.email}. ${buildStaffEmailPreview({ name: form.name, email: form.email })}`);
-      }
-
-      await refresh();
-      setForm(getEmptyForm());
-    } catch (saveError) {
-      setError(getErrorMessage(saveError, form.staff_id ? "Unable to update this staff account." : "Unable to create this staff account."));
+      await createStaffAccount(
+        {
+          ...createForm,
+          password: DEFAULT_PASSWORD,
+        },
+        sessionProfile,
+      );
+      closeCreateModal();
+      setPageMessage("Staff account created successfully.");
+      await refreshStaff();
+    } catch (error) {
+      setCreateError(getCreateErrorMessage(error));
+    } finally {
+      setCreateSubmitting(false);
     }
   }
 
-  async function handleDeactivate(item) {
-    if (!window.confirm(`Deactivate ${item.name}? Any facilities still assigned to this staff member will be moved off shelf until a replacement is assigned.`)) {
+  async function handleDeactivateConfirm() {
+    if (!deactivateTarget) {
       return;
     }
 
-    setError("");
-    setMessage("");
+    setDeactivateError("");
+    setPageError("");
+    setPageMessage("");
+    setDeactivateSubmitting(true);
 
     try {
-      await disableStaffAccount(item.id, sessionProfile);
-      await refresh();
-      setMessage(`${item.name} has been deactivated and their assigned facilities were taken off shelf if needed.`);
-    } catch (deactivateError) {
-      setError(getErrorMessage(deactivateError, "Unable to deactivate this staff account."));
+      await disableStaffAccount(deactivateTarget.id, sessionProfile);
+      setDeactivateTarget(null);
+      setPageMessage("Staff account deactivated successfully.");
+      await refreshStaff();
+    } catch (error) {
+      setDeactivateError(getDeactivateErrorMessage(error));
+    } finally {
+      setDeactivateSubmitting(false);
     }
   }
 
   return (
-    <div className="page-stack">
-      <section className="page-hero">
+    <div className="admin-staff-page">
+      <section className="admin-staff-page__hero">
         <div>
-          <h1>Staff management</h1>
-          <p>Create employee accounts, inspect managed facilities, and deactivate staff while automatically handling affected facilities.</p>
+          <h1>Staff Management</h1>
+          <p>Create new staff accounts and manage existing personnel.</p>
         </div>
-      </section>
 
-      {error && (
-        <section className="page-panel">
-          <p className="errorMessage">{error}</p>
-        </section>
-      )}
-      {message && (
-        <section className="page-panel">
-          <p className="successMessage">{message}</p>
-        </section>
-      )}
-
-      <section className="stats-grid">
-        <article className="stat-card">
-          <span className="soft-text">Total admin and staff records</span>
-          <strong>{items.length}</strong>
-        </article>
-        <article className="stat-card">
-          <span className="soft-text">Active staff members</span>
-          <strong>{items.filter((item) => item.role?.toLowerCase() === "staff" && item.status === "active").length}</strong>
-        </article>
-        <article className="stat-card">
-          <span className="soft-text">Admin accounts</span>
-          <strong>{items.filter((item) => item.role?.toLowerCase() === "admin").length}</strong>
-        </article>
-      </section>
-
-      <section className="split-layout">
-        <article className="form-card">
-          <h2>{form.staff_id ? "Edit staff account" : "Create staff account"}</h2>
-          <p className="soft-text">
-            Public registration only creates member accounts. Staff accounts are created here and can log in immediately with the generated credentials.
-          </p>
-
-          <div className="field-grid" style={{ marginTop: 18 }}>
-            <div className="field-span">
-              <label>Employee name</label>
-              <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
-            </div>
-            <div>
-              <label>Date of birth</label>
-              <input
-                type="date"
-                value={form.date_of_birth}
-                onChange={(event) => setForm((prev) => ({ ...prev, date_of_birth: event.target.value }))}
-              />
-            </div>
-            <div>
-              <label>Employee email</label>
-              <input
-                type="email"
-                value={form.email}
-                disabled={Boolean(form.staff_id)}
-                onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-              />
-            </div>
-            <div className="field-span">
-              <label>Address</label>
-              <input value={form.address} onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))} />
-            </div>
-            {!form.staff_id && (
-              <div className="field-span">
-                <label>Initial password</label>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                />
-              </div>
-            )}
-            <div className="field-span">
-              <div className="helper-box">
-                <p className="soft-text">
-                  {form.staff_id
-                    ? "Email is fixed to keep the login credential aligned with Firebase Auth. You can still update the name, date of birth, and address here."
-                    : "Once the account is created, the staff member can sign in directly using this email and password."}
-                </p>
-              </div>
-            </div>
-            <div className="field-span form-actions">
-              <button className="btn" type="button" onClick={handleSave}>
-                {form.staff_id ? "Save changes" : "Create account"}
-              </button>
-              <button className="btn-secondary" type="button" onClick={() => setForm(getEmptyForm())}>
-                {form.staff_id ? "Cancel edit" : "Clear form"}
-              </button>
-            </div>
-          </div>
-        </article>
-
-        <article className="detail-card">
-          <h2>Admin notes</h2>
-          <ul className="card-list" style={{ marginTop: 18 }}>
-            <li className="mini-card">Role is fixed by the admin workflow. Public registration never creates staff or admin identities.</li>
-            <li className="mini-card">Deactivating a staff member automatically removes them from active facilities.</li>
-            <li className="mini-card">Facilities without staff are moved off shelf until another staff member is assigned.</li>
-          </ul>
-        </article>
-      </section>
-
-      <section className="table-card">
-        <h2>Filters</h2>
-        <div className="filter-grid" style={{ marginTop: 16, marginBottom: 22 }}>
-          <div>
-            <label>Role</label>
-            <select value={filters.role} onChange={(event) => setFilters((prev) => ({ ...prev, role: event.target.value }))}>
-              <option value="All">All</option>
-              <option value="Staff">Staff</option>
-              <option value="Admin">Admin</option>
-            </select>
-          </div>
-          <div>
-            <label>Status</label>
-            <select value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}>
-              <option value="All">All</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          <div>
-            <label>Search</label>
+        <div className="admin-staff-page__toolbar">
+          <div className="admin-staff-page__search">
             <input
-              value={filters.search}
-              onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
-              placeholder="Search by staff member, email, or managed facility"
+              type="text"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  applySearch();
+                }
+              }}
+              placeholder="Search staff name..."
+              aria-label="Search staff name"
             />
+            <button className="btn-secondary admin-staff-page__searchButton" type="button" onClick={applySearch}>
+              <Search size={18} aria-hidden="true" />
+              <span>Search</span>
+            </button>
           </div>
-        </div>
 
-        <h2>Team members</h2>
-        <table style={{ marginTop: 18 }}>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Joined</th>
-              <th>Managed facilities</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  <strong>{item.name}</strong>
-                  <div className="soft-text" style={{ marginTop: 6 }}>
-                    {item.address || "Address not available"}
-                  </div>
-                </td>
-                <td>{item.email}</td>
-                <td>{item.roleLabel || formatRole(item.role)}</td>
-                <td>
-                  <span className={`status-pill ${statusTone(item.status)}`}>{item.statusLabel || item.status}</span>
-                </td>
-                <td>{item.joinedDate || "Not available"}</td>
-                <td>
-                  {item.managedFacility}
-                  {item.managedFacilityCount > 0 && (
-                    <div className="soft-text" style={{ marginTop: 6 }}>
-                      {item.managedFacilityCount} facility record(s)
-                    </div>
-                  )}
-                </td>
-                <td>
-                  <div className="inline-actions">
-                    <button className="btn-secondary" type="button" onClick={() => loadForEdit(item)}>
-                      Edit
-                    </button>
-                    {item.role?.toLowerCase() === "staff" && (
-                      <button className="btn-danger" type="button" onClick={() => handleDeactivate(item)}>
-                        Deactivate
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          <button className="btn admin-staff-page__addButton" type="button" onClick={openCreateModal}>
+            <Plus size={18} aria-hidden="true" />
+            <span>Add New Staff</span>
+          </button>
+        </div>
       </section>
 
-      {filteredItems.length === 0 && !error && (
-        <section className="page-panel">
-          <p>No staff accounts match the current filters.</p>
+      {pageError ? (
+        <section className="workspace-surface">
+          <p className="errorMessage">{pageError}</p>
         </section>
-      )}
+      ) : null}
+
+      {pageMessage ? (
+        <section className="workspace-surface">
+          <p className="successMessage">{pageMessage}</p>
+        </section>
+      ) : null}
+
+      <section className="admin-staff-page__tableCard">
+        {loading ? (
+          <div className="admin-staff-page__empty">Loading staff accounts...</div>
+        ) : filteredItems.length === 0 ? (
+          <div className="admin-staff-page__empty">No staff accounts match the current search.</div>
+        ) : (
+          <div className="admin-staff-page__tableWrap">
+            <table className="admin-staff-page__table">
+              <thead>
+                <tr>
+                  <th>Staff Name</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Managed Facilities</th>
+                  <th>Joined Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.map((item) => {
+                  const managedFacilities = getManagedFacilityNames(item);
+                  const isDeactivated = String(item.status || "").toLowerCase() === "deactivate";
+
+                  return (
+                    <tr key={item.id}>
+                      <td className="admin-staff-page__nameCell">{item.name || "Unknown staff"}</td>
+                      <td>{item.email || "Not available"}</td>
+                      <td>
+                        <span className={`status-pill ${statusTone(item.status)}`}>{item.status || "unknown"}</span>
+                      </td>
+                      <td>
+                        {managedFacilities.length ? (
+                          <div className="admin-staff-page__facilityList">
+                            {managedFacilities.map((facilityName) => (
+                              <span key={`${item.id}-${facilityName}`} className="admin-staff-page__facilityChip">
+                                {facilityName}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="admin-staff-page__none">None</span>
+                        )}
+                      </td>
+                      <td>{formatJoinedDate(item.joinedDate)}</td>
+                      <td>
+                        {isDeactivated ? (
+                          <span className="admin-staff-page__disabledAction">Deactivated</span>
+                        ) : (
+                          <button className="admin-staff-page__deactivateButton" type="button" onClick={() => openDeactivateModal(item)}>
+                            Deactivate
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {createOpen ? (
+        <div className="workspace-modal-overlay">
+          <div className="admin-staff-page__modalCard">
+            <div className="admin-staff-page__modalHead">
+              <div>
+                <h2>Create Staff Account</h2>
+              </div>
+              <button className="admin-staff-page__closeButton" type="button" onClick={closeCreateModal} aria-label="Close create staff account dialog">
+                <X size={28} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="admin-staff-page__modalBody">
+              {createError ? <p className="errorMessage">{createError}</p> : null}
+
+              <div className="admin-staff-page__field">
+                <label htmlFor="staff-name">Full Name</label>
+                <input
+                  id="staff-name"
+                  type="text"
+                  value={createForm.name}
+                  onChange={(event) => setCreateForm((prev) => ({ ...prev, name: event.target.value }))}
+                  placeholder="Enter staff full name"
+                />
+                {createErrors.name ? <p className="admin-staff-page__fieldError">{createErrors.name}</p> : null}
+              </div>
+
+              <div className="admin-staff-page__field">
+                <label htmlFor="staff-email">Email Address</label>
+                <input
+                  id="staff-email"
+                  type="email"
+                  value={createForm.email}
+                  onChange={(event) => setCreateForm((prev) => ({ ...prev, email: event.target.value }))}
+                  placeholder="e.g., staff@sportscenter.com"
+                />
+                {createErrors.email ? <p className="admin-staff-page__fieldError">{createErrors.email}</p> : null}
+              </div>
+
+              <div className="admin-staff-page__field">
+                <label htmlFor="staff-dob">Date of Birth</label>
+                <input
+                  id="staff-dob"
+                  type="date"
+                  value={createForm.date_of_birth}
+                  onChange={(event) => setCreateForm((prev) => ({ ...prev, date_of_birth: event.target.value }))}
+                />
+                {createErrors.date_of_birth ? <p className="admin-staff-page__fieldError">{createErrors.date_of_birth}</p> : null}
+              </div>
+
+              <div className="admin-staff-page__field">
+                <label htmlFor="staff-address">Address</label>
+                <input
+                  id="staff-address"
+                  type="text"
+                  value={createForm.address}
+                  onChange={(event) => setCreateForm((prev) => ({ ...prev, address: event.target.value }))}
+                  placeholder="Enter address"
+                />
+                {createErrors.address ? <p className="admin-staff-page__fieldError">{createErrors.address}</p> : null}
+              </div>
+
+              <div className="admin-staff-page__field">
+                <label htmlFor="staff-password">Temporary Password</label>
+                <input id="staff-password" type="text" value={DEFAULT_PASSWORD} readOnly />
+                {createErrors.password ? <p className="admin-staff-page__fieldError">{createErrors.password}</p> : null}
+              </div>
+            </div>
+
+            <div className="admin-staff-page__modalFooter">
+              <button className="btn-secondary" type="button" disabled={createSubmitting} onClick={closeCreateModal}>
+                Cancel
+              </button>
+              <button className="btn" type="button" disabled={createSubmitting} onClick={handleCreateSubmit}>
+                {createSubmitting ? "Creating..." : "Create Account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deactivateTarget ? (
+        <div className="workspace-modal-overlay">
+          <div className="admin-staff-page__confirmCard">
+            <h2>Deactivate Staff Account</h2>
+            <p className="admin-staff-page__confirmText">
+              Are you sure you want to deactivate <strong>{deactivateTarget.name}</strong>?
+            </p>
+            {deactivateError ? <p className="errorMessage">{deactivateError}</p> : null}
+            <div className="admin-staff-page__modalFooter admin-staff-page__modalFooter--confirm">
+              <button className="btn-secondary" type="button" disabled={deactivateSubmitting} onClick={closeDeactivateModal}>
+                Cancel
+              </button>
+              <button className="btn-danger" type="button" disabled={deactivateSubmitting} onClick={handleDeactivateConfirm}>
+                {deactivateSubmitting ? "Confirming..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

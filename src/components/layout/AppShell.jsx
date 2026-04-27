@@ -1,135 +1,165 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Bell, CalendarRange, ClipboardList, House, LogOut, ShieldCheck, UserRound, Wrench } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { CalendarRange, ClipboardList, UserRound, Wrench } from "lucide-react";
 import { useAuth } from "../../provider/AuthContext";
-import { subscribeToNotifications } from "../../services/notificationService";
+import { getAvatarForActor, subscribeToAvatarChanges } from "../../utils/avatar";
+import { ROUTE_PATHS, getDefaultRouteForRole, getProfileRouteForRole } from "../../constants/routes";
+import NotificationBell from "./NotificationBell";
 import "./AppShell.css";
 
 const navConfig = {
   Member: [
-    { to: "/home", label: "Overview", icon: House },
-    { to: "/facilities", label: "Facilities", icon: CalendarRange },
-    { to: "/bookings", label: "My Bookings", icon: ClipboardList },
-    { to: "/reports", label: "Reports", icon: Wrench },
-    { to: "/partner", label: "Partner", icon: UserRound },
-    { to: "/profile", label: "Profile", icon: ShieldCheck },
+    {
+      to: ROUTE_PATHS.FACILITIES,
+      label: "Facilities",
+      icon: CalendarRange,
+      matches: [{ path: ROUTE_PATHS.FACILITIES, exact: true }],
+    },
+    {
+      to: ROUTE_PATHS.BOOKINGS,
+      label: "My bookings",
+      icon: ClipboardList,
+      matches: [{ path: ROUTE_PATHS.BOOKINGS, exact: true }],
+    },
+    { to: ROUTE_PATHS.REPORTS, label: "Reports", icon: Wrench, matches: [ROUTE_PATHS.REPORTS] },
+    { to: ROUTE_PATHS.PARTNER, label: "Partner", icon: UserRound, matches: [ROUTE_PATHS.PARTNER] },
   ],
   Staff: [
-    { to: "/staff/requests", label: "Requests", icon: ClipboardList },
-    { to: "/staff/bookings", label: "Check-in", icon: CalendarRange },
-    { to: "/staff/reports", label: "Reports", icon: Wrench },
-    { to: "/staff/profile", label: "Profile", icon: UserRound },
+    {
+      to: ROUTE_PATHS.STAFF_REQUESTS,
+      label: "Booking Requests",
+      icon: ClipboardList,
+      matches: [{ path: ROUTE_PATHS.STAFF_REQUESTS, exact: true }],
+    },
+    { to: ROUTE_PATHS.STAFF_BOOKINGS, label: "Check-in", icon: CalendarRange, matches: [ROUTE_PATHS.STAFF_BOOKINGS] },
+    { to: ROUTE_PATHS.STAFF_REPORTS, label: "Reported Issues", icon: Wrench, matches: [ROUTE_PATHS.STAFF_REPORTS] },
   ],
   Admin: [
-    { to: "/admin/facilities", label: "Facilities", icon: House },
-    { to: "/admin/staff", label: "Staff", icon: ShieldCheck },
+    {
+      to: ROUTE_PATHS.ADMIN_FACILITIES,
+      label: "Facility Management",
+      matches: [{ path: ROUTE_PATHS.ADMIN_FACILITIES, exact: true }],
+    },
+    {
+      to: ROUTE_PATHS.ADMIN_STAFF,
+      label: "Staff Management",
+      matches: [{ path: ROUTE_PATHS.ADMIN_STAFF, exact: true }],
+    },
   ],
 };
 
 function AppShell({ children }) {
-  const { sessionRole, sessionProfile, logout } = useAuth();
+  const { sessionRole, sessionProfile } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const links = navConfig[sessionRole] || navConfig.Member;
-  const [unreadCount, setUnreadCount] = useState(0);
+  const profilePath = getProfileRouteForRole(sessionRole);
+  const homePath = getDefaultRouteForRole(sessionRole);
+  const [avatarVersion, setAvatarVersion] = useState(0);
 
-  useEffect(() => {
-    let unsubscribe = () => {};
-    let cancelled = false;
+  useEffect(() => subscribeToAvatarChanges(() => setAvatarVersion((value) => value + 1)), []);
 
-    subscribeToNotifications(
-      sessionProfile,
-      (items) => {
-        if (!cancelled) {
-          setUnreadCount(items.filter((item) => !item.isRead).length);
-        }
-      },
-      () => {
-        if (!cancelled) {
-          setUnreadCount(0);
-        }
-      },
-    ).then((nextUnsubscribe) => {
-      if (!cancelled) {
-        unsubscribe = nextUnsubscribe;
-      } else {
-        nextUnsubscribe();
+  const profileAvatar = getAvatarForActor(sessionProfile, sessionProfile?.name || "User");
+  const profileInitial = String(sessionProfile?.name || "S").trim().charAt(0).toUpperCase() || "S";
+
+  function isLinkActive(link) {
+    const matches = Array.isArray(link.matches) && link.matches.length ? link.matches : [link.to];
+    return matches.some((match) => {
+      if (typeof match === "string") {
+        return location.pathname === match || location.pathname.startsWith(`${match}/`);
       }
+
+      if (!match?.path) {
+        return false;
+      }
+
+      if (match.exact) {
+        return location.pathname === match.path;
+      }
+
+      return location.pathname === match.path || location.pathname.startsWith(`${match.path}/`);
     });
+  }
 
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [sessionProfile]);
+  if (sessionRole === "Member" || sessionRole === "Staff" || sessionRole === "Admin") {
+    const isStaff = sessionRole === "Staff";
+    const isAdmin = sessionRole === "Admin";
+    const usesFixedLetterAvatar = isStaff || isAdmin;
+    const roleBadgeLabel = isStaff ? "Staff" : isAdmin ? "Admin" : "";
+    const avatarLinkClass = isStaff
+      ? "member-shell__profileLink member-shell__profileLink--staff"
+      : isAdmin
+        ? "member-shell__profileLink member-shell__profileLink--admin"
+        : "member-shell__profileLink";
+    const avatarClass = isStaff
+      ? "member-shell__avatar member-shell__avatar--staff"
+      : isAdmin
+        ? "member-shell__avatar member-shell__avatar--admin"
+        : "member-shell__avatar";
+    const avatarInitialClass = isStaff
+      ? "member-shell__avatarInitial member-shell__avatarInitial--staff"
+      : "member-shell__avatarInitial member-shell__avatarInitial--admin";
+    const avatarBadgeClass = isAdmin
+      ? "member-shell__avatarBadge member-shell__avatarBadge--admin"
+      : "member-shell__avatarBadge";
 
-  return (
-    <div className="shell">
-      <aside className="shell__sidebar">
-        <div className="shell__brand">
-          <div className="shell__logo">SC</div>
-          <div>
-            <p className="shell__eyebrow">System</p>
-            <h1>Sports Centre Booking System</h1>
-          </div>
-        </div>
-
-        <nav className="shell__nav">
-          {links.map((link) => {
-            const NavIcon = link.icon;
-            return (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`shell__link ${location.pathname === link.to ? "is-active" : ""}`}
-            >
-              <NavIcon size={18} />
-              <span>{link.label}</span>
+    return (
+      <div className="member-shell">
+        <header className="member-shell__topbar">
+          <div className="member-shell__brandRow">
+            <Link className="member-shell__brand" to={homePath}>
+              Sports Center Booking System
             </Link>
-            );
-          })}
-        </nav>
-
-        <button className="shell__logout" onClick={logout} type="button">
-          <LogOut size={18} />
-          <span>Log out</span>
-        </button>
-      </aside>
-
-      <div className="shell__content">
-        <header className="shell__topbar">
-          <div>
-            <p className="shell__eyebrow">Signed in as</p>
-            <h2>{sessionRole}</h2>
+            {roleBadgeLabel ? (
+              <span className={`member-shell__roleBadge ${isAdmin ? "member-shell__roleBadge--admin" : ""}`}>
+                {roleBadgeLabel}
+              </span>
+            ) : null}
           </div>
 
-          <div className="shell__topbarRight">
-            <button
-              className="shell__notification"
-              type="button"
-              aria-label="Notifications"
-              onClick={() => navigate("/notifications")}
-            >
-              <Bell size={18} />
-              <span>{unreadCount}</span>
-            </button>
+          <nav className="member-shell__nav">
+            {links.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className={`member-shell__navLink ${isLinkActive(link) ? "is-active" : ""}`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
 
-            <div className="shell__profile">
-              <div className="shell__avatar">
-                {(sessionProfile?.name || "U").slice(0, 1).toUpperCase()}
+          <div className="member-shell__actions">
+            {!isAdmin ? <NotificationBell variant={isStaff ? "staff" : "member"} /> : null}
+
+            <Link
+              className={avatarLinkClass}
+              to={profilePath}
+              aria-label={
+                isStaff ? "Open staff profile" : isAdmin ? "Open admin profile" : "Open profile"
+              }
+            >
+              <div className={avatarClass}>
+                {usesFixedLetterAvatar ? (
+                  <span className={avatarInitialClass} aria-hidden="true">
+                    {profileInitial}
+                  </span>
+                ) : (
+                  <img key={avatarVersion} src={profileAvatar} alt={sessionProfile?.name || "User"} />
+                )}
               </div>
-              <div>
-                <strong>{sessionProfile?.name || "User"}</strong>
-                <p>{sessionProfile?.email || "member@sports.local"}</p>
-              </div>
-            </div>
+              {usesFixedLetterAvatar ? <span className={avatarBadgeClass}>{roleBadgeLabel}</span> : null}
+            </Link>
           </div>
         </header>
 
-        <main className="shell__main">{children}</main>
+        <main
+          className={`member-shell__main ${isStaff ? "member-shell__main--staff" : ""} ${isAdmin ? "member-shell__main--admin" : ""}`}
+        >
+          {children}
+        </main>
       </div>
-    </div>
-  );
+    );
+  }
 }
 
 export default AppShell;

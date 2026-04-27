@@ -17,7 +17,6 @@ export const BOOKING_HISTORY_STATUSES = new Set(["rejected", "cancelled", "compl
 export const FACILITY_VISIBLE_STATUSES = new Set(["normal", "fixing"]);
 export const FACILITY_BOOKABLE_STATUSES = new Set(["normal"]);
 export const MATCH_VISIBLE_STATUSES = new Set(["pending", "accepted", "rejected", "invalidated"]);
-const FACILITY_PERSISTED_STATUSES = new Set(["normal", "outdate", "deleted"]);
 
 function toLocalDateKey(value = new Date()) {
   const parsed = value instanceof Date ? value : new Date(value);
@@ -50,6 +49,11 @@ function normalizeDateInput(value) {
   }
 
   return parsed.toISOString().slice(0, 10);
+}
+
+export function toStoredDateString(value) {
+  const safeDate = normalizeDateInput(value);
+  return safeDate ? `${safeDate}T00:00:00.000Z` : "";
 }
 
 function shiftDateKey(dateKey, days) {
@@ -122,6 +126,24 @@ export function toHourString(value) {
   return String(toHourNumber(value)).padStart(2, "0");
 }
 
+function normalizeTimeValue(value) {
+  const source = String(value ?? "").trim();
+  if (!source) {
+    return "";
+  }
+
+  if (/^\d{1,2}:\d{2}$/.test(source)) {
+    const [hours = "0", minutes = "0"] = source.split(":");
+    return `${hours.padStart(2, "0")}:${minutes}`;
+  }
+
+  if (/^\d{1,2}$/.test(source)) {
+    return `${source.padStart(2, "0")}:00`;
+  }
+
+  return "";
+}
+
 export function formatHourLabel(value) {
   return `${toHourString(value)}:00`;
 }
@@ -145,7 +167,12 @@ export function overlaps(startA, endA, startB, endB) {
 }
 
 export function buildDateTime(date, hour) {
-  return new Date(`${date}T${toHourString(hour)}:00:00`);
+  const normalizedTime = normalizeTimeValue(hour);
+  if (!date || !normalizedTime) {
+    return new Date(Number.NaN);
+  }
+
+  return new Date(`${date}T${normalizedTime}:00`);
 }
 
 export function getEffectiveBookingStatus(item = {}, now = new Date()) {
@@ -162,15 +189,47 @@ export function getEffectiveBookingStatus(item = {}, now = new Date()) {
   return rawStatus === "accepted" ? "no_show" : "completed";
 }
 
-export function getEffectiveFacilityStatus(facility = {}, repairs = []) {
-  const normalizedFacility = normalizeFacilityDoc(facility);
-  const persistedStatus = getPersistedFacilityStatus(normalizedFacility);
+function normalizeBookingStatusValue(value = "") {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+}
 
-  if (persistedStatus !== "normal") {
-    return persistedStatus;
+export function getMemberBookingDisplayStatus(item = {}, now = new Date()) {
+  const source = item?.raw && typeof item.raw === "object" ? item.raw : item;
+  const rawStatus = normalizeBookingStatusValue(source.status || item.status);
+  const date = source.date || item.date || "";
+  const startTime = source.start_time ?? item.start_time ?? item.startTime ?? "";
+  const endTime = source.end_time ?? item.end_time ?? item.endTime ?? "";
+
+  if (rawStatus === "suggested") {
+    return "alternative suggested";
   }
 
-  return repairs.some((item) => getEffectiveRepairStatus(item, normalizedFacility) === "pending") ? "fixing" : "normal";
+  if (rawStatus === "accepted") {
+    const bookingStartTime = buildDateTime(date, startTime);
+    if (Number.isNaN(bookingStartTime.getTime())) {
+      return "upcoming";
+    }
+    return now < bookingStartTime ? "upcoming" : "no_show";
+  }
+
+  if (rawStatus === "in progress" || rawStatus === "in_progress") {
+    const bookingEndTime = buildDateTime(date, endTime);
+    if (Number.isNaN(bookingEndTime.getTime())) {
+      return "upcoming";
+    }
+    return now < bookingEndTime ? "upcoming" : "completed";
+  }
+
+  return rawStatus || "pending";
+}
+
+export function getEffectiveFacilityStatus(facility = {}, repairs = []) {
+  const normalizedFacility = getVirtualFacilityDoc(facility);
+  void repairs;
+  return getPersistedFacilityStatus(normalizedFacility);
 }
 
 export function isActiveAccount(status = "") {
@@ -218,26 +277,62 @@ export function normalizeStaffDoc(item = {}) {
 }
 
 export function normalizeFacilityDoc(item = {}) {
-  const rawStatus = String(item.status || "normal").toLowerCase();
+  const statusSource = Array.isArray(item.status)
+    ? item.status[0]
+    : item.status ?? item.rawStatus;
+  const rawStatus = String(statusSource || "normal").trim().toLowerCase();
+  const sportType = String(item.sport_type ?? item.sportType ?? "").trim();
+  const usageGuidelines = item.usage_guidelines ?? item.usageGuidelines ?? "";
+  const startTime = Number(item.start_time ?? item.startTime ?? 9);
+  const endTime = Number(item.end_time ?? item.endTime ?? 18);
+  const staffId = item.staff_id ?? item.staffId ?? "";
+  const scheduledChange = normalizeScheduledChange(
+    item.scheduled_change ?? item.scheduledChange,
+  );
+
   return {
     id: item.id || "",
     name: item.name || "",
-    sportType: item.sport_type || "",
+    sportType,
     description: item.description || "",
-    usageGuidelines: item.usage_guidelines || "",
+    usageGuidelines,
     capacity: Number(item.capacity || 0),
     status: rawStatus,
     rawStatus,
     location: item.location || "",
-    startTime: Number(item.start_time ?? 9),
-    endTime: Number(item.end_time ?? 18),
-    staffId: item.staff_id || "",
-    scheduledChange: normalizeScheduledChange(item.scheduled_change || item.scheduledChange),
+    startTime,
+    endTime,
+    staffId,
+    scheduledChange,
     raw: item,
   };
 }
 
-function getPersistedFacilityStatus(facility = {}) {
+export function getVirtualFacilityDoc(facility = {}, now = new Date()) {
+  const normalizedFacility = normalizeFacilityDoc(facility);
+  const scheduledChange = normalizedFacility.scheduledChange;
+
+  if (!scheduledChange || scheduledChange.effectiveOn > toLocalDateKey(now)) {
+    return normalizedFacility;
+  }
+
+  if (scheduledChange.type === "delete") {
+    return normalizeFacilityDoc({
+      ...normalizedFacility.raw,
+      status: "deleted",
+      staff_id: "",
+      scheduled_change: null,
+    });
+  }
+
+  return normalizeFacilityDoc({
+    ...normalizedFacility.raw,
+    ...scheduledChange.payload,
+    scheduled_change: null,
+  });
+}
+
+export function getPersistedFacilityStatus(facility = {}) {
   const normalizedFacility = normalizeFacilityDoc(facility);
   if (normalizedFacility.rawStatus === "deleted") {
     return "deleted";
@@ -245,15 +340,15 @@ function getPersistedFacilityStatus(facility = {}) {
   if (normalizedFacility.rawStatus === "outdate" || !normalizedFacility.staffId) {
     return "outdate";
   }
+  if (normalizedFacility.rawStatus === "fixing") {
+    return "fixing";
+  }
   return "normal";
 }
 
-function isRepairResolvedStatus(status = "") {
-  return ["resolved", "terminated"].includes(String(status || "").toLowerCase());
-}
-
 export function getEffectiveRepairStatus(repair = {}, facility = {}) {
-  const rawStatus = String(repair.status || "pending").toLowerCase();
+  const statusSource = Array.isArray(repair.status) ? repair.status[0] : repair.status;
+  const rawStatus = String(statusSource || "pending").trim().toLowerCase();
   if (rawStatus === "resolved") {
     return "resolved";
   }
@@ -261,7 +356,7 @@ export function getEffectiveRepairStatus(repair = {}, facility = {}) {
     return "terminated";
   }
 
-  const persistedStatus = getPersistedFacilityStatus(facility);
+  const persistedStatus = getPersistedFacilityStatus(getVirtualFacilityDoc(facility));
   if (persistedStatus === "deleted") {
     return "terminated";
   }
@@ -300,16 +395,18 @@ export async function getActorByEmail(email) {
   }
 
   const [memberDocs, staffDocs] = await Promise.all([
-    getCollectionDocs("member", [where("email", "==", normalizedEmail)]),
-    getCollectionDocs("admin_staff", [where("email", "==", normalizedEmail)]),
+    getCollectionDocs("member"),
+    getCollectionDocs("admin_staff"),
   ]);
 
-  if (staffDocs[0]) {
-    return normalizeStaffDoc(staffDocs[0]);
+  const matchedStaffDoc = staffDocs.find((item) => normalizeEmail(item.email) === normalizedEmail);
+  if (matchedStaffDoc) {
+    return normalizeStaffDoc(matchedStaffDoc);
   }
 
-  if (memberDocs[0]) {
-    return normalizeMemberDoc(memberDocs[0]);
+  const matchedMemberDoc = memberDocs.find((item) => normalizeEmail(item.email) === normalizedEmail);
+  if (matchedMemberDoc) {
+    return normalizeMemberDoc(matchedMemberDoc);
   }
 
   return null;
@@ -346,12 +443,9 @@ export async function getFacilityLookup() {
   const nextLookup = new Map();
 
   for (const item of facilityItems) {
-    let normalizedFacility = await applyDueFacilityChange(item);
-    normalizedFacility = await ensurePersistedFacilityState(normalizedFacility);
-
+    const normalizedFacility = getVirtualFacilityDoc(item);
     const facilityRepairs = repairItems.filter((repair) => repair.facility_id === normalizedFacility.id);
-    const reconciledRepairs = await reconcileRepairStatusesForFacility(normalizedFacility, facilityRepairs);
-    const effectiveStatus = getEffectiveFacilityStatus(normalizedFacility, reconciledRepairs);
+    const effectiveStatus = getEffectiveFacilityStatus(normalizedFacility, facilityRepairs);
 
     nextLookup.set(normalizedFacility.id, {
       ...normalizedFacility,
@@ -480,6 +574,38 @@ async function syncExistingSlotsToFacilityHours(existingSlots, facility, date) {
   ).sort((left, right) => toHourNumber(left.start_time) - toHourNumber(right.start_time));
 }
 
+function buildReadonlyTimeSlots(existingSlots, facility, date) {
+  const normalizedFacility = normalizeFacilityDoc(facility);
+  const safeDate = normalizeDateInput(date);
+  const expectedHours = buildHourRange(normalizedFacility.startTime, normalizedFacility.endTime).map((hour) => toHourString(hour));
+  const existingByHour = new Map(existingSlots.map((item) => [toHourString(item.start_time), item]));
+
+  const expectedSlots = expectedHours.map((hour) => {
+    const existingSlot = existingByHour.get(hour);
+    if (existingSlot) {
+      return existingSlot;
+    }
+
+    return {
+      id: `${normalizedFacility.id}-${safeDate}-${hour}`,
+      facility_id: normalizedFacility.id,
+      date: safeDate,
+      start_time: hour,
+      end_time: toHourString(toHourNumber(hour) + 1),
+      status: "open",
+      request_id: "",
+    };
+  });
+
+  const preservedExtraSlots = existingSlots.filter((slot) => {
+    const slotHour = toHourString(slot.start_time);
+    const slotStatus = String(slot.status || "").toLowerCase();
+    return !expectedHours.includes(slotHour) && (slotStatus !== "open" || slot.request_id);
+  });
+
+  return [...expectedSlots, ...preservedExtraSlots].sort((left, right) => toHourNumber(left.start_time) - toHourNumber(right.start_time));
+}
+
 function buildVirtualTimeSlotsForFacilityDate(facility, date) {
   const normalizedFacility = normalizeFacilityDoc(facility);
   const safeDate = normalizeDateInput(date);
@@ -496,14 +622,18 @@ function buildVirtualTimeSlotsForFacilityDate(facility, date) {
 }
 
 export async function getTimeSlotsForFacilityDate(facility, date, options = {}) {
-  const normalizedFacility = normalizeFacilityDoc(facility);
+  const normalizedFacility = getVirtualFacilityDoc(facility);
   const safeDate = normalizeDateInput(date);
   const existingSlots = (await getCollectionDocs("time_slot", [where("facility_id", "==", normalizedFacility.id)])).filter(
     (item) => item.date === safeDate,
   );
 
   if (existingSlots.length > 0) {
-    return syncExistingSlotsToFacilityHours(existingSlots, normalizedFacility, safeDate);
+    if (options.persist) {
+      return syncExistingSlotsToFacilityHours(existingSlots, normalizedFacility, safeDate);
+    }
+
+    return buildReadonlyTimeSlots(existingSlots, normalizedFacility, safeDate);
   }
 
   if (options.persist) {
@@ -569,9 +699,8 @@ export async function syncFacilityStatus(facilityId) {
     return null;
   }
 
-  let normalizedFacility = await applyDueFacilityChange(facility);
-  normalizedFacility = await ensurePersistedFacilityState(normalizedFacility);
-  const repairs = await reconcileRepairStatusesForFacility(normalizedFacility);
+  const normalizedFacility = getVirtualFacilityDoc(facility);
+  const repairs = await getCollectionDocs("repair", [where("facility_id", "==", facilityId)]);
 
   return {
     ...normalizedFacility,
@@ -648,134 +777,4 @@ export function assertRole(actor, allowedRoles) {
   if (!isActiveAccount(actor.status)) {
     throw createAppError("permission-denied", "This account is currently inactive.");
   }
-}
-
-async function applyDueFacilityChange(facility, now = new Date()) {
-  const normalizedFacility = normalizeFacilityDoc(facility);
-  const scheduledChange = normalizedFacility.scheduledChange;
-
-  if (!scheduledChange || scheduledChange.effectiveOn > toLocalDateKey(now)) {
-    return normalizedFacility;
-  }
-
-  if (scheduledChange.type === "delete") {
-    await updateCollectionDoc("facility", normalizedFacility.id, {
-      status: "deleted",
-      staff_id: "",
-      scheduled_change: null,
-      updated_at: serverTimestamp(),
-    });
-
-    return normalizeFacilityDoc({
-      ...normalizedFacility.raw,
-      status: "deleted",
-      staff_id: "",
-      scheduled_change: null,
-    });
-  }
-
-  const nextPayload = {
-    ...scheduledChange.payload,
-    scheduled_change: null,
-  };
-
-  await updateCollectionDoc("facility", normalizedFacility.id, {
-    ...nextPayload,
-    updated_at: serverTimestamp(),
-  });
-
-  if (scheduledChange.payload?.staff_id && scheduledChange.payload.staff_id !== normalizedFacility.staffId) {
-    await syncRelatedFacilityAssignments(normalizedFacility.id, scheduledChange.payload.staff_id);
-  }
-
-  return normalizeFacilityDoc({
-    ...normalizedFacility.raw,
-    ...nextPayload,
-  });
-}
-
-async function ensurePersistedFacilityState(facility) {
-  const normalizedFacility = normalizeFacilityDoc(facility);
-  const nextStatus = getPersistedFacilityStatus(normalizedFacility);
-  const updates = {};
-
-  if (!FACILITY_PERSISTED_STATUSES.has(normalizedFacility.rawStatus) || normalizedFacility.rawStatus !== nextStatus) {
-    updates.status = nextStatus;
-  }
-
-  if (nextStatus === "deleted" && normalizedFacility.staffId) {
-    updates.staff_id = "";
-  }
-
-  if (!Object.keys(updates).length) {
-    return normalizedFacility;
-  }
-
-  await updateCollectionDoc("facility", normalizedFacility.id, {
-    ...updates,
-    updated_at: serverTimestamp(),
-  });
-
-  return normalizeFacilityDoc({
-    ...normalizedFacility.raw,
-    ...updates,
-  });
-}
-
-async function syncRelatedFacilityAssignments(facilityId, nextStaffId) {
-  const [requests, repairs] = await Promise.all([
-    getCollectionDocs("request", [where("facility_id", "==", facilityId)]),
-    getCollectionDocs("repair", [where("facility_id", "==", facilityId)]),
-  ]);
-
-  await Promise.all([
-    ...requests
-      .filter((item) => BOOKING_ACTIVE_STATUSES.has(String(item.status || "").toLowerCase()) || String(item.status || "").toLowerCase() === "suggested")
-      .map((item) =>
-        updateCollectionDoc("request", item.id, {
-          staff_id: nextStaffId,
-          updated_at: serverTimestamp(),
-        }),
-      ),
-    ...repairs
-      .filter((item) => !isRepairResolvedStatus(item.status))
-      .map((item) =>
-        updateCollectionDoc("repair", item.id, {
-          staff_id: nextStaffId,
-          updated_at: serverTimestamp(),
-        }),
-      ),
-  ]);
-}
-
-async function reconcileRepairStatusesForFacility(facility, repairItems = null) {
-  const normalizedFacility = normalizeFacilityDoc(facility);
-  const items = repairItems || (await getCollectionDocs("repair", [where("facility_id", "==", normalizedFacility.id)]));
-  const batch = createWriteBatch();
-  let hasUpdates = false;
-
-  const reconciledItems = items.map((item) => {
-    const nextStatus = getEffectiveRepairStatus(item, normalizedFacility);
-    const currentStatus = String(item.status || "pending").toLowerCase();
-    if (currentStatus !== nextStatus) {
-      hasUpdates = true;
-      batch.update(getDocumentRef("repair", item.id), {
-        status: nextStatus,
-        completed_at: nextStatus === "terminated" ? item.completed_at || new Date().toISOString() : nextStatus === "pending" ? "" : item.completed_at,
-        updated_at: serverTimestamp(),
-      });
-    }
-
-    return {
-      ...item,
-      status: nextStatus,
-      completed_at: nextStatus === "terminated" ? item.completed_at || new Date().toISOString() : nextStatus === "pending" ? "" : item.completed_at,
-    };
-  });
-
-  if (hasUpdates) {
-    await batch.commit();
-  }
-
-  return reconciledItems;
 }

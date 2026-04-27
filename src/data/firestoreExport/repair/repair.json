@@ -1,0 +1,57 @@
+[
+  {
+    "id": "8udpdzRYSFn1aVtDRVvl",
+    "type": "other",
+    "repair_description": "The player bench in Court 1 has a loose leg and feels unstable when sat upon.",
+    "status": "pending",
+    "created_at": "2026-03-23T00:00:00.000Z",
+    "completed_at": "",
+    "member_id": "fjJBlI8A5Z096xkTrrCW",
+    "staff_id": "0WBUz5ZyYitFkAdSqEcm",
+    "facility_id": "6zdZxhrcuUwjFGZnrXWn"
+  },
+  {
+    "id": "92znpbJvYCougV8s41DG",
+    "type": "lighting",
+    "repair_description": "Two overhead LED panels in the northeast corner of the basketball court are flickering during matches.",
+    "status": "resolved",
+    "created_at": "2026-03-15T00:00:00.000Z",
+    "completed_at": "2026-03-15T00:00:00.000Z",
+    "member_id": "hF9X5jdPrPdGTMTD6sz0",
+    "staff_id": "1MleS2CdcvhSffXiiYYb",
+    "facility_id": "75Z5v1UVRrs602QFsvdj"
+  },
+  {
+    "id": "JfEelBovqWLZcqYNiKTh",
+    "type": "plumbing",
+    "repair_description": "Water temperature in the poolside showers is inconsistent, fluctuating between freezing and scalding.",
+    "status": "pending",
+    "created_at": "2026-03-22T00:00:00.000Z",
+    "completed_at": "",
+    "member_id": "kzuG4o8s0NTPnQN8Rnta",
+    "staff_id": "EEJMDWyGk8z4BdL8l36i",
+    "facility_id": "F6Cl37HMdxwfB2evRS9T"
+  },
+  {
+    "id": "NkO6KgFalYs6NI1YxNMY",
+    "type": "equipment",
+    "repair_description": "The net height adjuster on Badminton Court A is jammed and won't lock into place.",
+    "status": "resolved",
+    "created_at": "2026-03-18T00:00:00.000Z",
+    "completed_at": "2026-03-19T00:00:00.000Z",
+    "member_id": "mhrkvgidUpidLxD3roBN",
+    "staff_id": "FcYJS012Rxjbhb4W2MRF",
+    "facility_id": "N9vzrQ4GzQ2lwHCkV2h7"
+  },
+  {
+    "id": "k8LVbHb34XpB6pZN4b9C",
+    "type": "surface",
+    "repair_description": "A noticeable tear in the synthetic turf near the penalty spot. Needs urgent patching to prevent tripping.",
+    "status": "pending",
+    "created_at": "2026-03-20T00:00:00.000Z",
+    "completed_at": "",
+    "member_id": "xrYOwWczhMCTSP0ITYwN",
+    "staff_id": "ORF3jHhKNxytQKUMbLZr",
+    "facility_id": "PzTQl0mLMCUghme2Wtlw"
+  }
+]

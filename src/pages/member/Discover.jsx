@@ -1,142 +1,423 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, Dumbbell } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import "../pageStyles.css";
+import "./memberWorkspace.css";
+import "./Discover.css";
 import { useAuth } from "../../provider/AuthContext";
-import { getPartnerProfiles, sendMatchRequest } from "../../services/partnerService";
+import { ROUTE_PATHS } from "../../constants/routes";
+import { getFacilitySportTypes } from "../../services/bookingService";
+import {
+  getCurrentMatchProfile,
+  getPartnerProfiles,
+  sendMatchRequest,
+} from "../../services/partnerService";
+import { getAvatarForActor } from "../../utils/avatar";
 import { getErrorMessage } from "../../utils/errors";
+import { countMeaningfulCharacters } from "../../utils/text";
+import MatchRequestModal from "../../components/member/MatchRequestModal";
+
+const DAY_OPTIONS = [
+  { value: "any", label: "Any Day" },
+  { value: "monday", label: "Monday" },
+  { value: "tuesday", label: "Tuesday" },
+  { value: "wednesday", label: "Wednesday" },
+  { value: "thursday", label: "Thursday" },
+  { value: "friday", label: "Friday" },
+  { value: "saturday", label: "Saturday" },
+  { value: "sunday", label: "Sunday" },
+];
+
+const TIME_OPTIONS = [
+  { value: "any", label: "Any Time" },
+  { value: "morning", label: "Morning" },
+  { value: "afternoon", label: "Afternoon" },
+  { value: "evening", label: "Evening" },
+];
+
+function toTitleText(value) {
+  return String(value || "")
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function parseAvailabilityEntry(entry) {
+  const [day = "", time = ""] = String(entry || "").split("_");
+  return {
+    day,
+    time,
+    label: [toTitleText(day), toTitleText(time)].filter(Boolean).join(" - "),
+  };
+}
+
+function applyProfileFilters(profile, filters) {
+  const sportMatch =
+    filters.sport === "all" || (profile.interests || []).includes(filters.sport);
+  const dayMatch =
+    filters.day === "any" ||
+    (profile.availableTime || []).some((entry) => parseAvailabilityEntry(entry).day === filters.day);
+  const timeMatch =
+    filters.time === "any" ||
+    (profile.availableTime || []).some((entry) => parseAvailabilityEntry(entry).time === filters.time);
+  return sportMatch && dayMatch && timeMatch;
+}
 
 export default function Discover() {
+  const navigate = useNavigate();
   const { sessionProfile } = useAuth();
-  const [items, setItems] = useState([]);
-  const [matchingReady, setMatchingReady] = useState(true);
-  const [filters, setFilters] = useState({
-    sport: "All",
-    search: "",
-  });
-  const [message, setMessage] = useState("");
+  const [profiles, setProfiles] = useState([]);
+  const [sportOptions, setSportOptions] = useState([]);
+  const [currentProfile, setCurrentProfile] = useState(null);
+  const [filters, setFilters] = useState({ sport: "all", day: "any", time: "any" });
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [requestTarget, setRequestTarget] = useState(null);
+  const [detailTarget, setDetailTarget] = useState(null);
+  const [requestDraft, setRequestDraft] = useState("");
+  const [requestBusy, setRequestBusy] = useState(false);
 
   useEffect(() => {
-    getPartnerProfiles(sessionProfile)
-      .then((nextItems) => {
-        setMatchingReady(true);
-        setItems(nextItems);
-      })
-      .catch((loadError) => {
-        const nextMessage = getErrorMessage(loadError, "Unable to load the partner list.");
-        setItems([]);
-        setMatchingReady(!nextMessage.includes("enable matching first"));
-        setError(nextMessage);
-      });
-  }, [sessionProfile]);
+    let cancelled = false;
+    async function loadData() {
+      if (!sessionProfile) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError("");
+      try {
+        const [selfProfile, partnerProfiles, sports] = await Promise.all([
+          getCurrentMatchProfile(sessionProfile),
+          getPartnerProfiles(sessionProfile),
+          getFacilitySportTypes(),
+        ]);
+        if (cancelled) return;
+        if (!selfProfile?.openMatch) {
+          navigate(ROUTE_PATHS.PARTNER, {
+              replace: true,
+              state: { partnerError: "Please complete your profile and enable matching first." },
+            });
+          return;
+        }
+        setCurrentProfile(selfProfile);
+        setProfiles(partnerProfiles);
+        setSportOptions(sports);
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(getErrorMessage(loadError, "Unable to load partner recommendations."));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+    loadData();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, sessionProfile]);
 
-  const sports = ["All", ...new Set(items.map((item) => item.sport))];
-  const filteredItems = items.filter((item) => {
-    const sportMatch = filters.sport === "All" || item.sport === filters.sport;
-    const searchMatch =
-      !filters.search ||
-      item.nickname.toLowerCase().includes(filters.search.toLowerCase()) ||
-      item.bio.toLowerCase().includes(filters.search.toLowerCase());
-    return sportMatch && searchMatch;
-  });
+  const filteredProfiles = useMemo(
+    () => profiles.filter((profile) => applyProfileFilters(profile, filters)),
+    [profiles, filters],
+  );
+
+  const requestCount = countMeaningfulCharacters(requestDraft);
+
+  async function handleSendRequest() {
+    if (!requestTarget) return;
+    if (!currentProfile?.openMatch) {
+      setError("Please complete your profile and enable matching first.");
+      return;
+    }
+    if (requestTarget.id === currentProfile.id || requestTarget.memberId === currentProfile.memberId) {
+      setError("You cannot send a match request to yourself.");
+      return;
+    }
+    if (requestCount <= 0) {
+      setError("Please enter an application message before sending.");
+      return;
+    }
+    if (requestCount > 200) {
+      setError("Application message cannot exceed 200 characters.");
+      return;
+    }
+
+    setRequestBusy(true);
+    setError("");
+    try {
+      await sendMatchRequest({
+        reciever_id: requestTarget.memberId || requestTarget.id,
+        apply_description: requestDraft.trim(),
+      });
+      setMessage("Match request sent successfully.");
+      setRequestTarget(null);
+      setRequestDraft("");
+    } catch (sendError) {
+      setError(getErrorMessage(sendError, "Unable to send match request right now."));
+    } finally {
+      setRequestBusy(false);
+    }
+  }
 
   return (
-    <div className="page-stack">
-      <section className="page-hero">
+    <div className="member-workspace discover-page">
+      <div className="discover-page__header">
         <div>
-          <h1>Discover partners</h1>
-          <p>Browse members who currently have matching enabled and send a request directly from their public profile.</p>
+          <h1 className="member-page-title">Partner Recommendations</h1>
+          <p className="member-page-subtitle">
+            Find your perfect sports partner. Only displaying active members.
+          </p>
         </div>
-      </section>
+        <Link className="btn btn-secondary discover-page__back" to={ROUTE_PATHS.PARTNER}>
+            Back to Match Profile
+          </Link>
+      </div>
 
-      <section className="page-panel">
-        <h2>Filters</h2>
-        <div className="filter-grid" style={{ marginTop: 16 }}>
-          <div>
-            <label>Sport</label>
+      {error ? (
+        <section className="member-alert member-alert--error">
+          <strong>Unable to continue</strong>
+          <p>{error}</p>
+        </section>
+      ) : null}
+      {message ? (
+        <section className="member-alert member-alert--success">
+          <strong>Request sent</strong>
+          <p>{message}</p>
+        </section>
+      ) : null}
+
+      <section className="member-card discover-page__filters">
+        <div className="discover-page__filtersGrid">
+          <label className="form-field discover-page__field">
+            <span>Sport</span>
             <select
               value={filters.sport}
               onChange={(event) => setFilters((prev) => ({ ...prev, sport: event.target.value }))}
             >
-              {sports.map((sport) => (
+              <option value="all">All Sports</option>
+              {sportOptions.map((sport) => (
                 <option key={sport} value={sport}>
                   {sport}
                 </option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label>Search</label>
-            <input
-              value={filters.search}
-              onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
-              placeholder="Search by nickname or profile text"
-            />
-          </div>
+          </label>
+          <label className="form-field discover-page__field">
+            <span>Day</span>
+            <select
+              value={filters.day}
+              onChange={(event) => setFilters((prev) => ({ ...prev, day: event.target.value }))}
+            >
+              {DAY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field discover-page__field">
+            <span>Time</span>
+            <select
+              value={filters.time}
+              onChange={(event) => setFilters((prev) => ({ ...prev, time: event.target.value }))}
+            >
+              {TIME_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="btn btn-secondary discover-page__clear"
+            type="button"
+            onClick={() => setFilters({ sport: "all", day: "any", time: "any" })}
+          >
+            Clear Filters
+          </button>
         </div>
       </section>
 
-      {error && (
-        <section className="page-panel">
-          <p className="errorMessage">{error}</p>
-          {!matchingReady && (
-            <div className="panel-actions" style={{ marginTop: 16 }}>
-              <Link className="btn" to="/partner">Go to partner profile</Link>
-            </div>
-          )}
+      {loading ? (
+        <div className="member-card member-empty-state">Loading partner recommendations...</div>
+      ) : filteredProfiles.length === 0 ? (
+        <div className="member-card member-empty-state">
+          <h2>Recommendations unavailable</h2>
+          <p>Try adjusting your filters to see more active partners.</p>
+        </div>
+      ) : (
+        <section className="discover-page__grid">
+          {filteredProfiles.map((profile) => {
+            const shownInterests = (profile.interests || []).slice(0, 2);
+            const remainingInterests = Math.max((profile.interests || []).length - shownInterests.length, 0);
+            const shownAvailability = (profile.availableTime || []).slice(0, 2);
+            const remainingAvailability = Math.max(
+              (profile.availableTime || []).length - shownAvailability.length,
+              0,
+            );
+
+            return (
+              <article className="member-card discover-card" key={profile.id}>
+                <div className="discover-card__header">
+                  <img
+                    alt={profile.nickname}
+                    className="discover-card__avatar"
+                    src={getAvatarForActor(profile)}
+                  />
+                  <div>
+                    <h2>{profile.nickname}</h2>
+                    <span className="discover-card__status">MATCH READY</span>
+                  </div>
+                </div>
+
+                <p className="discover-card__bio">{profile.selfDescription}</p>
+
+                <div className="discover-card__meta">
+                  <div className="discover-card__metaRow">
+                    <Dumbbell aria-hidden="true" size={16} />
+                    <div className="discover-card__chips">
+                      {shownInterests.map((interest) => (
+                        <span className="discover-card__chip" key={`${profile.id}-${interest}`}>
+                          {interest}
+                        </span>
+                      ))}
+                      {remainingInterests > 0 ? (
+                        <span className="discover-card__metaMore">+{remainingInterests}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="discover-card__metaRow">
+                    <CalendarDays aria-hidden="true" size={16} />
+                    <div className="discover-card__availability">
+                      {shownAvailability.map((entry) => (
+                        <span key={`${profile.id}-${entry}`}>{parseAvailabilityEntry(entry).label}</span>
+                      ))}
+                      {remainingAvailability > 0 ? (
+                        <span className="discover-card__metaMore">+{remainingAvailability}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="discover-card__actions">
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => setDetailTarget(profile)}
+                  >
+                    View Details
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    onClick={() => {
+                      setRequestTarget(profile);
+                      setRequestDraft("");
+                      setError("");
+                      setMessage("");
+                    }}
+                  >
+                    Send Request
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </section>
       )}
 
-      <section className="cards-grid">
-        {filteredItems.map((item) => (
-          <article key={item.id} className="detail-card">
-            <div className="item-row">
-              <div>
-                <h2>{item.nickname}</h2>
-                <p>{item.sport} | {item.level}</p>
+      <MatchRequestModal
+        error={error}
+        open={Boolean(requestTarget)}
+        pending={requestBusy}
+        targetName={requestTarget?.nickname}
+        value={requestDraft}
+        onChange={setRequestDraft}
+        onCancel={() => {
+          if (requestBusy) return;
+          setRequestTarget(null);
+          setRequestDraft("");
+          setError("");
+        }}
+        onConfirm={handleSendRequest}
+      />
+
+      {detailTarget ? (
+        <div className="member-modal-overlay" role="presentation" onClick={() => setDetailTarget(null)}>
+          <div
+            className="member-modal discover-detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="discover-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="discover-detail-modal__header">
+              <div className="discover-detail-modal__identity">
+                <img
+                  alt={detailTarget.nickname}
+                  className="discover-detail-modal__avatar"
+                  src={getAvatarForActor(detailTarget)}
+                />
+                <div className="discover-detail-modal__identityText">
+                  <h2 id="discover-detail-title">{detailTarget.nickname}</h2>
+                  <span className="discover-card__status">MATCH READY</span>
+                </div>
               </div>
-              <span className="status-pill status-active">Open</span>
-            </div>
-            <p style={{ marginTop: 16 }}>{item.bio}</p>
-            <div className="tags-row" style={{ marginTop: 16 }}>
-              {item.availability ? <span className="tag">{item.availability}</span> : null}
-            </div>
-            <div className="panel-actions" style={{ marginTop: 18 }}>
-              <Link className="btn-secondary" to={`/partner/${item.id}`}>View details</Link>
               <button
-                className="btn"
-                onClick={async () => {
-                  setError("");
-                  setMessage("");
-                  try {
-                    await sendMatchRequest(
-                      {
-                        reciever_id: item.memberId || item.id,
-                        apply_description: `Hi ${item.nickname}, would you like to arrange a shared training session?`,
-                      },
-                      sessionProfile,
-                    );
-                    setMessage(`Request sent to ${item.nickname}.`);
-                  } catch (requestError) {
-                    setError(getErrorMessage(requestError, "Unable to send the partner request."));
-                  }
-                }}
+                className="discover-detail-modal__close"
+                type="button"
+                aria-label="Close details"
+                onClick={() => setDetailTarget(null)}
               >
-                Send request
+                ×
               </button>
             </div>
-          </article>
-        ))}
-      </section>
 
-      {message && <section className="page-panel"><p className="successMessage">{message}</p></section>}
+            <div className="discover-detail-modal__section">
+              <p className="member-card__eyebrow">About Me</p>
+              <p>
+                {detailTarget.description ||
+                  detailTarget.selfDescription ||
+                  detailTarget.bio ||
+                  "No self-description provided."}
+              </p>
+            </div>
 
-      {filteredItems.length === 0 && !error && (
-        <section className="page-panel">
-          <p>No partner profiles match your current filters.</p>
-        </section>
-      )}
+            <div className="discover-detail-modal__section">
+              <p className="member-card__eyebrow">Sports Interests</p>
+              <div className="discover-detail-modal__chips">
+                {(detailTarget.interests || []).map((interest) => (
+                  <span className="discover-detail-modal__chip" key={`${detailTarget.id}-${interest}`}>
+                    {toTitleText(interest)}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="discover-detail-modal__section">
+              <p className="member-card__eyebrow">Availability</p>
+              <div className="discover-detail-modal__availability">
+                {(detailTarget.availableTime || []).map((entry) => (
+                  <div className="discover-detail-modal__availabilityItem" key={`${detailTarget.id}-${entry}`}>
+                    {parseAvailabilityEntry(entry).label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="member-modal__actions">
+              <button className="btn btn-secondary" type="button" onClick={() => setDetailTarget(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

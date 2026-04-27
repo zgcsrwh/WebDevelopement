@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./provider/AuthContext";
 import AppShell from "./components/layout/AppShell";
 import LoginRegister from "./pages/LoginRegister";
-import Home from "./pages/member/Home";
 import Facilities from "./pages/member/Facilities";
 import FacilityDetail from "./pages/member/FacilityDetail";
 import BookingNew from "./pages/member/BookingNew";
@@ -13,27 +12,28 @@ import Partner from "./pages/member/Partner";
 import PartnerDetail from "./pages/member/PartnerDetail";
 import Profile from "./pages/member/Profile";
 import Reports from "./pages/member/Reports";
-import Notifications from "./pages/Notifications";
 import Requests from "./pages/staff/Requests";
 import CheckIn from "./pages/staff/CheckIn";
 import Repair from "./pages/staff/Repair";
 import StaffProfile from "./pages/staff/StaffProfile";
+import AdminProfile from "./pages/admin/AdminProfile";
 import AdminStaff from "./pages/admin/AdminStaff";
 import AdminFacilities from "./pages/admin/AdminFacilities";
+import { ROUTE_PATHS, getDefaultRouteForRole } from "./constants/routes";
 
 function ProtectedRoute({ children, allowedRoles }) {
-  const { currentUser, authReady, sessionRole } = useAuth();
+  const { authReady, isAuthenticated, sessionRole } = useAuth();
 
   if (!authReady) {
     return <div className="app-loading">Loading system...</div>;
   }
 
-  if (!currentUser) {
-    return <Navigate to="/" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(sessionRole)) {
-    return <Navigate to={sessionRole === "Admin" ? "/admin/facilities" : sessionRole === "Staff" ? "/staff/requests" : "/home"} replace />;
+    return <Navigate to={getDefaultRouteForRole(sessionRole)} replace />;
   }
 
   return children;
@@ -50,20 +50,21 @@ function ShellRoute({ children, allowedRoles }) {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<LoginRegister />} />
-      <Route path="/register" element={<Navigate to="/" replace />} />
+      <Route path={ROUTE_PATHS.ROOT} element={<Navigate to={ROUTE_PATHS.LOGIN} replace />} />
+      <Route path={ROUTE_PATHS.LOGIN} element={<LoginRegister initialMode="login" />} />
+      <Route path={ROUTE_PATHS.REGISTER} element={<LoginRegister initialMode="register" />} />
 
       <Route
-        path="/home"
+        path={ROUTE_PATHS.HOME}
         element={
           <ShellRoute allowedRoles={["Member"]}>
-            <Home />
+            <Navigate to={ROUTE_PATHS.FACILITIES} replace />
           </ShellRoute>
         }
       />
 
       <Route
-        path="/facilities"
+        path={ROUTE_PATHS.FACILITIES}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <Facilities />
@@ -71,7 +72,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/facilities/:id"
+        path={ROUTE_PATHS.FACILITY_DETAIL}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <FacilityDetail />
@@ -79,7 +80,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/bookings/new"
+        path={ROUTE_PATHS.BOOKINGS_NEW}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <BookingNew />
@@ -87,7 +88,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/bookings"
+        path={ROUTE_PATHS.BOOKINGS}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <MyBookings />
@@ -95,7 +96,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/bookings/:id"
+        path={ROUTE_PATHS.BOOKING_DETAIL}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <BookingDetail />
@@ -103,7 +104,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/partner"
+        path={ROUTE_PATHS.PARTNER}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <Partner />
@@ -111,7 +112,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/partner/discover"
+        path={ROUTE_PATHS.PARTNER_DISCOVER}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <Discover />
@@ -119,7 +120,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/partner/requests"
+        path={ROUTE_PATHS.PARTNER_REQUESTS}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <PartnerDetail />
@@ -127,7 +128,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/partner/:id"
+        path={ROUTE_PATHS.PARTNER_DETAIL}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <PartnerDetail />
@@ -135,15 +136,15 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/profile"
+        path={ROUTE_PATHS.PROFILE}
         element={
-          <ShellRoute allowedRoles={["Member"]}>
+          <ProtectedRoute allowedRoles={["Member"]}>
             <Profile />
-          </ShellRoute>
+          </ProtectedRoute>
         }
       />
       <Route
-        path="/reports"
+        path={ROUTE_PATHS.REPORTS}
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <Reports />
@@ -152,16 +153,7 @@ function AppRoutes() {
       />
 
       <Route
-        path="/notifications"
-        element={
-          <ShellRoute allowedRoles={["Member", "Staff", "Admin"]}>
-            <Notifications />
-          </ShellRoute>
-        }
-      />
-
-      <Route
-        path="/staff/requests"
+        path={ROUTE_PATHS.STAFF_REQUESTS}
         element={
           <ShellRoute allowedRoles={["Staff", "Admin"]}>
             <Requests />
@@ -169,7 +161,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/staff/bookings"
+        path={ROUTE_PATHS.STAFF_BOOKINGS}
         element={
           <ShellRoute allowedRoles={["Staff", "Admin"]}>
             <CheckIn />
@@ -177,7 +169,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/staff/reports"
+        path={ROUTE_PATHS.STAFF_REPORTS}
         element={
           <ShellRoute allowedRoles={["Staff", "Admin"]}>
             <Repair />
@@ -185,16 +177,24 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/staff/profile"
+        path={ROUTE_PATHS.STAFF_PROFILE}
         element={
-          <ShellRoute allowedRoles={["Staff", "Admin"]}>
+          <ShellRoute allowedRoles={["Staff"]}>
             <StaffProfile />
+          </ShellRoute>
+        }
+      />
+      <Route
+        path={ROUTE_PATHS.ADMIN_PROFILE}
+        element={
+          <ShellRoute allowedRoles={["Admin"]}>
+            <AdminProfile />
           </ShellRoute>
         }
       />
 
       <Route
-        path="/admin/staff"
+        path={ROUTE_PATHS.ADMIN_STAFF}
         element={
           <ShellRoute allowedRoles={["Admin"]}>
             <AdminStaff />
@@ -202,7 +202,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/admin/facilities"
+        path={ROUTE_PATHS.ADMIN_FACILITIES}
         element={
           <ShellRoute allowedRoles={["Admin"]}>
             <AdminFacilities />
@@ -210,7 +210,7 @@ function AppRoutes() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to={ROUTE_PATHS.LOGIN} replace />} />
     </Routes>
   );
 }

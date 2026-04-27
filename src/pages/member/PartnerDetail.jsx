@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import "../pageStyles.css";
+import "./memberWorkspace.css";
+import "./PartnerDetail.css";
 import { useAuth } from "../../provider/AuthContext";
 import {
   getMatchRequests,
@@ -8,8 +10,20 @@ import {
   respondToMatchRequest,
   sendMatchRequest,
 } from "../../services/partnerService";
+import { ROUTE_PATHS } from "../../constants/routes";
+import { getAvatarForActor } from "../../utils/avatar";
 import { getErrorMessage } from "../../utils/errors";
-import { displayStatus, statusTone } from "../../utils/presentation";
+import { displayStatus, statusTone, toTitleText } from "../../utils/presentation";
+import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
+import MatchRequestModal from "../../components/member/MatchRequestModal";
+
+function formatAvailabilityEntry(value = "") {
+  return String(value)
+    .split("_")
+    .filter(Boolean)
+    .map((part) => toTitleText(part))
+    .join(" - ");
+}
 
 export default function PartnerDetail() {
   const { id } = useParams();
@@ -20,25 +34,56 @@ export default function PartnerDetail() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [requests, setRequests] = useState([]);
+  const [requestModalOpen, setRequestModalOpen] = useState(false);
+  const [requestDraft, setRequestDraft] = useState("");
+  const [requestError, setRequestError] = useState("");
+  const [requestPending, setRequestPending] = useState(false);
   const isRequestsPage = !id;
 
   useEffect(() => {
-    if (isRequestsPage) {
-      getMatchRequests(sessionProfile)
-        .then(setRequests)
-        .catch((loadError) => setError(getErrorMessage(loadError, "Unable to load match requests.")));
-      return;
+    let cancelled = false;
+
+    async function loadData() {
+      if (isRequestsPage) {
+        try {
+          const nextRequests = await getMatchRequests(sessionProfile);
+          if (!cancelled) {
+            setRequests(nextRequests);
+            setError("");
+          }
+        } catch (loadError) {
+          if (!cancelled) {
+            setError(getErrorMessage(loadError, "Unable to load match requests."));
+          }
+        } finally {
+          if (!cancelled) {
+            setProfileLoaded(true);
+          }
+        }
+        return;
+      }
+
+      try {
+        const items = await getPartnerProfiles(sessionProfile);
+        if (!cancelled) {
+          setProfile(items.find((item) => item.id === id) || null);
+          setError("");
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(getErrorMessage(loadError, "Unable to load this profile."));
+        }
+      } finally {
+        if (!cancelled) {
+          setProfileLoaded(true);
+        }
+      }
     }
 
-    getPartnerProfiles(sessionProfile)
-      .then((items) => {
-        setProfile(items.find((item) => item.id === id) || null);
-        setProfileLoaded(true);
-      })
-      .catch((loadError) => {
-        setError(getErrorMessage(loadError, "Unable to load this profile."));
-        setProfileLoaded(true);
-      });
+    loadData();
+    return () => {
+      cancelled = true;
+    };
   }, [id, isRequestsPage, sessionProfile]);
 
   const incomingRequests = useMemo(
@@ -50,120 +95,251 @@ export default function PartnerDetail() {
     [requests],
   );
 
+  const pendingSummary = useMemo(
+    () => ({
+      incomingPending: incomingRequests.filter((request) => request.status === "pending").length,
+      outgoingPending: outgoingRequests.filter((request) => request.status === "pending").length,
+    }),
+    [incomingRequests, outgoingRequests],
+  );
+
+  async function refreshRequests() {
+    setRequests(await getMatchRequests(sessionProfile));
+  }
+
+  function closeRequestModal() {
+    setRequestModalOpen(false);
+    setRequestDraft("");
+    setRequestError("");
+    setRequestPending(false);
+  }
+
+  async function handleConfirmSend() {
+    if (!profile) {
+      return;
+    }
+
+    const count = countMeaningfulCharacters(requestDraft);
+    if (!hasMeaningfulText(requestDraft)) {
+      setRequestError("Please enter an application description.");
+      return;
+    }
+    if (count > 200) {
+      setRequestError("Application description must be 200 characters or fewer.");
+      return;
+    }
+
+    setRequestPending(true);
+    setRequestError("");
+
+    try {
+      await sendMatchRequest({
+        reciever_id: profile.memberId || profile.id,
+        apply_description: requestDraft.trim(),
+      });
+      setMessage("Match request sent.");
+      closeRequestModal();
+    } catch (sendError) {
+      setRequestPending(false);
+      setRequestError(getErrorMessage(sendError, "Unable to send this request."));
+    }
+  }
+
+  if (!profileLoaded) {
+    return (
+      <div className="member-workspace">
+        <div className="member-empty">
+          <p>Loading matching data...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (isRequestsPage) {
     return (
-      <div className="page-stack">
-        <section className="page-hero">
-          <div>
-            <h1>Partner requests</h1>
-            <p>Review incoming requests, track sent requests, and update matching relationships through the real request collection.</p>
+      <div className="member-workspace">
+        <section className="member-hero">
+          <div className="member-hero__top">
+            <div>
+              <p className="member-hero__eyebrow">Requests</p>
+              <h1>Partner request inbox</h1>
+              <p>
+                Handle incoming requests, review sent requests, and keep the actions aligned with
+                the matching API.
+              </p>
+            </div>
+              <div className="member-hero__actions">
+                <Link className="member-back-link" to={ROUTE_PATHS.PARTNER}>
+                  ← Back to partner profile
+                </Link>
+              <Link className="btn-secondary" to={ROUTE_PATHS.PARTNER_DISCOVER}>
+                Browse discover page
+              </Link>
+            </div>
+          </div>
+          <div className="member-chip-row">
+            <span className="member-chip">{pendingSummary.incomingPending} incoming pending</span>
+            <span className="member-chip member-chip--soft">
+              {pendingSummary.outgoingPending} outgoing pending
+            </span>
           </div>
         </section>
 
-        {error && (
-          <section className="page-panel">
-            <p className="errorMessage">{error}</p>
+        {error ? (
+          <section className="member-alert member-alert--error">
+            <strong>Unable to load requests</strong>
+            <p>{error}</p>
           </section>
-        )}
-        {message && (
-          <section className="page-panel">
-            <p className="successMessage">{message}</p>
+        ) : null}
+        {message ? (
+          <section className="member-alert member-alert--success">
+            <strong>Request updated</strong>
+            <p>{message}</p>
           </section>
-        )}
+        ) : null}
 
-        <section className="split-layout">
-          <article className="page-panel">
-            <h2>Received requests</h2>
-            <div className="card-list" style={{ marginTop: 18 }}>
-              {incomingRequests.map((request) => (
-                <article key={request.id} className="request-item">
-                  <div className="item-row">
-                    <div>
-                      <h3>{request.from}</h3>
-                      <p className="meta-row">{request.createdAt}</p>
-                      <p className="soft-text" style={{ marginTop: 8 }}>{request.message}</p>
-                      {request.response && (
-                        <p className="soft-text" style={{ marginTop: 8 }}>Response: {request.response}</p>
-                      )}
-                    </div>
-                    <span className={`status-pill ${statusTone(request.status)}`}>
-                      {request.statusLabel || displayStatus(request.status)}
-                    </span>
-                  </div>
-                  {request.status === "pending" && (
-                    <div className="panel-actions" style={{ marginTop: 16 }}>
-                      <button
-                        className="btn"
-                        onClick={async () => {
-                          try {
-                            await respondToMatchRequest(
-                              {
-                                match_id: request.id,
-                                status: ["accepted"],
-                                respond_message: "Happy to join.",
-                              },
-                              sessionProfile,
-                            );
-                            setRequests(await getMatchRequests(sessionProfile));
-                            setMessage(`Request from ${request.from} accepted.`);
-                          } catch (actionError) {
-                            setError(getErrorMessage(actionError, "Unable to accept this request."));
-                          }
-                        }}
-                      >
-                        Accept
-                      </button>
-                      <button
-                        className="btn-danger"
-                        onClick={async () => {
-                          try {
-                            await respondToMatchRequest(
-                              {
-                                match_id: request.id,
-                                status: ["rejected"],
-                                respond_message: "Not available right now.",
-                              },
-                              sessionProfile,
-                            );
-                            setRequests(await getMatchRequests(sessionProfile));
-                            setMessage(`Request from ${request.from} rejected.`);
-                          } catch (actionError) {
-                            setError(getErrorMessage(actionError, "Unable to reject this request."));
-                          }
-                        }}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  )}
-                </article>
-              ))}
-              {incomingRequests.length === 0 && <p className="soft-text">No incoming requests found.</p>}
+        <section className="member-request-columns">
+          <article className="member-card">
+            <div className="member-card__head">
+              <div>
+                <p className="member-card__eyebrow">Incoming</p>
+                <h2>Received requests</h2>
+              </div>
             </div>
+
+            {incomingRequests.length > 0 ? (
+              <div className="member-record-list">
+                {incomingRequests.map((request) => (
+                  <article key={request.id} className="member-record member-request-card">
+                    <div className="member-record__top">
+                      <div className="member-request-card__person">
+                        <img
+                          className="member-avatar-small"
+                          src={getAvatarForActor({ id: request.fromId }, request.from)}
+                          alt={request.from}
+                        />
+                        <div>
+                          <strong>{request.from}</strong>
+                          <span>{request.createdAt}</span>
+                        </div>
+                      </div>
+                      <span className={`status-pill ${statusTone(request.status)}`}>
+                        {request.statusLabel || displayStatus(request.status)}
+                      </span>
+                    </div>
+
+                    <p>{request.message || "No application message provided."}</p>
+
+                    {request.response ? (
+                      <div className="member-note">
+                        <strong>Response</strong>
+                        <p>{request.response}</p>
+                      </div>
+                    ) : null}
+
+                    {request.status === "pending" ? (
+                      <div className="member-inline-actions">
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await respondToMatchRequest(
+                                {
+                                  match_id: request.id,
+                                  status: ["accepted"],
+                                  respond_message: "Happy to join.",
+                                },
+                                sessionProfile,
+                              );
+                              await refreshRequests();
+                              setMessage(`Request from ${request.from} accepted.`);
+                            } catch (actionError) {
+                              setError(getErrorMessage(actionError, "Unable to accept this request."));
+                            }
+                          }}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="btn-danger"
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await respondToMatchRequest(
+                                {
+                                  match_id: request.id,
+                                  status: ["rejected"],
+                                  respond_message: "Not available right now.",
+                                },
+                                sessionProfile,
+                              );
+                              await refreshRequests();
+                              setMessage(`Request from ${request.from} rejected.`);
+                            } catch (actionError) {
+                              setError(getErrorMessage(actionError, "Unable to reject this request."));
+                            }
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="member-empty">
+                <p>No incoming requests found.</p>
+              </div>
+            )}
           </article>
 
-          <article className="page-panel">
-            <h2>Sent requests</h2>
-            <div className="card-list" style={{ marginTop: 18 }}>
-              {outgoingRequests.map((request) => (
-                <article key={request.id} className="request-item">
-                  <div className="item-row">
-                    <div>
-                      <h3>{request.to}</h3>
-                      <p className="meta-row">{request.createdAt}</p>
-                      <p className="soft-text" style={{ marginTop: 8 }}>{request.message}</p>
-                      {request.response && (
-                        <p className="soft-text" style={{ marginTop: 8 }}>Response: {request.response}</p>
-                      )}
-                    </div>
-                    <span className={`status-pill ${statusTone(request.status)}`}>
-                      {request.statusLabel || displayStatus(request.status)}
-                    </span>
-                  </div>
-                </article>
-              ))}
-              {outgoingRequests.length === 0 && <p className="soft-text">No sent requests found.</p>}
+          <article className="member-card">
+            <div className="member-card__head">
+              <div>
+                <p className="member-card__eyebrow">Outgoing</p>
+                <h2>Sent requests</h2>
+              </div>
             </div>
+
+            {outgoingRequests.length > 0 ? (
+              <div className="member-record-list">
+                {outgoingRequests.map((request) => (
+                  <article key={request.id} className="member-record member-request-card">
+                    <div className="member-record__top">
+                      <div className="member-request-card__person">
+                        <img
+                          className="member-avatar-small"
+                          src={getAvatarForActor({ id: request.toId }, request.to)}
+                          alt={request.to}
+                        />
+                        <div>
+                          <strong>{request.to}</strong>
+                          <span>{request.createdAt}</span>
+                        </div>
+                      </div>
+                      <span className={`status-pill ${statusTone(request.status)}`}>
+                        {request.statusLabel || displayStatus(request.status)}
+                      </span>
+                    </div>
+
+                    <p>{request.message || "No application message provided."}</p>
+
+                    {request.response ? (
+                      <div className="member-note">
+                        <strong>Response</strong>
+                        <p>{request.response}</p>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="member-empty">
+                <p>No sent requests found.</p>
+              </div>
+            )}
           </article>
         </section>
       </div>
@@ -172,93 +348,135 @@ export default function PartnerDetail() {
 
   if (error && !profile) {
     return (
-      <div className="page-stack">
-        <section className="page-panel">
-          <p className="errorMessage">{error}</p>
-          {error.includes("enable matching first") && (
-            <div className="panel-actions" style={{ marginTop: 16 }}>
-              <button className="btn" type="button" onClick={() => navigate("/partner")}>
+      <div className="member-workspace">
+          <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
+            ← Back to Partner Recommendations
+          </Link>
+        <section className="member-alert member-alert--error">
+          <strong>Profile unavailable</strong>
+          <p>{error}</p>
+          {error.toLowerCase().includes("enable matching first") ? (
+            <div className="member-card__actions" style={{ marginTop: 12 }}>
+              <button className="btn" type="button" onClick={() => navigate(ROUTE_PATHS.PARTNER)}>
                 Go to partner profile
               </button>
             </div>
-          )}
+          ) : null}
         </section>
       </div>
     );
   }
 
-  if (!profileLoaded) {
-    return <div className="app-loading">Loading profile...</div>;
-  }
-
   if (!profile) {
     return (
-      <div className="page-stack">
-        <section className="page-panel">
+      <div className="member-workspace">
+          <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
+            ← Back to Partner Recommendations
+          </Link>
+        <div className="member-empty">
           <p>No active partner profile was found for this request.</p>
-        </section>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="page-stack">
-      <section className="page-hero">
-        <div>
-          <h1>{profile.nickname}</h1>
-          <p>{profile.interests.join(", ")} | {profile.level}</p>
-        </div>
-        <div className="hero-actions">
-          <button
-            className="btn"
-            onClick={async () => {
-              setError("");
-              setMessage("");
-              try {
-                await sendMatchRequest(
-                  {
-                    reciever_id: profile.memberId || profile.id,
-                    apply_description: `Hi ${profile.nickname}, would you like to arrange a shared training session?`,
-                  },
-                  sessionProfile,
+    <div className="member-workspace">
+        <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
+          ← Back to Partner Recommendations
+        </Link>
+
+      {error ? (
+        <section className="member-alert member-alert--error">
+          <strong>Request failed</strong>
+          <p>{error}</p>
+        </section>
+      ) : null}
+      {message ? (
+        <section className="member-alert member-alert--success">
+          <strong>Request sent</strong>
+          <p>{message}</p>
+        </section>
+      ) : null}
+
+      <section className="partner-detail">
+        <article className="partner-detail__card">
+          <div className="partner-detail__header">
+            <div className="partner-detail__identity">
+              <img
+                alt={profile.nickname}
+                className="partner-detail__avatar"
+                src={getAvatarForActor({ id: profile.memberId || profile.id }, profile.nickname)}
+              />
+              <div className="partner-detail__identityText">
+                <h1>{profile.nickname}</h1>
+                <span className="partner-detail__status">MATCH READY</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="partner-detail__section">
+            <h2>About Me</h2>
+            <p>{profile.description || profile.selfDescription || profile.bio || "No self-description provided."}</p>
+          </div>
+
+          <div className="partner-detail__section">
+            <h2>Sports Interests</h2>
+            <div className="partner-detail__chips">
+              {(profile.interests || profile.interestsRaw || []).map((entry) => (
+                <span key={entry} className="partner-detail__chip">
+                  {toTitleText(entry)}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="partner-detail__section">
+            <h2>Availability</h2>
+            <div className="partner-detail__availabilityList">
+              {(profile.availableTime || profile.availableTimeRaw || []).map((slot) => {
+                const [day, time] = formatAvailabilityEntry(slot).split(" - ");
+                return (
+                  <div key={slot} className="partner-detail__availabilityItem">
+                    <strong>{day}</strong>
+                    <span>{time}</span>
+                  </div>
                 );
-                setMessage("Match request sent.");
-              } catch (requestError) {
-                setError(getErrorMessage(requestError, "Unable to send this request."));
-              }
-            }}
-          >
-            Send match request
-          </button>
-        </div>
-      </section>
+              })}
+            </div>
+          </div>
 
-      {error && (
-        <section className="page-panel">
-          <p className="errorMessage">{error}</p>
-        </section>
-      )}
-      {message && (
-        <section className="page-panel">
-          <p className="successMessage">{message}</p>
-        </section>
-      )}
-
-      <section className="split-layout">
-        <article className="detail-card">
-          <h2>About</h2>
-          <p>{profile.bio}</p>
-        </article>
-
-        <article className="detail-card">
-          <h2>Availability</h2>
-          <div className="tags-row" style={{ marginTop: 16 }}>
-            {profile.availableTimeRaw?.map((slot) => (
-              <span key={slot} className="tag">{slot.replaceAll("_", " ")}</span>
-            ))}
+          <div className="partner-detail__actions">
+            <button
+              className="btn partner-detail__send"
+              type="button"
+              onClick={() => {
+                setRequestModalOpen(true);
+                setRequestDraft("");
+                setRequestError("");
+                setMessage("");
+                setError("");
+              }}
+            >
+              Send Match Request
+            </button>
           </div>
         </article>
       </section>
+
+      <MatchRequestModal
+        open={requestModalOpen}
+        pending={requestPending}
+        targetName={profile.nickname}
+        value={requestDraft}
+        error={requestError}
+        onChange={(nextValue) => {
+          setRequestDraft(nextValue);
+          setRequestError("");
+        }}
+        onCancel={closeRequestModal}
+        onConfirm={handleConfirmSend}
+      />
     </div>
   );
 }

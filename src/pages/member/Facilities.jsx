@@ -1,177 +1,449 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "../pageStyles.css";
-import { getFacilities } from "../../services/bookingService";
+import "./Facilities.css";
+import {
+  getFacilities,
+  getFacilityDateBounds,
+  getFacilitySportTypes,
+} from "../../services/bookingService";
+import { getBookingNewRoute, getFacilityDetailRoute } from "../../constants/routes";
+import { getErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 
+const DEFAULT_FILTERS = {
+  date: "",
+  type: "All",
+  availability: "All",
+  time: "All",
+};
+
+const AVAILABILITY_OPTIONS = [
+  { value: "All", label: "All statuses" },
+  { value: "normal", label: "normal" },
+  { value: "fixing", label: "fixing" },
+];
+
+function sortAlphabetically(values) {
+  return [...values].sort((left, right) => left.localeCompare(right));
+}
+
+function isDisplayableTimeSlot(slot = "") {
+  const match = String(slot).match(/^(\d{2}):00\s*-\s*(\d{2}):00$/);
+  if (!match) {
+    return false;
+  }
+
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  return start >= 0 && end <= 24 && end - start === 1;
+}
+
+function getDisplayableTimeSlots(slots = []) {
+  return slots.filter(isDisplayableTimeSlot);
+}
+
+function normalizeFacilityType(value = "") {
+  return String(value || "").trim().toLowerCase();
+}
+
+function formatFacilityType(value = "") {
+  return String(value || "").trim();
+}
+
+function buildHourSlotRange(startHour, endHour) {
+  const safeStart = Number(startHour);
+  const safeEnd = Number(endHour);
+
+  if (!Number.isFinite(safeStart) || !Number.isFinite(safeEnd) || safeEnd <= safeStart) {
+    return [];
+  }
+
+  return Array.from({ length: safeEnd - safeStart }, (_, index) => {
+    const start = String(safeStart + index).padStart(2, "0");
+    const end = String(safeStart + index + 1).padStart(2, "0");
+    return `${start}:00 - ${end}:00`;
+  });
+}
+
+function sortTimeSlots(slots = []) {
+  return [...slots].sort((left, right) => {
+    const leftStart = Number(String(left).slice(0, 2));
+    const rightStart = Number(String(right).slice(0, 2));
+    return leftStart - rightStart;
+  });
+}
+
+function getTimeOptions(items = [], selectedType = "All") {
+  const normalizedSelectedType = normalizeFacilityType(selectedType);
+  const scopedItems =
+    normalizedSelectedType === "all"
+      ? items
+      : items.filter((item) => normalizeFacilityType(item.sportType) === normalizedSelectedType);
+
+  if (!scopedItems.length) {
+    return ["All"];
+  }
+
+  if (normalizedSelectedType === "all") {
+    const startHours = scopedItems.map((item) => Number(item.startTime)).filter(Number.isFinite);
+    const endHours = scopedItems.map((item) => Number(item.endTime)).filter(Number.isFinite);
+
+    if (!startHours.length || !endHours.length) {
+      return ["All"];
+    }
+
+    return ["All", ...buildHourSlotRange(Math.min(...startHours), Math.max(...endHours))];
+  }
+
+  const timeSlots = new Set();
+  scopedItems.forEach((item) => {
+    buildHourSlotRange(item.startTime, item.endTime).forEach((slot) => timeSlots.add(slot));
+  });
+
+  return ["All", ...sortTimeSlots([...timeSlots])];
+}
+
+function formatDateLabel(value = "") {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 export default function Facilities() {
-  const [dateLimits] = useState(() => {
-    const today = new Date();
-    const maxBookingDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-    return {
-      today: today.toISOString().slice(0, 10),
-      maxBookingDate: maxBookingDate.toISOString().slice(0, 10),
-    };
+  const [dateBounds, setDateBounds] = useState({
+    minDate: "",
+    maxDate: "",
+    defaultDate: "",
   });
+  const [sportTypeOptions, setSportTypeOptions] = useState(["All"]);
   const [items, setItems] = useState([]);
-  const [filters, setFilters] = useState({
-    date: dateLimits.today,
-    type: "All",
-    availability: "All",
-    time: "All",
-  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [draftFilters, setDraftFilters] = useState(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   useEffect(() => {
-    getFacilities(filters.date).then(setItems);
+    let isActive = true;
+
+    Promise.all([getFacilityDateBounds(), getFacilitySportTypes()])
+      .then(([bounds, sportTypes]) => {
+        if (!isActive) {
+          return;
+        }
+
+        const nextBounds = {
+          minDate: bounds.minDate,
+          maxDate: bounds.maxDate,
+          defaultDate: bounds.defaultDate,
+        };
+
+        setDateBounds(nextBounds);
+        setSportTypeOptions(["All", ...sortAlphabetically(new Set(sportTypes))]);
+        setDraftFilters((previous) => ({
+          ...previous,
+          date: previous.date || nextBounds.defaultDate,
+        }));
+        setFilters((previous) => ({
+          ...previous,
+          date: previous.date || nextBounds.defaultDate,
+        }));
+      })
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+        const fallbackBounds = {
+          minDate: today,
+          maxDate: today,
+          defaultDate: today,
+        };
+
+        setDateBounds(fallbackBounds);
+        setSportTypeOptions(["All"]);
+        setDraftFilters((previous) => ({
+          ...previous,
+          date: previous.date || fallbackBounds.defaultDate,
+        }));
+        setFilters((previous) => ({
+          ...previous,
+          date: previous.date || fallbackBounds.defaultDate,
+        }));
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!filters.date) {
+      return undefined;
+    }
+
+    let isActive = true;
+
+    async function loadFacilities() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const result = await getFacilities(filters.date);
+        if (!isActive) {
+          return;
+        }
+        setItems(result);
+      } catch (loadError) {
+        if (!isActive) {
+          return;
+        }
+        setItems([]);
+        setError(getErrorMessage(loadError, "Unable to load facilities right now."));
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadFacilities();
+
+    return () => {
+      isActive = false;
+    };
   }, [filters.date]);
 
+  const displayItems = useMemo(() => {
+    return items.map((item) => ({
+      ...item,
+      memberVisibleSlots: getDisplayableTimeSlots(item.availableSlots || []),
+    }));
+  }, [items]);
+  const timeOptions = useMemo(() => getTimeOptions(displayItems, draftFilters.type), [displayItems, draftFilters.type]);
+
+  useEffect(() => {
+    if (!timeOptions.includes(draftFilters.time)) {
+      setDraftFilters((previous) => ({
+        ...previous,
+        time: "All",
+      }));
+    }
+  }, [draftFilters.time, timeOptions]);
+
+  useEffect(() => {
+    if (!timeOptions.includes(filters.time)) {
+      setFilters((previous) => ({
+        ...previous,
+        time: "All",
+      }));
+    }
+  }, [filters.time, timeOptions]);
+
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      const typeMatch = filters.type === "All" || item.sportType === filters.type;
+    return displayItems.filter((item) => {
+      const normalizedFilterType = normalizeFacilityType(filters.type);
+      const typeMatch =
+        normalizedFilterType === "all" || normalizeFacilityType(item.sportType) === normalizedFilterType;
       const statusMatch = filters.availability === "All" || item.status === filters.availability;
-      const slots = item.availableSlots ?? [];
-      const timeMatch = filters.time === "All" || slots.some((slot) => slot.startsWith(filters.time));
+      const timeMatch = filters.time === "All" || item.memberVisibleSlots.includes(filters.time);
       return typeMatch && statusMatch && timeMatch;
     });
-  }, [items, filters]);
+  }, [displayItems, filters]);
 
-  const sportTypes = ["All", ...new Set(items.map((item) => item.sportType))];
-  const timeOptions = ["All", ...new Set(items.flatMap((item) => (item.availableSlots || []).map((slot) => slot.slice(0, 5))))];
+  function updateDraftFilter(field, value) {
+    setDraftFilters((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  }
+
+  function applyFilters() {
+    setFilters(draftFilters);
+  }
+
+  function clearFilters() {
+    const resetFilters = {
+      date: dateBounds.defaultDate,
+      type: "All",
+      availability: "All",
+      time: "All",
+    };
+
+    setDraftFilters(resetFilters);
+    setFilters(resetFilters);
+  }
 
   return (
-    <div className="page-stack">
-      <section className="page-hero">
-        <div>
+    <div className="member-facilities-page">
+      <section className="member-facilities-header">
+        <div className="member-facilities-header__body">
           <h1>Facilities</h1>
-          <p>Browse visible venues, check live availability for the selected date, and only book facilities whose current status is normal.</p>
-        </div>
-        <div className="hero-actions">
-          <Link className="btn" to="/bookings/new">New booking request</Link>
+          <p className="member-facilities-header__subtitle">
+            Browse available sports venues and make a reservation.
+          </p>
         </div>
       </section>
 
-      <section className="page-panel">
-        <h2>Filters</h2>
-        <div className="filter-grid">
-          <div>
-            <label>Date</label>
+      <section className="member-facilities-toolbar">
+        <div className="member-facilities-toolbar__grid">
+          <div className="member-facilities-toolbar__field member-facilities-toolbar__field--date">
+            <label htmlFor="facilities-date">Date</label>
             <input
+              id="facilities-date"
               type="date"
-              value={filters.date}
-              min={dateLimits.today}
-              max={dateLimits.maxBookingDate}
-              onChange={(event) => setFilters((prev) => ({ ...prev, date: event.target.value }))}
+              value={draftFilters.date}
+              min={dateBounds.minDate}
+              max={dateBounds.maxDate}
+              onChange={(event) => updateDraftFilter("date", event.target.value)}
             />
           </div>
 
-          <div>
-            <label>Venue type</label>
+          <div className="member-facilities-toolbar__field">
+            <label htmlFor="facilities-type">Venue Type</label>
             <select
-              value={filters.type}
-              onChange={(event) => setFilters((prev) => ({ ...prev, type: event.target.value }))}
+              id="facilities-type"
+              value={draftFilters.type}
+              onChange={(event) => updateDraftFilter("type", event.target.value)}
             >
-              {sportTypes.map((type) => (
+              {sportTypeOptions.map((type) => (
                 <option key={type} value={type}>
-                  {type}
+                  {type === "All" ? "All Types" : type}
                 </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label>Status</label>
+          <div className="member-facilities-toolbar__field">
+            <label htmlFor="facilities-time">Time Slot (1h)</label>
             <select
-              value={filters.availability}
-              onChange={(event) => setFilters((prev) => ({ ...prev, availability: event.target.value }))}
-            >
-              <option value="All">All</option>
-              <option value="normal">Normal</option>
-              <option value="fixing">Fixing</option>
-            </select>
-          </div>
-
-          <div>
-            <label>Time slot</label>
-            <select
-              value={filters.time}
-              onChange={(event) => setFilters((prev) => ({ ...prev, time: event.target.value }))}
+              id="facilities-time"
+              value={draftFilters.time}
+              onChange={(event) => updateDraftFilter("time", event.target.value)}
             >
               {timeOptions.map((option) => (
                 <option key={option} value={option}>
-                  {option === "All" ? "All" : `${option} onwards`}
+                  {option === "All" ? "All Times" : option}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="member-facilities-toolbar__field">
+            <label htmlFor="facilities-availability">Availability</label>
+            <select
+              id="facilities-availability"
+              value={draftFilters.availability}
+              onChange={(event) => updateDraftFilter("availability", event.target.value)}
+            >
+              {AVAILABILITY_OPTIONS.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
                 </option>
               ))}
             </select>
           </div>
         </div>
-        <div className="panel-actions" style={{ marginTop: 16 }}>
-          <button
-            className="btn-secondary"
-            type="button"
-            onClick={() =>
-              setFilters({
-                date: dateLimits.today,
-                type: "All",
-                availability: "All",
-                time: "All",
-              })
-            }
-          >
-            Clear filters
+
+        <div className="member-facilities-toolbar__actions">
+          <button className="btn-ghost" type="button" onClick={clearFilters}>
+            Clear
+          </button>
+          <button className="btn" type="button" onClick={applyFilters}>
+            Apply
           </button>
         </div>
       </section>
 
-      <section className="cards-grid">
-        {filteredItems.map((facility) => (
-          <article key={facility.id} className="detail-card">
-            <div className="item-row">
-              <div>
-                <h2>{facility.name}</h2>
-                <p>{facility.sportType}</p>
-              </div>
-              <span className={`status-pill ${statusTone(facility.status)}`}>
-                {facility.statusLabel || displayStatus(facility.status)}
-              </span>
-            </div>
+      {loading && (
+        <section className="member-facilities-feedback">
+          <h2>Loading facilities</h2>
+          <p>Fetching the latest venue availability for the selected date.</p>
+        </section>
+      )}
 
-            <div className="booking-summary" style={{ marginTop: 16 }}>
-              <span className="soft-text">Capacity: {facility.capacity}</span>
-              <span className="soft-text">Location: {facility.location}</span>
-              <span className="soft-text">
-                Opening hours: {String(facility.startTime).padStart(2, "0")}:00 - {String(facility.endTime).padStart(2, "0")}:00
-              </span>
-            </div>
+      {!loading && error && (
+        <section className="member-facilities-feedback member-facilities-feedback--error">
+          <h2>Facilities could not be loaded</h2>
+          <p>{error}</p>
+        </section>
+      )}
 
-            <div className="tags-row" style={{ marginTop: 16 }}>
-              {(facility.availableSlots ?? []).length > 0 ? (
-                facility.availableSlots.map((slot) => (
-                  <span key={slot} className="tag">
-                    {slot}
+      {!loading && !error && filteredItems.length === 0 && (
+        <section className="member-facilities-feedback">
+          <h2>No facilities match the current filters</h2>
+          <p>Try another date, time slot, or venue type. Current date: {formatDateLabel(filters.date)}.</p>
+        </section>
+      )}
+
+      {!loading && !error && filteredItems.length > 0 && (
+        <section className="member-facilities-grid">
+          {filteredItems.map((facility) => {
+            const visibleSlots = facility.memberVisibleSlots.slice(0, 2);
+            const isBookable = facility.status === "normal" && facility.memberVisibleSlots.length > 0;
+            const hasSlots = facility.memberVisibleSlots.length > 0;
+
+            return (
+              <article key={facility.id} className="member-facility-card">
+                <div className="member-facility-card__header">
+                  <div className="member-facility-card__titleGroup">
+                    <h2>{facility.name || "Facility"}</h2>
+                    <p className="member-facility-card__subtitle">
+                      {formatFacilityType(facility.sportType) || "Venue type"}
+                    </p>
+                  </div>
+                  <span className={`status-pill ${statusTone(facility.status)}`}>
+                    {facility.statusLabel || displayStatus(facility.status)}
                   </span>
-                ))
-              ) : (
-                <span className="soft-text">No open slots are available for the selected date.</span>
-              )}
-            </div>
+                </div>
 
-            <div className="card-actions" style={{ marginTop: 20 }}>
-              <Link className="btn-secondary" to={`/facilities/${facility.id}`}>
-                View details
-              </Link>
-              {facility.status === "normal" && (
-                <Link className="btn" to={`/bookings/new?facility=${facility.id}`}>
-                  Book
-                </Link>
-              )}
-            </div>
-          </article>
-        ))}
-      </section>
+                <div className="member-facility-card__meta">
+                  <p>Capacity: {facility.capacity}</p>
+                </div>
 
-      {filteredItems.length === 0 && (
-        <section className="page-panel">
-          <p>No facilities match the selected filters.</p>
+                <div className="member-facility-card__slots">
+                  <p className="member-facility-card__slotsLabel">Available Times:</p>
+
+                  {facility.status === "fixing" ? (
+                    <p className="member-facility-card__unavailable">Not available for booking</p>
+                  ) : hasSlots ? (
+                    <div className="member-facility-card__slotTags">
+                      {visibleSlots.map((slot) => (
+                        <span key={slot} className="member-facility-card__slotTag">
+                          {slot}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="member-facility-card__emptySlots">No available time slots for the selected date.</p>
+                  )}
+                </div>
+
+                <div className="member-facility-card__actions">
+                  <Link className="btn-secondary" to={getFacilityDetailRoute(facility.id)}>
+                    View Details
+                  </Link>
+                  {isBookable && (
+                    <Link className="btn" to={getBookingNewRoute({ facilityId: facility.id, date: filters.date })}>
+                      Book
+                    </Link>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </section>
       )}
     </div>

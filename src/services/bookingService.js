@@ -6,20 +6,23 @@ import {
   buildHourRange,
   createNotifications,
   formatHourRange,
+  getCurrentActor,
   getEffectiveBookingStatus,
   getEffectiveFacilityStatus,
-  getCurrentActor,
   getFacilityLookup,
   getFriendRecord,
+  getMemberBookingDisplayStatus,
   getMemberLookup,
   getStaffLookup,
   getTimeSlotsForFacilityDate,
+  getVirtualFacilityDoc,
   isFacilityBookable,
   isFacilityVisible,
   overlaps,
   releaseRequestSlots,
   toHourNumber,
   toHourString,
+  toStoredDateString,
 } from "./centreService";
 import {
   buildCollectionQuery,
@@ -29,11 +32,13 @@ import {
   getDocumentRef,
   normalizeTimestamp,
   orderBy,
+  subscribeToCollection,
   updateCollectionDoc,
   where,
 } from "./firestoreService";
 import { createAppError } from "../utils/errors";
 import { displayStatus } from "../utils/presentation";
+import { callSubmitAction } from "./callableService";
 
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -43,12 +48,202 @@ function getMaxBookingDate() {
   return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+function buildHourSlotRange(startHour, endHour) {
+  const safeStart = Number(startHour);
+  const safeEnd = Number(endHour);
+
+  if (!Number.isFinite(safeStart) || !Number.isFinite(safeEnd) || safeEnd <= safeStart) {
+    return [];
+  }
+
+  return Array.from({ length: safeEnd - safeStart }, (_, index) => {
+    const start = String(safeStart + index).padStart(2, "0");
+    const end = String(safeStart + index + 1).padStart(2, "0");
+    return `${start}:00 - ${end}:00`;
+  });
+}
+
+function sortTimeSlots(slots = []) {
+  return [...slots].sort((left, right) => {
+    const leftStart = Number(String(left).slice(0, 2));
+    const rightStart = Number(String(right).slice(0, 2));
+    return leftStart - rightStart;
+  });
+}
+
+function normalizeText(value = "") {
+  return String(value || "").trim();
+}
+
+function normalizeKey(value = "") {
+  return normalizeText(value).toLowerCase();
+}
+
+export async function getFacilityDateBounds() {
+  return {
+    minDate: getTodayDate(),
+    maxDate: getMaxBookingDate(),
+    defaultDate: getTodayDate(),
+  };
+}
+
+export async function getFacilitySportTypes() {
+  const facilityDocs = await getCollectionDocs("facility", [orderBy("sport_type", "asc")]);
+  const uniqueTypes = new Map();
+
+  facilityDocs.forEach((item) => {
+    const label = normalizeText(item.sport_type);
+    const key = normalizeKey(item.sport_type);
+
+    if (!label || uniqueTypes.has(key)) {
+      return;
+    }
+
+    uniqueTypes.set(key, label);
+  });
+
+  return [...uniqueTypes.values()];
+}
+
+export async function getFacilityTimeFilterOptions(selectedType = "All") {
+  const [facilityDocs, repairs] = await Promise.all([
+    getCollectionDocs("facility", [orderBy("sport_type", "asc")]),
+    getCollectionDocs("repair"),
+  ]);
+
+  const visibleFacilities = facilityDocs
+    .map((item) => {
+      const virtualFacility = getVirtualFacilityDoc(item);
+      return {
+        ...virtualFacility,
+        status: getEffectiveFacilityStatus(
+          virtualFacility,
+          repairs.filter((repair) => repair.facility_id === item.id),
+        ),
+      };
+    })
+    .filter((item) => isFacilityVisible(item.status));
+
+  const scopedFacilities =
+    selectedType === "All"
+      ? visibleFacilities
+      : visibleFacilities.filter((item) => String(item.sportType || "") === String(selectedType || ""));
+
+  if (!scopedFacilities.length) {
+    return ["All"];
+  }
+
+  if (selectedType === "All") {
+    const startHours = scopedFacilities.map((item) => Number(item.startTime)).filter(Number.isFinite);
+    const endHours = scopedFacilities.map((item) => Number(item.endTime)).filter(Number.isFinite);
+
+    if (!startHours.length || !endHours.length) {
+      return ["All"];
+    }
+
+    return ["All", ...buildHourSlotRange(Math.min(...startHours), Math.max(...endHours))];
+  }
+
+  const timeOptions = new Set();
+  scopedFacilities.forEach((item) => {
+    buildHourSlotRange(item.startTime, item.endTime).forEach((slot) => timeOptions.add(slot));
+  });
+
+  return ["All", ...sortTimeSlots([...timeOptions])];
+}
+
+export function isBookingCancellationAllowed(item, now = new Date()) {
+  const source = item?.raw && typeof item.raw === "object" ? item.raw : item;
+  const normalizedStatus = normalizeBookingStatusValue(source?.status);
+  if (normalizedStatus !== "accepted") {
+    return false;
+  }
+
+  const bookingStart = buildDateTime(
+    source?.date || item?.date,
+    source?.start_time ?? item?.start_time ?? item?.startTime,
+  );
+  if (Number.isNaN(bookingStart.getTime())) {
+    return false;
+  }
+
+  return new Date(bookingStart.getTime() - 2 * 60 * 60 * 1000) > now;
+}
+
+export function isBookingCheckInOpen(item, now = new Date()) {
+  if (String(item?.status || "").toLowerCase() !== "accepted") {
+    return false;
+  }
+
+  const bookingStart = buildDateTime(item.date, item.start_time);
+  if (Number.isNaN(bookingStart.getTime())) {
+    return false;
+  }
+
+  const earliestCheckIn = new Date(bookingStart.getTime() - 15 * 60 * 1000);
+  return now >= earliestCheckIn && now < bookingStart;
+}
+
 async function resolveActor(actor) {
   return actor || getCurrentActor();
 }
 
 function normalizeParticipantIds(item = {}) {
   return [...new Set([...(item.participant_ids || []), ...(item.user_id_list || [])].filter(Boolean))];
+}
+
+function normalizeBookingStatusValue(value = "") {
+  const rawStatus = String(value || "").trim().toLowerCase();
+
+  if (!rawStatus) {
+    return "";
+  }
+
+  return rawStatus.replace(/[_-]+/g, " ");
+}
+
+function applyMemberBookingDisplay(item) {
+  const displayStatus = normalizeBookingStatusValue(getMemberBookingDisplayStatus(item.raw || item));
+  return {
+    ...item,
+    status: displayStatus,
+    statusLabel: displayStatus || item.statusLabel || "",
+  };
+}
+
+export function getStaffRequestPageStatus(value = "") {
+  const normalizedStatus = normalizeBookingStatusValue(value);
+  return normalizedStatus === "suggested" ? "alternative suggested" : normalizedStatus;
+}
+
+export function getStaffCheckInPageStatus(item = {}, now = new Date()) {
+  const source = item?.raw && typeof item.raw === "object" ? item.raw : item;
+  const rawStatus = normalizeBookingStatusValue(source.status || item.status);
+  const date = source.date || item.date || "";
+  const startTime = source.start_time ?? item.start_time ?? item.startTime ?? "";
+  const endTime = source.end_time ?? item.end_time ?? item.endTime ?? "";
+
+  if (rawStatus === "accepted") {
+    const bookingStartTime = buildDateTime(date, startTime);
+    if (Number.isNaN(bookingStartTime.getTime())) {
+      return "accepted";
+    }
+    return now < bookingStartTime ? "accepted" : "no_show";
+  }
+
+  if (rawStatus === "in progress" || rawStatus === "in_progress") {
+    const bookingEndTime = buildDateTime(date, endTime);
+    if (Number.isNaN(bookingEndTime.getTime())) {
+      return "in_progress";
+    }
+    return now < bookingEndTime ? "in_progress" : "completed";
+  }
+
+  if (rawStatus === "no show" || rawStatus === "no_show") {
+    return "no_show";
+  }
+
+  return rawStatus || "";
 }
 
 function sortBookings(items) {
@@ -72,7 +267,7 @@ function mapFacility(item, slotItems = []) {
   return {
     id: item.id,
     name: item.name,
-    sportType: item.sportType,
+    sportType: normalizeText(item.sportType),
     description: item.description,
     usageGuidelines: item.usageGuidelines,
     capacity: item.capacity,
@@ -95,7 +290,7 @@ function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "
   const participantNames = participantIds
     .map((participantId) => memberLookup.get(participantId)?.name || participantId)
     .filter(Boolean);
-  const effectiveStatus = getEffectiveBookingStatus(item);
+  const effectiveStatus = normalizeBookingStatusValue(getEffectiveBookingStatus(item));
 
   return {
     id: item.id,
@@ -108,7 +303,7 @@ function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "
     staffId: item.staff_id || "",
     staffName: staff?.name || "Staff",
     status: effectiveStatus,
-    statusLabel: displayStatus(effectiveStatus),
+      statusLabel: effectiveStatus || String(item.status || "").toLowerCase(),
     date: item.date || "",
     startTime: toHourString(item.start_time),
     endTime: toHourString(item.end_time),
@@ -157,15 +352,22 @@ async function validateFacilityBookingInput(facility, payload) {
   }
 
   if (payload.date < getTodayDate() || payload.date > getMaxBookingDate()) {
-    throw createAppError("invalid-argument", "Bookings must be made from today up to 7 days in advance.");
+    const existingSlots = await getCollectionDocs("time_slot", [
+      where("facility_id", "==", payload.facility_id),
+      where("date", "==", payload.date),
+    ]);
+
+    if (!existingSlots.length) {
+      throw createAppError("invalid-argument", "Bookings must be made within the visible booking date range.");
+    }
   }
 
   const startTime = toHourNumber(payload.start_time);
   const endTime = toHourNumber(payload.end_time);
   const duration = endTime - startTime;
 
-  if (startTime < facility.startTime || endTime > facility.endTime || duration < 1 || duration > 4) {
-    throw createAppError("invalid-argument", "Bookings must fit within facility hours and last between 1 and 4 hours.");
+  if (startTime < facility.startTime || endTime > facility.endTime || duration !== 1) {
+    throw createAppError("invalid-argument", "Each booking request must stay within facility hours and last exactly 1 hour.");
   }
 
   const attendees = Number(payload.attendent || 0);
@@ -223,11 +425,11 @@ function hasParticipantConflict(requests, involvedIds, selectedHours, currentReq
   return false;
 }
 
-async function validateParticipantConflicts(actor, payload, selectedHours) {
+async function validateParticipantConflicts(actor, payload, selectedHours, currentRequestId = "") {
   const allRequestsForDate = await getCollectionDocs("request", [where("date", "==", payload.date)]);
   const involvedIds = new Set([actor.id, ...normalizeParticipantIds(payload)]);
 
-  if (hasParticipantConflict(allRequestsForDate, involvedIds, selectedHours)) {
+  if (hasParticipantConflict(allRequestsForDate, involvedIds, selectedHours, currentRequestId)) {
     throw createAppError(
       "failed-precondition",
       "You or one of the invited friends already has an active booking in this time period.",
@@ -245,26 +447,55 @@ export async function getFacilities(selectedDate = getTodayDate(), options = {})
     getCollectionDocs("facility", [orderBy("sport_type", "asc")]),
     getCollectionDocs("repair"),
   ]);
-  const nextFacilities = [];
+  const nextFacilities = await Promise.all(
+    facilityDocs.map(async (item) => {
+      const virtualFacility = getVirtualFacilityDoc(item);
+      const facilityWithEffectiveStatus = {
+        ...virtualFacility,
+        status: getEffectiveFacilityStatus(
+          virtualFacility,
+          repairs.filter((repair) => repair.facility_id === item.id),
+        ),
+      };
 
-  for (const item of facilityDocs) {
-    const facilityWithEffectiveStatus = {
-      ...item,
-      status: getEffectiveFacilityStatus(
-        item,
-        repairs.filter((repair) => repair.facility_id === item.id),
-      ),
-    };
+      const slots = await getTimeSlotsForFacilityDate(facilityWithEffectiveStatus, selectedDate);
+      return mapFacility(facilityWithEffectiveStatus, slots);
+    }),
+  );
 
-    if (!options.includeHidden && !isFacilityVisible(facilityWithEffectiveStatus.status)) {
-      continue;
-    }
-
-    const slots = await getTimeSlotsForFacilityDate(facilityWithEffectiveStatus, selectedDate);
-    nextFacilities.push(mapFacility(facilityWithEffectiveStatus, slots));
+  const nonDeletedFacilities = nextFacilities.filter((item) => item.status !== "deleted");
+  if (typeof window !== "undefined" && import.meta.env.DEV) {
+    console.debug("[FacilitiesDebug:getFacilities]", {
+      selectedDate,
+      rawFacilityCount: facilityDocs.length,
+      rawFacilities: facilityDocs.map((item) => ({
+        id: item.id,
+        name: item.name,
+        sport_type: item.sport_type,
+        status: item.status,
+        staff_id: item.staff_id,
+        start_time: item.start_time,
+        end_time: item.end_time,
+        scheduled_change: item.scheduled_change || item.scheduledChange || null,
+      })),
+      repairCount: repairs.length,
+      mappedFacilities: nextFacilities.map((item) => ({
+        id: item.id,
+        name: item.name,
+        sportType: item.sportType,
+        status: item.status,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        availableSlotCount: item.availableSlots.length,
+      })),
+    });
   }
 
-  return nextFacilities;
+  if (options.includeHidden) {
+    return nonDeletedFacilities;
+  }
+
+  return nonDeletedFacilities.filter((item) => isFacilityVisible(item.status));
 }
 
 export async function getFacilityById(id, selectedDate = getTodayDate()) {
@@ -276,9 +507,10 @@ export async function getFacilityById(id, selectedDate = getTodayDate()) {
     return null;
   }
 
+  const virtualFacility = getVirtualFacilityDoc(facility);
   const facilityWithEffectiveStatus = {
-    ...facility,
-    status: getEffectiveFacilityStatus(facility, repairs),
+    ...virtualFacility,
+    status: getEffectiveFacilityStatus(virtualFacility, repairs),
   };
   const slots = await getTimeSlotsForFacilityDate(facilityWithEffectiveStatus, selectedDate);
   return mapFacility(facilityWithEffectiveStatus, slots);
@@ -290,7 +522,7 @@ export async function getTimeSlotsByFacility(facilityId, selectedDate = getToday
     return [];
   }
 
-  const slots = await getTimeSlotsForFacilityDate(facility, selectedDate);
+  const slots = await getTimeSlotsForFacilityDate(getVirtualFacilityDoc(facility), selectedDate);
   return slots.map((slot) => ({
     ...slot,
     timeLabel: formatHourRange(slot.start_time, slot.end_time),
@@ -307,7 +539,8 @@ export async function getBookings(actor) {
     return item.member_id === resolvedActor.id || participantIds.includes(resolvedActor.id);
   });
 
-  return decorateRequests(relevantRequests, resolvedActor.id);
+  const decoratedItems = await decorateRequests(relevantRequests, resolvedActor.id);
+  return decoratedItems.map(applyMemberBookingDisplay);
 }
 
 export async function getBookingById(id, actor) {
@@ -324,10 +557,10 @@ export async function getBookingById(id, actor) {
   }
 
   const [booking] = await decorateRequests([request], resolvedActor?.id || "");
-  return booking || null;
+  return booking ? applyMemberBookingDisplay(booking) : null;
 }
 
-export async function submitBookingRequest(payload, actor) {
+async function submitBookingRequestDirect(payload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
 
@@ -431,20 +664,286 @@ export async function submitBookingRequest(payload, actor) {
   return { success: true, request_id: requestRef.id };
 }
 
+export async function submitBookingRequest(payload, actor) {
+  return callSubmitAction(
+    "submitBookingRequest",
+    {
+      facility_id: payload.facility_id,
+      date: toStoredDateString(payload.date),
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      attendent: Number(payload.attendent || 0),
+      activity_description: payload.activity_description,
+      user_id_list: [...new Set([...(payload.user_id_list || []), ...(payload.participant_ids || [])].filter(Boolean))],
+    },
+  );
+}
+
+async function modifyPendingBookingDirect(payload, actor) {
+  const resolvedActor = await resolveActor(actor);
+  assertRole(resolvedActor, ["Member"]);
+
+  const requestId = payload.request_id || payload.id;
+  const existingRequest = await getRequestByIdOrThrow(requestId);
+  if (existingRequest.member_id !== resolvedActor.id) {
+    throw createAppError("permission-denied");
+  }
+
+  const currentStatus = String(existingRequest.status || "").toLowerCase();
+  if (!["pending", "suggested"].includes(currentStatus)) {
+    throw createAppError("failed-precondition", "Only pending requests can be modified.");
+  }
+
+  const facility = await getFacilityById(existingRequest.facility_id, payload.date);
+  if (!facility) {
+    throw createAppError("not-found");
+  }
+
+  if (!isFacilityBookable(facility.status)) {
+    throw createAppError("failed-precondition", "This facility is currently unavailable for booking.");
+  }
+
+  const participantIds = normalizeParticipantIds(existingRequest);
+  const nextPayload = {
+    facility_id: existingRequest.facility_id,
+    date: payload.date,
+    start_time: payload.start_time,
+    end_time: payload.end_time,
+    attendent: Number(payload.attendent || 0),
+    activity_description: existingRequest.activity_description || "Booking request",
+    participant_ids: participantIds,
+  };
+
+  await validateFacilityBookingInput(facility, nextPayload);
+  if (participantIds.length > Number(nextPayload.attendent || 0) - 1) {
+    throw createAppError("invalid-argument", "The updated attendee count must still include all invited friends.");
+  }
+
+  const selectedHours = buildHourRange(nextPayload.start_time, nextPayload.end_time);
+  const persistedFacility = await getDocById("facility", existingRequest.facility_id);
+  if (persistedFacility) {
+    await getTimeSlotsForFacilityDate(persistedFacility, nextPayload.date, { persist: true });
+  }
+  await validateParticipantConflicts(resolvedActor, nextPayload, selectedHours, requestId);
+
+  await runDbTransaction(async (transaction) => {
+    const requestRef = getDocumentRef("request", requestId);
+    const requestSnapshot = await transaction.get(requestRef);
+    if (!requestSnapshot.exists()) {
+      throw createAppError("not-found");
+    }
+
+    const currentRequest = {
+      id: requestSnapshot.id,
+      ...requestSnapshot.data(),
+    };
+
+    if (currentRequest.member_id !== resolvedActor.id) {
+      throw createAppError("permission-denied");
+    }
+
+    if (!["pending", "suggested"].includes(String(currentRequest.status || "").toLowerCase())) {
+      throw createAppError("aborted", "The request status changed. Please refresh and try again.");
+    }
+
+    const involvedIds = new Set([resolvedActor.id, ...normalizeParticipantIds(currentRequest)]);
+    const requestsForDateSnapshot = await transaction.get(buildCollectionQuery("request", [where("date", "==", nextPayload.date)]));
+    const requestsForDate = requestsForDateSnapshot.docs.map(buildDocSnapshot).filter(Boolean);
+    if (hasParticipantConflict(requestsForDate, involvedIds, selectedHours, requestId)) {
+      throw createAppError(
+        "failed-precondition",
+        "You or one of the invited friends already has an active booking in this time period.",
+      );
+    }
+
+    const slotSnapshots = await transaction.get(buildCollectionQuery("time_slot", [where("facility_id", "==", currentRequest.facility_id)]));
+    const allSlots = slotSnapshots.docs.map(buildDocSnapshot).filter(Boolean);
+    const slotsForTargetDate = allSlots.filter((slot) => slot.date === nextPayload.date);
+    const slotsByHour = new Map(slotsForTargetDate.map((slot) => [toHourNumber(slot.start_time), slot]));
+    const currentLockedSlots = allSlots.filter((slot) => slot.request_id === requestId);
+
+    selectedHours.forEach((hour) => {
+      const slot = slotsByHour.get(hour);
+      if (!slot) {
+        throw createAppError("resource-exhausted");
+      }
+
+      const slotStatus = String(slot.status || "").toLowerCase();
+      if (slotStatus !== "open" && slot.request_id !== requestId) {
+        throw createAppError("resource-exhausted");
+      }
+    });
+
+    const nextSlotIds = new Set(selectedHours.map((hour) => slotsByHour.get(hour)?.id).filter(Boolean));
+
+    currentLockedSlots.forEach((slot) => {
+      if (nextSlotIds.has(slot.id)) {
+        return;
+      }
+
+      transaction.update(getDocumentRef("time_slot", slot.id), {
+        status: "open",
+        request_id: "",
+        updated_at: serverTimestamp(),
+      });
+    });
+
+    selectedHours.forEach((hour) => {
+      const slot = slotsByHour.get(hour);
+      transaction.update(getDocumentRef("time_slot", slot.id), {
+        status: "locked",
+        request_id: requestId,
+        updated_at: serverTimestamp(),
+      });
+    });
+
+    transaction.update(requestRef, {
+      date: nextPayload.date,
+      start_time: toHourString(nextPayload.start_time),
+      end_time: toHourString(nextPayload.end_time),
+      attendent: Number(nextPayload.attendent || 1),
+      status: "pending",
+      staff_response: "",
+      completed_at: "",
+      updated_at: serverTimestamp(),
+    });
+  });
+
+  await createNotifications(
+    [existingRequest.member_id, existingRequest.staff_id, ...participantIds],
+    `The booking request for ${nextPayload.date} ${formatHourRange(nextPayload.start_time, nextPayload.end_time)} was updated and sent back for approval.`,
+    "facility_request",
+    "pending",
+    requestId,
+  );
+
+  return { success: true };
+}
+
+export async function modifyPendingBooking(payload, actor) {
+  return callSubmitAction(
+    "modifyPendingBooking",
+    {
+      request_id: payload.request_id || payload.id,
+      date: payload.date,
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      attendent: Number(payload.attendent || 0),
+    },
+  );
+}
+
 export async function getStaffRequests(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
   const allRequests = await getCollectionDocs("request");
-  const pendingRequests = allRequests.filter((item) => {
-    const isPending = String(item.status || "").toLowerCase() === "pending";
-    if (!isPending) {
-      return false;
-    }
-    return resolvedActor.role === "Admin" ? true : item.staff_id === resolvedActor.id;
-  });
+  const relevantRequests = allRequests.filter((item) => (resolvedActor.role === "Admin" ? true : item.staff_id === resolvedActor.id));
 
-  return decorateRequests(pendingRequests, resolvedActor.id);
+  return decorateRequests(relevantRequests, resolvedActor.id);
+}
+
+export async function getStaffManagedFacilities(actor) {
+  const resolvedActor = await resolveActor(actor);
+  assertRole(resolvedActor, ["Staff", "Admin"]);
+
+  const allFacilities = await getCollectionDocs("facility");
+  const relevantFacilities = allFacilities.filter((item) => (resolvedActor.role === "Admin" ? true : item.staff_id === resolvedActor.id));
+
+  return [...relevantFacilities]
+    .sort((left, right) => String(left.name || "").localeCompare(String(right.name || "")))
+    .map((item) => ({
+      id: item.id,
+      name: item.name || item.id,
+      sport_type: item.sport_type || "",
+      staff_id: item.staff_id || "",
+      status: item.status || "",
+    }));
+}
+
+export async function getStaffRequestConflictSummary(requestOrId, actor) {
+  const resolvedActor = await resolveActor(actor);
+  assertRole(resolvedActor, ["Staff", "Admin"]);
+
+  const request =
+    typeof requestOrId === "object" && requestOrId !== null
+      ? requestOrId.raw && typeof requestOrId.raw === "object"
+        ? requestOrId.raw
+        : requestOrId
+      : await getRequestByIdOrThrow(requestOrId);
+
+  if (!request?.id && !request?.facility_id) {
+    throw createAppError("not-found");
+  }
+
+  if (resolvedActor.role === "Staff" && request.staff_id !== resolvedActor.id) {
+    throw createAppError("permission-denied");
+  }
+
+  const pageStatus = getStaffRequestPageStatus(request.status);
+
+  if (pageStatus === "accepted") {
+    return {
+      state: "available",
+      title: "Facility Available",
+      message: "This request has already been approved and is now read-only.",
+    };
+  }
+
+  if (pageStatus === "rejected") {
+    return {
+      state: "conflict",
+      title: "Request Rejected",
+      message: String(request.staff_response || "").trim() || "This request has already been rejected and can no longer be processed.",
+    };
+  }
+
+  if (pageStatus === "alternative suggested") {
+    return {
+      state: "conflict",
+      title: "Alternative Suggested",
+      message:
+        String(request.staff_response || "").trim() ||
+        "An alternative has already been suggested for this request, so it is now read-only.",
+    };
+  }
+
+  if (pageStatus === "cancelled") {
+    return {
+      state: "conflict",
+      title: "Request Cancelled",
+      message: "This request is no longer active because the member cancelled it after approval.",
+    };
+  }
+
+  const requiredHours = buildHourRange(request.start_time, request.end_time);
+  const facilitySlots = await getCollectionDocs("time_slot", [where("facility_id", "==", request.facility_id)]);
+  const slotsForDate = facilitySlots.filter((slot) => slot.date === request.date);
+  const slotsByHour = new Map(slotsForDate.map((slot) => [toHourNumber(slot.start_time), slot]));
+  const selectedSlots = requiredHours.map((hour) => slotsByHour.get(hour)).filter(Boolean);
+
+  if (selectedSlots.length !== requiredHours.length) {
+    return {
+      state: "conflict",
+      title: "Time Conflict Detected",
+      message: "One or more required time slots are missing. Please suggest an alternative or reject this request.",
+    };
+  }
+
+  const hasConflict = selectedSlots.some((slot) => String(slot.request_id || "") !== String(request.id || ""));
+  if (hasConflict) {
+    return {
+      state: "conflict",
+      title: "Time Conflict Detected",
+      message: "Another booking already exists for this slot. Please suggest an alternative or reject.",
+    };
+  }
+
+  return {
+    state: "available",
+    title: "Facility Available",
+    message: "No conflicting bookings for this time slot.",
+  };
 }
 
 export async function getRequestFeedbackTemplate(status) {
@@ -464,8 +963,8 @@ export async function getStaffCheckIns(actor) {
 
   const allRequests = await getCollectionDocs("request");
   const checkInRequests = allRequests.filter((item) => {
-    const status = getEffectiveBookingStatus(item);
-    const allowed = ["accepted", "in_progress"].includes(status);
+    const status = normalizeBookingStatusValue(item.status);
+    const allowed = ["accepted", "in_progress", "in progress", "no_show", "no show"].includes(status);
     if (!allowed) {
       return false;
     }
@@ -475,10 +974,36 @@ export async function getStaffCheckIns(actor) {
   return decorateRequests(checkInRequests, resolvedActor.id);
 }
 
-export async function checkInBooking(id, actor) {
+export async function subscribeToStaffCheckIns(actor, onNext, onError) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
+  const constraints = resolvedActor.role === "Admin" ? [] : [where("staff_id", "==", resolvedActor.id)];
+
+  return subscribeToCollection(
+    "request",
+    constraints,
+    async (items) => {
+      try {
+        const checkInRequests = items.filter((item) => {
+          const status = normalizeBookingStatusValue(item.status);
+          return ["accepted", "in_progress", "in progress", "no_show", "no show"].includes(status);
+        });
+        const decorated = await decorateRequests(checkInRequests, resolvedActor.id);
+        onNext?.(decorated);
+      } catch (mappingError) {
+        onError?.(mappingError);
+      }
+    },
+    onError,
+  );
+}
+
+async function checkInBookingDirect(idOrPayload, actor) {
+  const resolvedActor = await resolveActor(actor);
+  assertRole(resolvedActor, ["Staff", "Admin"]);
+
+  const id = typeof idOrPayload === "object" && idOrPayload !== null ? idOrPayload.request_id || idOrPayload.id : idOrPayload;
   const request = await getRequestByIdOrThrow(id);
   if (resolvedActor.role === "Staff" && request.staff_id !== resolvedActor.id) {
     throw createAppError("permission-denied");
@@ -487,16 +1012,12 @@ export async function checkInBooking(id, actor) {
     throw createAppError("failed-precondition", "Only accepted bookings can be checked in.");
   }
 
-  const now = new Date();
-  const bookingStart = buildDateTime(request.date, request.start_time);
-  const bookingEnd = buildDateTime(request.date, request.end_time);
-  const earliestCheckIn = new Date(bookingStart.getTime() - 30 * 60 * 1000);
-  if (now < earliestCheckIn || now > bookingEnd) {
-    throw createAppError(
-      "failed-precondition",
-      "Check-in is only available from 30 minutes before the booking starts until the booking ends.",
-    );
-  }
+    if (!isBookingCheckInOpen(request)) {
+      throw createAppError(
+        "failed-precondition",
+        "Check-in is only available from 15 minutes before the booking starts until the booking starts.",
+      );
+    }
 
   await updateCollectionDoc("request", id, {
     status: "in_progress",
@@ -514,54 +1035,41 @@ export async function checkInBooking(id, actor) {
   return { success: true };
 }
 
-export async function withdrawPendingBooking(id, actor) {
-  const resolvedActor = await resolveActor(actor);
-  assertRole(resolvedActor, ["Member"]);
+export async function checkInBooking(idOrPayload, actor) {
+  const payload =
+    typeof idOrPayload === "object" && idOrPayload !== null
+      ? { request_id: idOrPayload.request_id || idOrPayload.id }
+      : { request_id: idOrPayload };
 
-  const request = await getRequestByIdOrThrow(id);
-  if (request.member_id !== resolvedActor.id) {
-    throw createAppError("permission-denied");
-  }
-
-  const status = String(request.status || "").toLowerCase();
-  if (!["pending", "suggested"].includes(status)) {
-    throw createAppError("failed-precondition", "Only pending requests can be withdrawn.");
-  }
-
-  await updateCollectionDoc("request", id, {
-    status: "cancelled",
-    completed_at: new Date().toISOString(),
-    updated_at: serverTimestamp(),
-  });
-  await releaseRequestSlots(id);
-
-  await createNotifications(
-    [resolvedActor.id, request.staff_id, ...normalizeParticipantIds(request)],
-    `The pending booking request for ${request.date} ${formatHourRange(request.start_time, request.end_time)} was withdrawn.`,
-    "facility_request",
-    "cancelled",
-    id,
-  );
-
-  return { success: true };
+  return callSubmitAction("checkInBooking", payload);
 }
 
-export async function cancelConfirmedBooking(id, actor) {
+export async function withdrawPendingBooking(idOrPayload, actor) {
+  void actor;
+
+  const payload =
+    typeof idOrPayload === "object" && idOrPayload !== null
+      ? { request_id: idOrPayload.request_id || idOrPayload.id }
+      : { request_id: idOrPayload };
+
+  return callSubmitAction("withdrawPendingBooking", payload);
+}
+
+async function cancelConfirmedBookingDirect(idOrPayload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
 
+  const id = typeof idOrPayload === "object" && idOrPayload !== null ? idOrPayload.request_id || idOrPayload.id : idOrPayload;
   const request = await getRequestByIdOrThrow(id);
   if (request.member_id !== resolvedActor.id) {
     throw createAppError("permission-denied");
   }
 
-  if (String(request.status || "").toLowerCase() !== "accepted") {
+  if (normalizeBookingStatusValue(request.status) !== "accepted") {
     throw createAppError("failed-precondition", "Only accepted bookings can be cancelled.");
   }
 
-  const bookingStart = buildDateTime(request.date, request.start_time);
-  const cancellationDeadline = new Date(bookingStart.getTime() - 2 * 60 * 60 * 1000);
-  if (cancellationDeadline <= new Date()) {
+  if (!isBookingCancellationAllowed(request)) {
     throw createAppError("deadline-exceeded");
   }
 
@@ -590,16 +1098,32 @@ export async function cancelConfirmedBooking(id, actor) {
   return { success: true };
 }
 
-export async function approveBooking(id, nextStatus = "accepted", staffResponse = "", actor) {
+export async function cancelConfirmedBooking(idOrPayload, actor) {
+  const payload =
+    typeof idOrPayload === "object" && idOrPayload !== null
+      ? { request_id: idOrPayload.request_id || idOrPayload.id }
+      : { request_id: idOrPayload };
+
+  return callSubmitAction("cancelConfirmedBooking", payload);
+}
+
+async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted", staffResponse = "", actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
-  const normalizedStatus = String(nextStatus || "").toLowerCase();
+  const payload =
+    typeof idOrPayload === "object" && idOrPayload !== null
+      ? idOrPayload
+      : { request_id: idOrPayload, status: nextStatus, staff_response: staffResponse };
+  const id = payload.request_id || payload.id;
+  const statusSource = Array.isArray(payload.status) ? payload.status[0] : payload.status;
+  const responseText = String(payload.staff_response || payload.staffResponse || "").trim();
+  const normalizedStatus = String(statusSource || "").toLowerCase();
   if (!["accepted", "rejected", "suggested"].includes(normalizedStatus)) {
     throw createAppError("invalid-argument");
   }
 
-  if (["rejected", "suggested"].includes(normalizedStatus) && !staffResponse.trim()) {
+  if (["rejected", "suggested"].includes(normalizedStatus) && !responseText) {
     throw createAppError("invalid-argument", "Please enter a response for rejected or suggested requests.");
   }
 
@@ -622,12 +1146,12 @@ export async function approveBooking(id, nextStatus = "accepted", staffResponse 
     }
 
     if (String(request.status || "").toLowerCase() !== "pending") {
-      throw createAppError("already-processed");
+      throw createAppError("aborted", "Current request status has changed. Please refresh.");
     }
 
     transaction.update(requestRef, {
       status: normalizedStatus,
-      staff_response: staffResponse.trim(),
+      staff_response: responseText,
       completed_at: normalizedStatus === "accepted" ? "" : new Date().toISOString(),
       updated_at: serverTimestamp(),
     });
@@ -647,8 +1171,8 @@ export async function approveBooking(id, nextStatus = "accepted", staffResponse 
 
   const messageByStatus = {
     accepted: "Your booking request has been approved.",
-    rejected: `Your booking request has been rejected. ${staffResponse.trim()}`.trim(),
-    suggested: `A change was suggested for your booking request. ${staffResponse.trim()}`.trim(),
+    rejected: `Your booking request has been rejected. ${responseText}`.trim(),
+    suggested: `A change was suggested for your booking request. ${responseText}`.trim(),
   };
 
   await createNotifications(
@@ -661,3 +1185,21 @@ export async function approveBooking(id, nextStatus = "accepted", staffResponse 
 
   return { success: true };
 }
+
+export async function processBookingApproval(idOrPayload, nextStatus = "accepted", staffResponse = "", actor) {
+  const payload =
+    typeof idOrPayload === "object" && idOrPayload !== null
+      ? idOrPayload
+      : { request_id: idOrPayload, status: nextStatus, staff_response: staffResponse };
+
+  return callSubmitAction(
+    "processBookingApproval",
+    {
+      request_id: payload.request_id || payload.id,
+      status: Array.isArray(payload.status) ? payload.status : [payload.status || nextStatus].filter(Boolean),
+      staff_response: payload.staff_response || payload.staffResponse || staffResponse || "",
+    },
+  );
+}
+
+export const approveBooking = processBookingApproval;

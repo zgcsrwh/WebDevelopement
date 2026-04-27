@@ -1,178 +1,319 @@
-.shell {
+.member-shell {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  background: var(--color-surface-muted);
-}
-
-.shell__sidebar {
   display: flex;
   flex-direction: column;
-  padding: 24px 18px;
-  gap: 24px;
-  background: linear-gradient(180deg, #0f172a 0%, #162238 100%);
-  color: var(--color-text-on-dark);
+  background: #edf2f5;
+  overflow-x: clip;
 }
 
-.shell__brand {
+.member-shell__topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 24px;
+  min-height: 112px;
+  padding: 0 32px;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #d9e2e8;
+  backdrop-filter: blur(10px);
+}
+
+.member-shell__brand {
+  color: #17212b;
+  text-decoration: none;
+  font-size: clamp(1.7rem, 2.1vw, 2.05rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.member-shell__brandRow {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 6px;
+  min-width: 0;
 }
 
-.shell__logo {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #38bdf8, #22c55e);
-  color: #04111c;
+.member-shell__roleBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: #eef4f7;
+  color: #5a7485;
+  font-size: 0.92rem;
   font-weight: 800;
 }
 
-.shell__brand h1,
-.shell__topbar h2 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.shell__eyebrow {
-  margin: 0 0 4px;
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-soft);
-}
-
-.shell__nav {
-  display: grid;
-  gap: 8px;
-}
-
-.shell__link,
-.shell__logout {
-  border: 0;
+.member-shell__nav {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  color: #d8e1ec;
-  text-decoration: none;
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
-}
-
-.shell__link:hover,
-.shell__logout:hover,
-.shell__link.is-active {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-}
-
-.shell__logout {
-  margin-top: auto;
-}
-
-.shell__content {
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
 }
 
-.shell__topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 20px 32px 10px;
-}
-
-.shell__topbarRight {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.shell__notification {
+.member-shell__navLink {
   position: relative;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 112px;
+  padding: 0 22px;
+  color: #667887;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.shell__notification span {
+.member-shell__navLink:hover {
+  color: #223642;
+}
+
+.member-shell__navLink.is-active {
+  color: #223642;
+}
+
+.member-shell__navLink.is-active::after {
+  content: "";
   position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--color-danger);
-  color: white;
-  font-size: 0.7rem;
+  left: 22px;
+  right: 22px;
+  bottom: 0;
+  height: 4px;
+  border-radius: 999px 999px 0 0;
+  background: #5e798a;
 }
 
-.shell__profile {
+.member-shell__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: 18px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  justify-content: flex-end;
+  gap: 14px;
 }
 
-.shell__profile p {
-  margin: 2px 0 0;
-  color: var(--color-text-soft);
-  font-size: 0.85rem;
+.member-shell__iconButton,
+.member-shell__profileLink {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: #edf1f4;
+  color: #657785;
+  text-decoration: none;
+  overflow: visible;
 }
 
-.shell__avatar {
-  width: 40px;
-  height: 40px;
+.member-shell__iconButton:hover,
+.member-shell__profileLink:hover {
+  background: #e5ebef;
+  color: #223642;
+}
+
+.member-shell__badge {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  min-width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #dbeafe, #ccfbf1);
-  color: var(--color-primary);
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #cb6158;
+  color: #ffffff;
+  font-size: 0.78rem;
   font-weight: 700;
+  line-height: 1;
 }
 
-.shell__main {
-  padding: 12px 32px 32px;
+.member-shell__avatar {
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf1f4;
+}
+
+.member-shell__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.member-shell__avatarInitial {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-family: "Manrope", "Inter", sans-serif;
+  font-weight: 800;
+}
+
+.member-shell__roleBadge--admin {
+  background: #f6eefc;
+  color: #8a45d2;
+}
+
+.member-shell__profileLink--staff {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.member-shell__avatar--staff {
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: #2f4b59;
+}
+
+.member-shell__avatar--staff img {
+  border-radius: 18px;
+}
+
+.member-shell__avatarInitial--staff {
+  border-radius: 18px;
+  border: 0;
+  background: #2f4b59;
+  color: #ffffff;
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+.member-shell__profileLink--admin {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.member-shell__avatar--admin {
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: #5c31ab;
+}
+
+.member-shell__avatarInitial--admin {
+  border-radius: 18px;
+  border: 0;
+  background: #5c31ab;
+  color: #ffffff;
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+}
+
+.member-shell__avatarBadge {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  min-height: 22px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #1f3745;
+  border: 2px solid #ffffff;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.member-shell__avatarBadge--admin {
+  background: #5c31ab;
+}
+
+.member-shell__main {
+  flex: 1 1 auto;
+  width: 100%;
+  margin: 0;
+  max-width: none;
+  padding: 48px 32px 56px;
+  background: #edf2f5 !important;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+.member-shell__main > * {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+}
+
+.member-shell__main--staff > * {
+  width: min(100%, 1240px);
+}
+
+.member-shell__main--admin > * {
+  width: min(100%, 1240px);
 }
 
 @media (max-width: 960px) {
-  .shell {
-    grid-template-columns: 1fr;
+  .member-shell__topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 18px 18px 0;
+    gap: 12px;
   }
 
-  .shell__sidebar {
+  .member-shell__brand {
+    min-width: 0;
+    font-size: 1.55rem;
+  }
+
+  .member-shell__brandRow {
+    flex-wrap: wrap;
+  }
+
+  .member-shell__nav {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .member-shell__navLink {
+    min-height: 58px;
+    padding: 0 14px;
+  }
+
+  .member-shell__navLink.is-active::after {
+    left: 14px;
+    right: 14px;
+  }
+
+  .member-shell__actions {
+    justify-content: flex-end;
     padding-bottom: 12px;
   }
 
-  .shell__nav {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  .member-shell__main {
+    padding: 32px 18px 28px;
+  }
+}
+
+@media (max-width: 640px) {
+  .member-shell__topbar {
+    grid-template-columns: 1fr;
+    justify-items: start;
   }
 
-  .shell__logout {
-    margin-top: 0;
-  }
-
-  .shell__topbar,
-  .shell__main {
-    padding-left: 18px;
-    padding-right: 18px;
+  .member-shell__actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

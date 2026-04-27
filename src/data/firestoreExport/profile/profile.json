@@ -1,0 +1,122 @@
+[
+  {
+    "id": "23PHGjRFIBVa3Ju5ORNo",
+    "nickname": "NetMaster",
+    "open_match": true,
+    "interests": [
+      "tennis",
+      "table_tennis"
+    ],
+    "self_description": "Looking for high-intensity tennis rallies. Let's hit the court!",
+    "available_time": [
+      "monday_afternoon",
+      "thursday_evening"
+    ],
+    "last_updated": "2026-03-18T00:00:00.000Z",
+    "member_id": "fjJBlI8A5Z096xkTrrCW"
+  },
+  {
+    "id": "3bXaLjbbQ3LprvEVDl4G",
+    "nickname": "GoalGetter",
+    "open_match": true,
+    "interests": [
+      "soccer",
+      "running"
+    ],
+    "self_description": "Always down for a 5-a-side match. I can play as a defender or goalkeeper.",
+    "available_time": [
+      "saturday_evening",
+      "sunday_afternoon"
+    ],
+    "last_updated": "2026-03-05T00:00:00.000Z",
+    "member_id": "hF9X5jdPrPdGTMTD6sz0"
+  },
+  {
+    "id": "TwSPeGmM0bUHBAIJAKv6",
+    "nickname": "HoopsQueen",
+    "open_match": true,
+    "interests": [
+      "basketball",
+      "yoga"
+    ],
+    "self_description": "Ex-varsity basketball player. Down for a 3v3 or some shooting practice anytime.",
+    "available_time": [
+      "friday_evening",
+      "saturday_morning",
+      "sunday_evening"
+    ],
+    "last_updated": "2026-03-22T00:00:00.000Z",
+    "member_id": "kzuG4o8s0NTPnQN8Rnta"
+  },
+  {
+    "id": "YWHJ8h9utCA53FjzMZX7",
+    "nickname": "SmashMaster",
+    "open_match": true,
+    "interests": [
+      "badminton",
+      "table_tennis"
+    ],
+    "self_description": "Competitive badminton player looking for high-intensity sparring partners. I have my own professional rackets.",
+    "available_time": [
+      "tuesday_evening",
+      "friday_evening",
+      "sunday_morning"
+    ],
+    "last_updated": "2026-03-24T00:00:00.000Z",
+    "member_id": "mhrkvgidUpidLxD3roBN"
+  },
+  {
+    "id": "g4b10WVCSde19iWHH7gF",
+    "nickname": "AquaZen",
+    "open_match": false,
+    "interests": [
+      "swimming",
+      "yoga",
+      "pilates"
+    ],
+    "self_description": "Focusing on endurance swimming and mindfulness. Prefer solo practice but happy to share tips on breathing techniques.",
+    "available_time": [
+      "monday_morning",
+      "wednesday_morning",
+      "thursday_afternoon"
+    ],
+    "last_updated": "2026-03-22T00:00:00.000Z",
+    "member_id": "xrYOwWczhMCTSP0ITYwN"
+  },
+  {
+    "id": "pq3xHDF5UoCLOgqJ97vK",
+    "nickname": "IronChen",
+    "open_match": false,
+    "interests": [
+      "swimming",
+      "gym",
+      "cycling"
+    ],
+    "self_description": "Training for my first triathlon. Usually prefer solo sessions but open to chatting about gear.",
+    "available_time": [
+      "tuesday_morning",
+      "thursday_morning",
+      "sunday_morning"
+    ],
+    "last_updated": "2026-03-10T00:00:00.000Z",
+    "member_id": "xvhKfJs35W7n47BKgWiW"
+  },
+  {
+    "id": "xyQtk4iivc7HX90rECc8",
+    "nickname": "AceSpiker",
+    "open_match": true,
+    "interests": [
+      "badminton",
+      "tennis",
+      "volleyball"
+    ],
+    "self_description": "Intermediate badminton player looking for doubles partners. I love competitive but friendly matches!",
+    "available_time": [
+      "monday_evening",
+      "wednesday_evening",
+      "saturday_afternoon"
+    ],
+    "last_updated": "2026-03-15T00:00:00.000Z",
+    "member_id": "y4xKFVcdkPjjpChkH1EA"
+  }
+]

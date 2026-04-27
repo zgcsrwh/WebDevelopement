@@ -10,9 +10,11 @@ import {
 } from "firebase/auth";
 import { auth, googleProvider } from "./FirebaseConfig";
 import {
-  getUserContextFromEmail,
-  loginWithResolvedContext,
-  registerProfile,
+  createUserProfile,
+  getRegistrationEligibility,
+  getUserContext,
+  getUserContextOnLogin,
+  normalizeUserContextPayload,
 } from "../services/authService";
 
 const AuthContext = createContext(null);
@@ -32,24 +34,47 @@ async function signInAndLoad(email, password) {
   return credential.user;
 }
 
+async function assertEmailAvailableForMemberRegistration(email) {
+  const context = await getRegistrationEligibility(email);
+  if (context.canRegister) {
+    return;
+  }
+
+  if (context.role === "Member") {
+    throw new Error("An account already exists for this email. Please sign in instead.");
+  }
+
+  throw new Error("This email is already used by a staff or admin account.");
+}
+
+function normalizeSessionContext(context = {}) {
+  return normalizeUserContextPayload(context, context.role || "Member");
+}
+
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [sessionRole, setSessionRole] = useState("Member");
   const [sessionProfile, setSessionProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [registrationPending, setRegistrationPending] = useState(false);
 
   const resetSession = useCallback(() => {
     setSessionProfile(null);
     setSessionRole("Member");
   }, []);
 
+  const clearRegistrationPending = useCallback(() => {
+    setRegistrationPending(false);
+  }, []);
+
   async function beginEmailVerification(email, password) {
     setAuthLoading(true);
     try {
+      await assertEmailAvailableForMemberRegistration(email);
       const credential = await createUserWithEmailAndPassword(auth, email, password);
       await sendEmailVerification(credential.user);
-      await signOut(auth);
+      setRegistrationPending(true);
       return { success: true };
     } finally {
       setAuthLoading(false);
@@ -59,29 +84,20 @@ export function AuthProvider({ children }) {
   async function resendRegistrationVerification(email, password) {
     setAuthLoading(true);
     try {
-      const user = await signInAndLoad(email, password);
+      let user = auth.currentUser;
+      if (!user || user.email !== email) {
+        await assertEmailAvailableForMemberRegistration(email);
+        user = await signInAndLoad(email, password);
+      } else {
+        await reload(user);
+      }
       if (user.emailVerified) {
-        await signOut(auth);
+        setRegistrationPending(true);
         return { success: true, verified: true };
       }
       await sendEmailVerification(user);
-      await signOut(auth);
+      setRegistrationPending(true);
       return { success: true, verified: false };
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
-  async function confirmVerifiedEmail(email, password) {
-    setAuthLoading(true);
-    try {
-      const user = await signInAndLoad(email, password);
-      const verified = Boolean(user.emailVerified);
-      await signOut(auth);
-      if (!verified) {
-        throw new Error("Please verify your email before continuing the registration form.");
-      }
-      return { success: true, verified: true };
     } finally {
       setAuthLoading(false);
     }
@@ -90,9 +106,14 @@ export function AuthProvider({ children }) {
   async function checkRegistrationVerification(email, password) {
     setAuthLoading(true);
     try {
-      const user = await signInAndLoad(email, password);
+      let user = auth.currentUser;
+      if (!user || user.email !== email) {
+        user = await signInAndLoad(email, password);
+      } else {
+        await reload(user);
+      }
       const verified = Boolean(user.emailVerified);
-      await signOut(auth);
+      setRegistrationPending(true);
       return { success: true, verified };
     } finally {
       setAuthLoading(false);
@@ -102,18 +123,20 @@ export function AuthProvider({ children }) {
   async function signup(name, email, password, address, dateOfBirth) {
     setAuthLoading(true);
     try {
+      await assertEmailAvailableForMemberRegistration(email);
       const user = await signInAndLoad(email, password);
       if (!user.emailVerified) {
         await signOut(auth);
         throw new Error("Please verify your email before completing registration.");
       }
-      await registerProfile({
-        uid: user.uid,
+      await createUserProfile({
         name,
         email,
+        password,
         address,
         dateOfBirth,
       });
+      clearRegistrationPending();
       await signOut(auth);
       return { success: true };
     } finally {
@@ -121,11 +144,21 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const discardPendingRegistration = useCallback(async () => {
+    if (auth.currentUser) {
+      await signOut(auth);
+    }
+    clearRegistrationPending();
+    resetSession();
+  }, [clearRegistrationPending, resetSession]);
+
   async function login(email, password, expectedRole = "") {
     setAuthLoading(true);
     try {
       const user = await signInAndLoad(email, password);
-      const context = await loginWithResolvedContext(email);
+      const context = normalizeSessionContext(
+        await getUserContextOnLogin(email, email.split("@")[0] || "Member"),
+      );
       if ((context.role === "Member" || !context.isProfileComplete) && !user.emailVerified) {
         await signOut(auth);
         throw new Error("Please verify your email before signing in.");
@@ -154,9 +187,11 @@ export function AuthProvider({ children }) {
     setAuthLoading(true);
     try {
       const credential = await signInWithPopup(auth, googleProvider);
-      const context = await getUserContextFromEmail(
-        credential.user.email || "member@example.com",
-        credential.user.displayName || "Google User",
+      const context = normalizeSessionContext(
+        await getUserContextOnLogin(
+          credential.user.email || "member@example.com",
+          credential.user.displayName || "Google User",
+        ),
       );
       if (!context.isProfileComplete) {
         await signOut(auth);
@@ -175,61 +210,84 @@ export function AuthProvider({ children }) {
   }
 
   const logout = useCallback(async () => {
+    clearRegistrationPending();
     resetSession();
     await signOut(auth);
-  }, [resetSession]);
+  }, [clearRegistrationPending, resetSession]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (!user?.email) {
+        clearRegistrationPending();
         resetSession();
         setAuthReady(true);
         return;
       }
 
       try {
-        const context = await getUserContextFromEmail(user.email, user.displayName || "Member");
+        const context = normalizeSessionContext(await getUserContext(user.email, user.displayName || "Member"));
         const requiresVerifiedEmail = context.role === "Member" || !context.isProfileComplete;
-        if ((requiresVerifiedEmail && !user.emailVerified) || !context.isProfileComplete) {
+        if (!context.isProfileComplete) {
+          setRegistrationPending(true);
+          resetSession();
+        } else if (requiresVerifiedEmail && !user.emailVerified) {
+          clearRegistrationPending();
           resetSession();
           await signOut(auth);
           setCurrentUser(null);
         } else if (String(context.status || "").toLowerCase() !== "active") {
+          clearRegistrationPending();
           resetSession();
           await signOut(auth);
           setCurrentUser(null);
         } else {
+          clearRegistrationPending();
           setSessionRole(context.role);
           setSessionProfile(context.profile);
         }
       } catch (error) {
         console.error("Unable to resolve the signed-in user context:", error);
+        clearRegistrationPending();
         resetSession();
       }
       setAuthReady(true);
     });
 
     return unsubscribe;
-  }, [resetSession]);
+  }, [clearRegistrationPending, resetSession]);
+
+  const isAuthenticated = Boolean(currentUser && sessionProfile && !registrationPending);
 
   const value = useMemo(
     () => ({
       currentUser,
       authReady,
+      isAuthenticated,
       sessionRole,
       sessionProfile,
+      registrationPending,
       loading: authLoading,
       beginEmailVerification,
       resendRegistrationVerification,
-      confirmVerifiedEmail,
       checkRegistrationVerification,
+      discardPendingRegistration,
       signup,
       login,
       loginWithGoogle,
       logout,
     }),
-    [currentUser, authReady, sessionRole, sessionProfile, authLoading, logout],
+    [
+      currentUser,
+      authReady,
+      isAuthenticated,
+      sessionRole,
+      sessionProfile,
+      registrationPending,
+      authLoading,
+      discardPendingRegistration,
+      logout,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

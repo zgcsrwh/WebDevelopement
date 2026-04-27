@@ -1,12 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import styles from "../components/LoginRegister/LoginRegister.module.css";
 import Carousel from "../components/LoginRegister/Carousel";
 import LoginForm from "../components/LoginRegister/LoginForm";
 import RegisterForm from "../components/LoginRegister/RegisterForm";
 import Footer from "../components/LoginRegister/InitFooter";
+import { ROUTE_PATHS } from "../constants/routes";
 
-const LoginRegister = () => {
-  const [isLogin, setIsLogin] = useState(true);
+const LoginRegister = ({ initialMode = "login" }) => {
+  const navigate = useNavigate();
+  const [isLogin, setIsLogin] = useState(initialMode !== "register");
+
+  useEffect(() => {
+    setIsLogin(initialMode !== "register");
+  }, [initialMode]);
+
+  function switchMode(nextIsLogin) {
+    setIsLogin(nextIsLogin);
+    navigate(nextIsLogin ? ROUTE_PATHS.LOGIN : ROUTE_PATHS.REGISTER, { replace: true });
+  }
 
   return (
     <div className={styles.pageWrapper}>
@@ -27,7 +39,7 @@ const LoginRegister = () => {
               <div className={styles.toggleContainer}>
                 <button
                   className={`${styles.toggleBtn} ${isLogin ? styles.activeToggle : ""}`}
-                  onClick={() => setIsLogin(true)}
+                  onClick={() => switchMode(true)}
                   type="button"
                 >
                   Sign in
@@ -35,14 +47,14 @@ const LoginRegister = () => {
 
                 <button
                   className={`${styles.toggleBtn} ${!isLogin ? styles.activeToggle : ""}`}
-                  onClick={() => setIsLogin(false)}
+                  onClick={() => switchMode(false)}
                   type="button"
                 >
                   Register
                 </button>
               </div>
 
-              {isLogin ? <LoginForm /> : <RegisterForm onSwitch={() => setIsLogin(true)} />}
+              {isLogin ? <LoginForm /> : <RegisterForm onSwitch={() => switchMode(true)} />}
             </div>
           </div>
         </section>

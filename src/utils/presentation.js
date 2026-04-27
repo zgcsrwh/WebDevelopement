@@ -1,15 +1,15 @@
 export function statusTone(status = "") {
   const value = status.toLowerCase();
 
-  if (["active", "booked", "completed", "resolved", "accepted", "normal"].includes(value)) {
+  if (["active", "booked", "completed", "resolved", "accepted", "normal", "upcoming"].includes(value)) {
     return "status-active";
   }
 
-  if (["pending approval", "pending", "in progress", "in_progress", "suggested alternative", "suggested", "suspended", "fixing"].includes(value)) {
+  if (["pending approval", "pending", "in progress", "in_progress", "suggested alternative", "alternative suggested", "suggested", "suspended", "fixing", "maintenance"].includes(value)) {
     return "status-pending";
   }
 
-  if (["rejected", "cancelled", "no show", "no_show", "maintenance", "closed", "deactivated", "terminated", "inactive"].includes(value)) {
+  if (["rejected", "cancelled", "no show", "no_show", "closed", "deactivated", "deactivate", "terminated", "inactive", "outdate", "deleted", "invalidated", "removed"].includes(value)) {
     return "status-rejected";
   }
 
@@ -36,9 +36,9 @@ export function displayStatus(value = "") {
   const normalized = String(value).toLowerCase();
 
   const labels = {
-    accepted: "Accepted",
+    accepted: "Booked",
     rejected: "Rejected",
-    pending: "Pending",
+    pending: "Pending Approval",
     cancelled: "Cancelled",
     completed: "Completed",
     in_progress: "In Progress",
@@ -46,15 +46,16 @@ export function displayStatus(value = "") {
     resolved: "Resolved",
     suspended: "Suspended",
     terminated: "Terminated",
-    normal: "Normal",
+    normal: "normal",
     closed: "Closed",
-    fixing: "Fixing",
-    outdate: "Off Shelf",
-    deleted: "Deleted",
+    fixing: "fixing",
+    outdate: "outdate",
+    deleted: "deleted",
     active: "Active",
     deactivated: "Deactivated",
+    deactivate: "Deactivated",
     inactive: "Inactive",
-    suggested: "Suggested Change",
+    suggested: "Suggested Alternative",
     invalidated: "Invalidated",
   };
 

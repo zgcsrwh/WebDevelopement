@@ -15,11 +15,14 @@ import {
   normalizeTimestamp,
   orderBy,
   serverTimestamp,
+  subscribeToCollection,
   updateCollectionDoc,
   where,
 } from "./firestoreService";
 import { createAppError } from "../utils/errors";
 import { displayStatus, toTitleText } from "../utils/presentation";
+import { callSubmitAction } from "./callableService";
+import { countMeaningfulCharacters, hasMeaningfulText } from "../utils/text";
 
 async function resolveActor(actor) {
   return actor || getCurrentActor();
@@ -41,9 +44,12 @@ function mapProfile(item, memberLookup, currentActorId = "") {
     sport: normalized.interests[0] ? toTitleText(normalized.interests[0]) : "Sports",
     interests: normalized.interests,
     interestsRaw: normalized.interests,
+    availableTime: normalized.availableTime,
     availability: normalized.availableTime.map((entry) => toTitleText(entry)).join(", "),
     availableTimeRaw: normalized.availableTime,
     bio: normalized.bio,
+    description: normalized.bio,
+    selfDescription: normalized.bio,
     openMatch: normalized.openMatch,
     isActive: normalized.openMatch,
     level: item.level || "Intermediate",
@@ -58,6 +64,8 @@ function mapMatchRequest(item, memberLookup, actorId = "") {
   const sender = memberLookup.get(item.sender_id);
   const receiver = memberLookup.get(item.reciever_id);
   const isIncoming = item.reciever_id === actorId;
+  const counterpart = isIncoming ? sender : receiver;
+  const counterpartProfile = counterpart?.profile || null;
 
   return {
     id: item.id,
@@ -72,6 +80,14 @@ function mapMatchRequest(item, memberLookup, actorId = "") {
     createdAt: normalizeTimestamp(item.created_at),
     completedAt: normalizeTimestamp(item.completed_at),
     direction: isIncoming ? "incoming" : "outgoing",
+    counterpartId: isIncoming ? item.sender_id : item.reciever_id,
+    counterpartName:
+      counterpartProfile?.nickname || counterpart?.name || (isIncoming ? item.sender_id : item.reciever_id),
+    counterpartBio: counterpartProfile?.bio || "",
+    counterpartInterestsRaw: counterpartProfile?.interests || [],
+    counterpartInterests: (counterpartProfile?.interests || []).map((entry) => toTitleText(entry)),
+    counterpartAvailabilityRaw: counterpartProfile?.availableTime || [],
+    counterpartAvailability: (counterpartProfile?.availableTime || []).map((entry) => toTitleText(entry)),
     raw: item,
   };
 }
@@ -93,19 +109,22 @@ export async function getPartnerProfiles(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
 
-  const ownProfile = await getOwnProfile(resolvedActor.id);
-  if (!ownProfile || !ownProfile.open_match) {
-    throw createAppError("failed-precondition", "Please complete your partner profile and enable matching first.");
-  }
-
-  const [profiles, memberLookup] = await Promise.all([
+  const [profiles, memberLookup, friendRecord] = await Promise.all([
     getCollectionDocs("profile", [orderBy("last_updated", "desc")]),
     getMemberLookup(),
+    getFriendRecord(resolvedActor.id),
   ]);
+  const friendIds = new Set(friendRecord?.friends_ids || []);
 
   return profiles
     .map((item) => mapProfile(item, memberLookup, resolvedActor.id))
-    .filter((item) => item.openMatch && !item.isCurrentUser && item.memberStatus === "active");
+    .filter(
+      (item) =>
+        item.openMatch &&
+        !item.isCurrentUser &&
+        item.memberStatus === "active" &&
+        !friendIds.has(item.memberId),
+    );
 }
 
 export async function getFriendProfiles(actor) {
@@ -123,37 +142,65 @@ export async function getFriendProfiles(actor) {
     .filter(Boolean)
     .map((member) => ({
       id: member.id,
+      memberId: member.id,
       name: member.profile?.nickname || member.name,
       nickname: member.profile?.nickname || member.name,
       sport: member.profile?.interests?.[0] ? toTitleText(member.profile.interests[0]) : "Sports",
+      interests: member.profile?.interests || [],
       level: member.profile?.raw?.level || "Intermediate",
       bio: member.profile?.bio || "No description yet.",
+      description: member.profile?.bio || "No description yet.",
+      selfDescription: member.profile?.bio || "No description yet.",
       availability: member.profile?.availableTime || [],
+      availableTime: member.profile?.availableTime || [],
+      openMatch: Boolean(member.profile?.openMatch),
       status: member.status,
     }));
 }
 
-export async function saveMatchProfile(payload, actor) {
+export async function upsertMatchProfile(payload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
 
-  if (!payload.nickname?.trim() || !payload.self_description?.trim()) {
+  const nickname = String(payload.nickname || "").trim();
+  const selfDescription = String(payload.self_description || "").trim();
+  const interests = Array.isArray(payload.interests) ? payload.interests.filter(Boolean) : [];
+  const availableTime = Array.isArray(payload.available_time) ? payload.available_time.filter(Boolean) : [];
+  const normalizedSlots = availableTime.map((slot) => String(slot).trim().toLowerCase());
+  const uniqueTimeSegments = new Set(
+    normalizedSlots
+      .map((slot) => slot.split("_").slice(1).join("_"))
+      .filter(Boolean),
+  );
+
+  if (!hasMeaningfulText(nickname) || !hasMeaningfulText(selfDescription)) {
     throw createAppError("invalid-argument", "Please complete the nickname and profile description.");
   }
 
-  if (!payload.interests?.length || !payload.available_time?.length) {
+  if (!interests.length || !availableTime.length) {
     throw createAppError("invalid-argument", "Please select at least one interest and one available time.");
+  }
+
+  if (countMeaningfulCharacters(selfDescription) > 150) {
+    throw createAppError("invalid-argument", "Please keep the profile description within 150 characters.");
+  }
+
+  if (normalizedSlots.length > 3) {
+    throw createAppError("invalid-argument", "Available time can include up to 3 entries.");
+  }
+
+  if (uniqueTimeSegments.size !== normalizedSlots.length) {
+    throw createAppError("invalid-argument", "Availability time slots cannot repeat.");
   }
 
   const existingProfile = await getOwnProfile(resolvedActor.id);
   const profilePayload = {
     member_id: resolvedActor.id,
-    nickname: payload.nickname.trim(),
-    open_match: true,
-    interests: payload.interests,
-    level: payload.level || "Intermediate",
-    self_description: payload.self_description.trim(),
-    available_time: payload.available_time,
+    nickname,
+    open_match: Boolean(existingProfile?.open_match),
+    interests,
+    self_description: selfDescription,
+    available_time: normalizedSlots,
     last_updated: new Date().toISOString(),
   };
 
@@ -167,9 +214,15 @@ export async function saveMatchProfile(payload, actor) {
   return { success: true, id: profileId };
 }
 
-export async function toggleMatchStatus(isActive, actor) {
+export const saveMatchProfile = upsertMatchProfile;
+
+async function toggleMatchStatusDirect(isActiveOrPayload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
+  const isActive =
+    typeof isActiveOrPayload === "object" && isActiveOrPayload !== null
+      ? Boolean(isActiveOrPayload.open_match)
+      : Boolean(isActiveOrPayload);
 
   const existingProfile = await getOwnProfile(resolvedActor.id);
   if (!existingProfile) {
@@ -214,6 +267,15 @@ export async function toggleMatchStatus(isActive, actor) {
   return { success: true, isActive: Boolean(isActive) };
 }
 
+export async function toggleMatchStatus(isActiveOrPayload, actor) {
+  const payload =
+    typeof isActiveOrPayload === "object" && isActiveOrPayload !== null
+      ? { open_match: Boolean(isActiveOrPayload.open_match) }
+      : { open_match: Boolean(isActiveOrPayload) };
+
+  return callSubmitAction("toggleMatchStatus", payload);
+}
+
 export async function getMatchRequests(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
@@ -228,7 +290,71 @@ export async function getMatchRequests(actor) {
     .map((item) => mapMatchRequest(item, memberLookup, resolvedActor.id));
 }
 
-export async function sendMatchRequest(payload, actor) {
+export async function subscribeToMatchRequests(actor, onNext, onError) {
+  const resolvedActor = await resolveActor(actor);
+  if (!resolvedActor?.id || resolvedActor.role !== "Member") {
+    onNext([]);
+    return () => {};
+  }
+
+  let senderItems = [];
+  let receiverItems = [];
+  let cancelled = false;
+
+  async function emit() {
+    if (cancelled) {
+      return;
+    }
+
+    try {
+      const memberLookup = await getMemberLookup();
+      const merged = [...senderItems, ...receiverItems];
+      const uniqueItems = merged.filter(
+        (item, index, collection) => collection.findIndex((entry) => entry.id === item.id) === index,
+      );
+
+      onNext(
+        uniqueItems
+          .map((item) => mapMatchRequest(item, memberLookup, resolvedActor.id))
+          .sort((left, right) =>
+            String(right.completedAt || right.createdAt || "").localeCompare(
+              String(left.completedAt || left.createdAt || ""),
+            ),
+          ),
+      );
+    } catch (error) {
+      onError?.(error);
+    }
+  }
+
+  const unsubscribeSender = subscribeToCollection(
+    "matching",
+    [where("sender_id", "==", resolvedActor.id)],
+    (docs) => {
+      senderItems = docs;
+      void emit();
+    },
+    onError,
+  );
+
+  const unsubscribeReceiver = subscribeToCollection(
+    "matching",
+    [where("reciever_id", "==", resolvedActor.id)],
+    (docs) => {
+      receiverItems = docs;
+      void emit();
+    },
+    onError,
+  );
+
+  return () => {
+    cancelled = true;
+    unsubscribeSender();
+    unsubscribeReceiver();
+  };
+}
+
+async function sendMatchRequestDirect(payload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
 
@@ -295,7 +421,17 @@ export async function sendMatchRequest(payload, actor) {
   return { success: true, match_id: requestId };
 }
 
-export async function respondToMatchRequest(payload, actor) {
+export async function sendMatchRequest(payload, actor) {
+  return callSubmitAction(
+    "sendMatchRequest",
+    {
+      reciever_id: payload.reciever_id || payload.receiver_id,
+      apply_description: payload.apply_description?.trim() || "",
+    },
+  );
+}
+
+async function respondToMatchRequestDirect(payload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
 
@@ -360,9 +496,25 @@ export async function respondToMatchRequest(payload, actor) {
   return { success: true };
 }
 
+export async function respondToMatchRequest(payload, actor) {
+  return callSubmitAction(
+    "respondToMatchRequest",
+    {
+      match_id: payload.match_id || payload.id,
+      status: Array.isArray(payload.status) ? payload.status : [payload.status].filter(Boolean),
+      respond_message: payload.respond_message?.trim() || "",
+    },
+  );
+}
+
 export async function removeFriend(friendId, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
+
+  if (!friendId || friendId === resolvedActor.id) {
+    throw createAppError("invalid-argument", "Please select a valid friend.");
+  }
+
   await unlinkFriends(resolvedActor.id, friendId);
   return { success: true };
 }
