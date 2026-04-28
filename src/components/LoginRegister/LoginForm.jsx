@@ -18,6 +18,7 @@ const LoginForm = () => {
   const navigate = useNavigate();
   const { login, loginWithGoogle, loading } = useAuth();
 
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -33,7 +34,8 @@ const LoginForm = () => {
     }
 
     try {
-      const context = await login(email, password, role);
+      const context = await login(email, password, role);  
+      
       if (context.role === "Admin") {
         navigate(ROUTE_PATHS.ADMIN_FACILITIES);
       } else if (context.role === "Staff") {
@@ -47,7 +49,7 @@ const LoginForm = () => {
       const loweredMessage = message.toLowerCase();
 
       if (loweredMessage.includes("incorrect") || loweredMessage.includes("invalid email or password")) {
-        setError("Invalid email or password.");
+        setError("Invalid email or password");
         } else if (code === "permission-denied") {
           setError("This account has been suspended. Please contact the administrator.");
         } else if (message.includes("Please verify your email")) {
@@ -83,8 +85,8 @@ const LoginForm = () => {
       </div>
 
       {error && <p className={styles.errorMessage}>{error}</p>}
-
-      <form onSubmit={handleLogin} className={styles.verticalForm}>
+      
+      <form onSubmit={handleLogin} className={styles.verticalForm} noValidate>
         <div className={styles.inputGroup}>
           <label>Identity</label>
           <div className={styles.inputWrapper}>

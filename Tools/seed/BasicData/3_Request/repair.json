@@ -1,0 +1,52 @@
+[
+  {
+    "member_id": "",
+    "facility_id": "",
+    "staff_id": "",
+    "type": "surface",
+    "repair_description": "A noticeable tear in the synthetic turf near the penalty spot. Needs urgent patching to prevent tripping.",
+    "status": "pending",
+    "created_at": { "_type": "timestamp", "value": "2026-03-20" },
+    "completed_at": ""
+  },
+  {
+    "member_id": "",
+    "facility_id": "",
+    "staff_id": "",
+    "type": "equipment",
+    "repair_description": "The net height adjuster on Badminton Court A is jammed and won't lock into place.",
+    "status": "resolved",
+    "created_at": { "_type": "timestamp", "value": "2026-03-18" },
+    "completed_at": { "_type": "timestamp", "value": "2026-03-19" }
+  },
+  {
+    "member_id": "",
+    "facility_id": "",
+    "staff_id": "",
+    "type": "plumbing",
+    "repair_description": "Water temperature in the poolside showers is inconsistent, fluctuating between freezing and scalding.",
+    "status": "pending",
+    "created_at": { "_type": "timestamp", "value": "2026-03-22" },
+    "completed_at": ""
+  },
+  {
+    "member_id": "",
+    "facility_id": "",
+    "staff_id": "",
+    "type": "lighting",
+    "repair_description": "Two overhead LED panels in the northeast corner of the basketball court are flickering during matches.",
+    "status": "resolved",
+    "created_at": { "_type": "timestamp", "value": "2026-03-15" },
+    "completed_at": { "_type": "timestamp", "value": "2026-03-15" }
+  },
+  {
+    "member_id": "",
+    "facility_id": "",
+    "staff_id": "",
+    "type": "other",
+    "repair_description": "The player bench in Court 1 has a loose leg and feels unstable when sat upon.",
+    "status": "pending",
+    "created_at": { "_type": "timestamp", "value": "2026-03-23" },
+    "completed_at": ""
+  }
+]

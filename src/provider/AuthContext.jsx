@@ -159,13 +159,10 @@ export function AuthProvider({ children }) {
       const context = normalizeSessionContext(
         await getUserContextOnLogin(email, email.split("@")[0] || "Member"),
       );
-      if ((context.role === "Member" || !context.isProfileComplete) && !user.emailVerified) {
+
+      if (context.role === "Member" && !user.emailVerified) {
         await signOut(auth);
         throw new Error("Please verify your email before signing in.");
-      }
-      if (!context.isProfileComplete) {
-        await signOut(auth);
-        throw new Error("Please complete your registration details before signing in.");
       }
       if (String(context.status || "").toLowerCase() !== "active") {
         await signOut(auth);
@@ -178,7 +175,8 @@ export function AuthProvider({ children }) {
       setSessionRole(context.role);
       setSessionProfile(context.profile);
       return context;
-    } finally {
+    } 
+    finally {
       setAuthLoading(false);
     }
   }
@@ -193,10 +191,6 @@ export function AuthProvider({ children }) {
           credential.user.displayName || "Google User",
         ),
       );
-      if (!context.isProfileComplete) {
-        await signOut(auth);
-        throw new Error("Please complete your registration details before signing in.");
-      }
       if (String(context.status || "").toLowerCase() !== "active") {
         await signOut(auth);
         throw new Error("This account has been suspended or deactivated by an administrator.");
@@ -227,11 +221,8 @@ export function AuthProvider({ children }) {
 
       try {
         const context = normalizeSessionContext(await getUserContext(user.email, user.displayName || "Member"));
-        const requiresVerifiedEmail = context.role === "Member" || !context.isProfileComplete;
-        if (!context.isProfileComplete) {
-          setRegistrationPending(true);
-          resetSession();
-        } else if (requiresVerifiedEmail && !user.emailVerified) {
+        const requiresVerifiedEmail = context.role === "Member";
+        if (requiresVerifiedEmail && !user.emailVerified) {
           clearRegistrationPending();
           resetSession();
           await signOut(auth);

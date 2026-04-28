@@ -385,7 +385,19 @@ const RegisterForm = ({ onSwitch }) => {
       {error && <p className={styles.errorMessage}>{error}</p>}
       {success && <p className={styles.successMessage}>{success}</p>}
 
-      <form onSubmit={handleSubmit} className={styles.verticalForm}>
+      <form onSubmit={handleSubmit} className={styles.verticalForm}  noValidate>
+        
+        <FormInput
+          label="Name"
+          icon={User}
+          name="name"
+          placeholder="Your name"
+          value={name}
+          onChange={updateField("name")}
+          disabled={isDisabled}
+          required
+        />
+        
         <FormInput
           label="Email"
           icon={Mail}
@@ -425,21 +437,11 @@ const RegisterForm = ({ onSwitch }) => {
         />
 
         <FormInput
-          label="Name"
-          icon={User}
-          name="name"
-          placeholder="Your name"
-          value={name}
-          onChange={updateField("name")}
-          disabled={isDisabled}
-          required
-        />
-
-        <FormInput
           label="Date of Birth"
           icon={Calendar}
           type="date"
           name="date_of_birth"
+          placeholder="yyyy-mm-dd"
           value={dateOfBirth}
           onChange={updateField("dateOfBirth")}
           disabled={isDisabled}
@@ -459,7 +461,7 @@ const RegisterForm = ({ onSwitch }) => {
 
         {!verificationSent ? (
           <button type="submit" className={styles.submitBtn} disabled={submitting}>
-            {submitting ? "Processing..." : "Register"}
+            {submitting ? "Processing..." : "Submit"}
           </button>
         ) : (
           <div className={styles.verificationActions}>
