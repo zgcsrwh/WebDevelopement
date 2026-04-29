@@ -49,3 +49,8 @@ ________________________________________________________________________________
   (2) Adding the config of Firestore Emulator, and a test data generation file-seed.js
   (3) Adding the config of vitest, submitting a test folder with Login.test.jsx and Register.test.jsx files. 
   (4) The Login/Register functions are valified completely.
+
+_______________________________________________________________________________________________________________________________________________
+## 2026.4.29 Update
+
+  Add a new page in src/pages/member/FacilitiesMap. It will read the facility name, which should same as real life name, and search them using Google API and then draw them in the map for visualization feature requirement. 
