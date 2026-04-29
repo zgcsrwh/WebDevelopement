@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./provider/AuthContext";
 import AppShell from "./components/layout/AppShell";
 import LoginRegister from "./pages/LoginRegister";
 import Facilities from "./pages/member/Facilities";
+import FacilitiesMap from "./pages/member/FacilitiesMap";
 import FacilityDetail from "./pages/member/FacilityDetail";
 import BookingNew from "./pages/member/BookingNew";
 import BookingDetail from "./pages/member/BookingDetail";
@@ -68,6 +69,14 @@ function AppRoutes() {
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <Facilities />
+          </ShellRoute>
+        }
+      />
+      <Route
+        path={ROUTE_PATHS.FACILITIES_MAP}
+        element={
+          <ShellRoute allowedRoles={["Member"]}>
+            <FacilitiesMap />
           </ShellRoute>
         }
       />

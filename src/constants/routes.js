@@ -4,6 +4,7 @@ export const ROUTE_PATHS = {
   REGISTER: "/register",
   HOME: "/home",
   FACILITIES: "/facilities",
+  FACILITIES_MAP: "/facilities/map",
   FACILITY_DETAIL: "/facilities/:id",
   BOOKINGS_NEW: "/bookings/new",
   BOOKINGS: "/bookings",
