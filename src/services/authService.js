@@ -19,7 +19,7 @@ function normalizeStatusValue(value = "active") {
   return String(resolved || "active").trim().toLowerCase();
 }
 
-function buildProfilePayload({ name, email, address, password, dateOfBirth, date_of_birth: dateOfBirthLegacy }) {
+function buildProfilePayload({ name, email, address, password, dateOfBirth, uid, date_of_birth: dateOfBirthLegacy }) {
   const resolvedDateOfBirth = dateOfBirth || dateOfBirthLegacy || "";
 
   return {
@@ -28,6 +28,7 @@ function buildProfilePayload({ name, email, address, password, dateOfBirth, date
     address: String(address || "").trim(),
     date_of_birth: toStoredDateString(resolvedDateOfBirth),
     password: String(password || ""),
+    uid : String(uid || "").trim(),
   };
 }
 
@@ -60,8 +61,10 @@ async function createUserProfileDirect(payload) {
   if (existingMembers.length > 0) {
     throw createAppError("already-exists", "This email address is already registered.");
   }
+  const memberIdTmp = profilePayload.uid;
 
-  const memberId = await addCollectionDoc("member", {
+  // Get Authentication uid
+   const memberId = await addCollectionDoc("member", {
     name: profilePayload.name,
     email: profilePayload.email,
     address: profilePayload.address,
@@ -70,7 +73,7 @@ async function createUserProfileDirect(payload) {
     no_show_times: 0,
     profile_ID: "",
     status: "active",
-  });
+  }, memberIdTmp);
 
   await setFriendIds(memberId, []);
 
@@ -79,6 +82,7 @@ async function createUserProfileDirect(payload) {
 
 export async function createUserProfile(payload) {
   const profilePayload = buildProfilePayload(payload);
+  console.log(profilePayload)
 
   const response = await callSubmitAction(
     "createUserProfile",
@@ -88,6 +92,7 @@ export async function createUserProfile(payload) {
       address: profilePayload.address,
       email: profilePayload.email,
       password: profilePayload.password,
+      uid:profilePayload.uid,
     },
     () => createUserProfileDirect(profilePayload),
   );

@@ -16,6 +16,8 @@ import {
   getUserContextOnLogin,
   normalizeUserContextPayload,
 } from "../services/authService";
+import FirestoreFunc from "./FirebaseFunc"
+
 
 const AuthContext = createContext(null);
 
@@ -73,6 +75,10 @@ export function AuthProvider({ children }) {
     try {
       await assertEmailAvailableForMemberRegistration(email);
       const credential = await createUserWithEmailAndPassword(auth, email, password);
+      // Store the uid in a tmp doc in firestor
+      const uid = credential.user.uid;
+      FirestoreFunc.create("TempUser", {email:email, uid:uid});
+
       await sendEmailVerification(credential.user);
       setRegistrationPending(true);
       return { success: true };
@@ -129,15 +135,24 @@ export function AuthProvider({ children }) {
         await signOut(auth);
         throw new Error("Please verify your email before completing registration.");
       }
+
+      // Get the tmp doc
+      const tmpMember = await FirestoreFunc.filterSingle("TempUser", [{ field: "email", operator: "==", value: email }]);
+      const uid = tmpMember[0].uid;
       await createUserProfile({
         name,
         email,
         password,
         address,
         dateOfBirth,
+        uid,
       });
       clearRegistrationPending();
       await signOut(auth);
+
+      // Clear the tmp doc
+      await FirestoreFunc.remove("TempUser", tmpMember[0].id)
+
       return { success: true };
     } finally {
       setAuthLoading(false);

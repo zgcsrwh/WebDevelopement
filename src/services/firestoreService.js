@@ -107,12 +107,20 @@ export async function getFirstByField(collectionName, field, value) {
   return items[0] || null;
 }
 
-export async function addCollectionDoc(collectionName, payload) {
-  const ref = await addDoc(collection(db, collectionName), {
+export async function addCollectionDoc(collectionName, payload, uid = null) {
+
+  const data = {
     ...payload,
     created_at: payload.created_at || serverTimestamp(),
-  });
-  return ref.id;
+  };
+  
+  if (uid && typeof uid === "string") {
+    await setDoc(doc(db, collectionName, uid), data);
+    return uid;
+  } else {
+    const ref = await addDoc(collection(db, collectionName), data);
+    return ref.id;
+  }
 }
 
 export async function updateCollectionDoc(collectionName, docId, payload) {
