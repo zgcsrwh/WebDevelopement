@@ -99,7 +99,7 @@ function normalizeErrorCode(code) {
 // ============ Scenario 配置 ============
 
 const scenarios = {
-  success: {
+  "success": {
     payload: { request_id: null },
     preProcess: "create-future-booking",
     expectedSuccess: true,
@@ -135,7 +135,8 @@ const scenarios = {
     preProcess: "create-other-owner-booking",
     expectedSuccess: null,
     expectedErrorCode: "permission-denied",
-    verifyDatabase: false
+    verifyDatabase: false,
+    loginAs: "bob"
   },
   "slot-not-found": {
     payload: { request_id: null },
@@ -152,7 +153,7 @@ const scenarios = {
     verifyDatabase: false,
     memberStatus: "suspended"
   },
-  unauthenticated: {
+  "unauthenticated": {
     payload: { request_id: "some-id" },
     preProcess: null,
     expectedSuccess: null,
@@ -459,9 +460,6 @@ async function main() {
   }
 
   // ============ 3. 登录用户 ============
-
-  // 确保登出当前用户（避免之前登录状态影响）
-  await signOut(auth);
 
   if (!currentScenario.skipLogin) {
     const loginEmail = currentScenario.loginAs === "bob" ? "bob@test.com" : "alice@test.com";
