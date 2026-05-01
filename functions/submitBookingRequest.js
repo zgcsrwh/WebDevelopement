@@ -71,6 +71,11 @@ function hasTimeOverlap(start1, end1, start2, end2) {
  * 基础参数校验
  */
 function validateBasicParams(data) {
+  // 日期标准化：支持 ISO string "2026-05-02T00:00:00.000Z" → "2026-05-02"
+  if (data.date && typeof data.date === "string" && data.date.includes("T")) {
+    data.date = data.date.split("T")[0];
+  }
+
   // 必传参数
   assertRequired(data, ["facility_id", "date", "start_time", "end_time", "attendent", "activity_description"]);
 

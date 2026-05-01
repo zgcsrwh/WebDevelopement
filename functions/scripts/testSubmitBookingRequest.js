@@ -20,7 +20,7 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) {
 
 // Modern Firebase Client SDK (使用主项目已有的 firebase ^12.11.0)
 const { initializeApp } = require("firebase/app");
-const { getAuth, connectAuthEmulator, signInWithEmailAndPassword } = require("firebase/auth");
+const { getAuth, connectAuthEmulator, signInWithEmailAndPassword, createUserWithEmailAndPassword } = require("firebase/auth");
 const { getFunctions, connectFunctionsEmulator, httpsCallable } = require("firebase/functions");
 
 // Firebase Admin SDK (用于验证结果)
@@ -108,9 +108,30 @@ const scenarios = {
       activity_description: "Test booking"
     },
     preProcess: null,
+    startTime: 9,
     expectedSuccess: true,
     expectedErrorCode: null,
-    verifyDatabase: true
+    verifyDatabase: true,
+    needsTimeSlot: true,
+    needsOpenSlot: true
+  },
+  "success-iso-date": {
+    payload: {
+      facility_id: "facility-001",
+      date: null, // 运行时填充 ISO date，如 "2026-05-03T00:00:00.000Z"
+      start_time: "10:00", // 字符串格式
+      end_time: "11:00",   // 字符串格式
+      attendent: 2,
+      activity_description: "Test booking with ISO date"
+    },
+    preProcess: null,
+    startTime: 10,
+    expectedSuccess: true,
+    expectedErrorCode: null,
+    verifyDatabase: true,
+    checkRequestDateNormalized: true,
+    needsTimeSlot: true,
+    needsOpenSlot: true
   },
   "locked-slot": {
     payload: {
@@ -122,9 +143,12 @@ const scenarios = {
       activity_description: "Test locked slot"
     },
     preProcess: "locked-slot",
+    startTime: 9,
     expectedSuccess: null,
     expectedErrorCode: "resource-exhausted",
-    verifyDatabase: false
+    verifyDatabase: false,
+    needsTimeSlot: true,
+    needsOpenSlot: false
   },
   "over-capacity": {
     payload: {
@@ -136,9 +160,12 @@ const scenarios = {
       activity_description: "Test over capacity"
     },
     preProcess: null,
+    startTime: 9,
     expectedSuccess: null,
     expectedErrorCode: "invalid-argument",
-    verifyDatabase: false
+    verifyDatabase: false,
+    needsTimeSlot: true,
+    needsOpenSlot: true
   },
   "duration-too-long": {
     payload: {
@@ -150,9 +177,12 @@ const scenarios = {
       activity_description: "Test duration too long"
     },
     preProcess: null,
+    startTime: 9,
     expectedSuccess: null,
     expectedErrorCode: "invalid-argument",
-    verifyDatabase: false
+    verifyDatabase: false,
+    needsTimeSlot: true,
+    needsOpenSlot: true
   },
   "date-out-of-range": {
     payload: {
@@ -164,9 +194,12 @@ const scenarios = {
       activity_description: "Test date out of range"
     },
     preProcess: null,
+    startTime: 9, // 仍需要一个基础 slot 数据存在，但不会验证其状态
     expectedSuccess: null,
     expectedErrorCode: "invalid-argument",
-    verifyDatabase: false
+    verifyDatabase: false,
+    needsTimeSlot: true,
+    needsOpenSlot: false
   }
 };
 
@@ -190,6 +223,84 @@ async function testSubmitBookingRequest() {
 
   console.log(`Scenario: ${scenario}`);
   console.log("");
+
+  // ============ 0. 初始化用户（在 Auth 中创建或登录） ============
+  console.log("Initializing user...");
+
+  let aliceUser = null;
+  let aliceUid = null;
+
+  try {
+    aliceUser = await signInWithEmailAndPassword(auth, "alice@test.com", "123456");
+    aliceUid = aliceUser.user.uid;
+    console.log(`  ✓ Logged in as alice@test.com, UID: ${aliceUid}`);
+  } catch (error) {
+    if (error.code === "auth/user-not-found") {
+      aliceUser = await createUserWithEmailAndPassword(auth, "alice@test.com", "123456");
+      aliceUid = aliceUser.user.uid;
+      console.log(`  ✓ Created alice@test.com, UID: ${aliceUid}`);
+    } else {
+      console.error("ERROR: Login failed:", error.message);
+      process.exit(1);
+    }
+  }
+
+  // 校验 member/{uid} 是否存在
+  const memberRef = db.collection("member").doc(aliceUid);
+  const memberDoc = await memberRef.get();
+  if (!memberDoc.exists) {
+    console.error(`ERROR: member/${aliceUid} not found. Run seedLocalEmulator.js --member-uid=${aliceUid} first.`);
+    process.exit(1);
+  }
+  console.log(`  ✓ member/${aliceUid} exists, status: ${memberDoc.data().status}`);
+
+  // ============ 0.5. 准备测试数据（对需要新 slot 的 scenario） ============
+  // 在检查 seed 数据之前就重置，避免检查时发现 slot 被占用而失败
+  const prepConfig = scenarios[scenario];
+  if (prepConfig && prepConfig.needsOpenSlot) {
+    console.log("Preparing test data...");
+
+    // 确定使用的日期和时间（从 scenario config 读取）
+    const testDate = scenario === "success-iso-date"
+      ? tomorrowDate + "T00:00:00.000Z"
+      : tomorrowDate;
+    const normalizedTestDate = testDate.includes("T") ? testDate.split("T")[0] : testDate;
+    const testStartTime = prepConfig.startTime || 9;
+
+    // 清理旧的测试 request
+    const oldRequests = await db.collection("request")
+      .where("member_id", "==", aliceUid)
+      .where("facility_id", "==", "facility-001")
+      .where("date", "==", normalizedTestDate)
+      .where("status", "in", ["pending", "accepted"])
+      .get();
+
+    for (const reqDoc of oldRequests.docs) {
+      const reqData = reqDoc.data();
+      if (reqData.activity_description && reqData.activity_description.includes("Test booking")) {
+        await reqDoc.ref.delete();
+        const oldNotifs = await db.collection("notification")
+          .where("reference_id", "==", reqDoc.id)
+          .get();
+        for (const notifDoc of oldNotifs.docs) {
+          await notifDoc.ref.delete();
+        }
+      }
+    }
+
+    // 重置 time_slot
+    const slotRef = db.collection("time_slot").doc(`facility-001-${normalizedTestDate}-${testStartTime}`);
+    const slotDoc = await slotRef.get();
+    if (slotDoc.exists) {
+      await slotRef.update({
+        status: "open",
+        request_id: "",
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+      console.log(`  ✓ Reset time_slot/${slotRef.id} to open`);
+    }
+    console.log("  ✓ Test data prepared");
+  }
 
   // ============ 1. 检查 seed 数据是否存在 ============
   console.log("Checking seed data...");
@@ -217,27 +328,36 @@ async function testSubmitBookingRequest() {
   const memberData = memberDocs.docs[0].data();
   console.log(`  ✓ member/${memberUid} exists (status: ${memberData.status})`);
 
-  // 检查 time_slot
-  const slotQuery = await db.collection("time_slot")
-    .where("facility_id", "==", "facility-001")
-    .where("date", "==", tomorrowDate)
-    .where("start_time", "==", 9)
-    .get();
+  // 根据 scenario 确定要检查的 start_time
+  const scenarioConfig = scenarios[scenario];
 
-  if (slotQuery.empty) {
-    console.error(`ERROR: time_slot for date ${tomorrowDate} not found. Run seed script first.`);
-    process.exit(1);
-  }
+  // 从 scenario config 读取 start_time（不是硬编码判断）
+  // date-out-of-range 不需要检查 time_slot
+  const verifyStartTime = scenarioConfig.needsTimeSlot !== false ? (scenarioConfig.startTime || 9) : null;
 
-  const slotData = slotQuery.docs[0].data();
-  console.log(`  ✓ time_slot exists (status: ${slotData.status})`);
+  // 检查 time_slot（如果需要）
+  if (verifyStartTime !== null) {
+    const slotQuery = await db.collection("time_slot")
+      .where("facility_id", "==", "facility-001")
+      .where("date", "==", tomorrowDate)
+      .where("start_time", "==", verifyStartTime)
+      .get();
 
-  // 检查 scenario 是否需要 time_slot 为 open 状态
-  const currentScenario = scenarios[scenario];
-  if (currentScenario.verifyDatabase && slotData.status !== "open") {
-    console.error(`ERROR: time_slot status is "${slotData.status}", expected "open" for success scenario.`);
-    console.error("Please re-run seed script to reset time_slot status.");
-    process.exit(1);
+    if (slotQuery.empty) {
+      console.error(`ERROR: time_slot for date ${tomorrowDate} start ${verifyStartTime} not found. Run seed script first.`);
+      process.exit(1);
+    }
+
+    const slotData = slotQuery.docs[0].data();
+    console.log(`  ✓ time_slot exists (status: ${slotData.status})`);
+
+    // 检查 scenario 是否需要 time_slot 为 open 状态（只有 success 类需要）
+    // locked-slot 需要 slot 为 locked，over-capacity 等只做参数校验
+    if (scenarioConfig.needsOpenSlot && slotData.status !== "open") {
+      console.error(`ERROR: time_slot status is "${slotData.status}", expected "open" for success scenario.`);
+      console.error("Please re-run seed script to reset time_slot status.");
+      process.exit(1);
+    }
   }
 
   console.log("");
@@ -245,7 +365,7 @@ async function testSubmitBookingRequest() {
   console.log("");
 
   // ============ 2. 执行 preProcess（如果需要） ============
-  if (currentScenario.preProcess === "locked-slot") {
+  if (prepConfig && prepConfig.preProcess === "locked-slot") {
     console.log("Pre-processing: setting time_slot to locked...");
     // 使用与 seedLocalEmulator.js 一致的 doc ID 格式
     const slotId = `facility-001-${tomorrowDate}-9`;
@@ -281,9 +401,15 @@ async function testSubmitBookingRequest() {
   // 动态填充 date 字段
   if (scenario === "date-out-of-range") {
     payload.date = getDateString(8); // today + 8
+  } else if (scenario === "success-iso-date") {
+    // ISO 格式：如 "2026-05-03T00:00:00.000Z"，后端会标准化为 "2026-05-03"
+    payload.date = tomorrowDate + "T00:00:00.000Z";
   } else {
     payload.date = tomorrowDate;
   }
+
+  // 标准化后的 date（用于数据库验证查询）
+  const normalizedDate = payload.date.includes("T") ? payload.date.split("T")[0] : payload.date;
 
   console.log(`Payload (${scenario}):`, JSON.stringify(payload, null, 2));
   console.log("");
@@ -309,10 +435,10 @@ async function testSubmitBookingRequest() {
         console.log("");
         console.log("Verifying results with Admin SDK...");
 
-        // 5.1 检查 request 是否新增
+        // 5.1 检查 request 是否新增（使用 normalizedDate 查询）
         const requestDocs = await db.collection("request")
           .where("facility_id", "==", "facility-001")
-          .where("date", "==", payload.date)
+          .where("date", "==", normalizedDate)
           .get();
 
         if (requestDocs.empty) {
@@ -329,10 +455,10 @@ async function testSubmitBookingRequest() {
         console.log(`    - start_time: ${requestData.start_time}`);
         console.log(`    - end_time: ${requestData.end_time}`);
 
-        // 5.2 检查 time_slot 是否变成 locked
+        // 5.2 检查 time_slot 是否变成 locked（使用 normalizedDate 查询）
         const lockedSlotQuery = await db.collection("time_slot")
           .where("facility_id", "==", "facility-001")
-          .where("date", "==", payload.date)
+          .where("date", "==", normalizedDate)
           .where("start_time", "==", 9)
           .get();
 
