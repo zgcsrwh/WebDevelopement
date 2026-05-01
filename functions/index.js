@@ -20,3 +20,7 @@ exports.processBookingApproval = processBookingApproval;
 // 导入 cancelConfirmedBooking
 const { cancelConfirmedBooking } = require("./cancelConfirmedBooking");
 exports.cancelConfirmedBooking = cancelConfirmedBooking;
+
+// 导入 withdrawPendingBooking
+const { withdrawPendingBooking } = require("./withdrawPendingBooking");
+exports.withdrawPendingBooking = withdrawPendingBooking;
