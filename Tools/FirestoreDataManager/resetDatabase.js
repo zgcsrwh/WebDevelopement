@@ -54,36 +54,36 @@ async function resetProjectDatabase() {
   process.exit();
 }
 
-// 给场馆分配员工ID
+// Assign staff IDs to facilities
 async function assignStaffToFacilities() {
   try {
-    // 1. 获取所有 role == "staff" 的员工 ID
+    // 1. Get all staff IDs where role == "staff"
     const staffSnapshot = await db.collection('admin_staff')
       .where('role', '==', 'staff')
       .get();
 
     if (staffSnapshot.empty) {
-      console.log('未找到任何角色为 staff 的员工。');
+      console.log('No employees with the "staff" role found.');
       return;
     }
 
     const staffIds = staffSnapshot.docs.map(doc => doc.id);
-    console.log(`获取到 ${staffIds.length} 名员工。`);
+    console.log(`Retrieved ${staffIds.length} staff members.`);
 
-    // 2. 获取所有场馆 (facility)
+    // 2. Get all facilities
     const facilitySnapshot = await db.collection('facility').get();
 
     if (facilitySnapshot.empty) {
-      console.log('场馆集合为空，无需分配。');
+      console.log('Facility collection is empty, no assignment needed.');
       return;
     }
 
-    // 3. 开始批量更新 (使用 WriteBatch 性能更高)
+    // 3. Start batch update (using WriteBatch for higher performance)
     const batch = db.batch();
     
     facilitySnapshot.docs.forEach((doc, index) => {
-      // 使用取模运算 (%) 实现循环分配
-      // 例如：如果有 3 个员工，5 个场馆，分配索引为 0, 1, 2, 0, 1
+      // Use modulo operation (%) for cyclic assignment
+      // Example: If there are 3 staff and 5 facilities, assignment indices are 0, 1, 2, 0, 1
       const assignedStaffId = staffIds[index % staffIds.length];
       
       const facilityRef = db.collection('facility').doc(doc.id);
@@ -92,7 +92,7 @@ async function assignStaffToFacilities() {
       //console.log(`场馆 [${doc.id}] 已分配给员工 [${assignedStaffId}]`);
     });
 
-    // 4. 提交批量操作
+    // 4. Commit
     await batch.commit();
     console.log('Success : update facility : staff_id');
 
@@ -101,32 +101,32 @@ async function assignStaffToFacilities() {
   }
 }
 
-// 给profile分配member_id, 要求二者数量一致(通过json手动控制)
+// Assign member_id to profiles, requiring matching counts (manually controlled via JSON)
 async function assignMemberToProfile() {
   try {
-    // 1. 获取所有member ID
+    // 1. Get all member IDs
     const memberSnapshot = await db.collection('member').get();
 
     if (memberSnapshot.empty) {
-      console.log('未找到member信息。');
+      console.log('No member information found.');
       return;
     }
 
-    // 2. 获取所有profile ID
+    // 2. Get all profile IDs
     const profileSnapshot = await db.collection('profile').get();
 
     if (profileSnapshot.empty) {
-      console.log('未找到profile信息。');
+      console.log('No profile information found.');
       return;
     }
 
     if(memberSnapshot.size != profileSnapshot.size)
     {
-      console.log('member和profile数量不一致');
+      console.log('Mismatch in member and profile counts');
       return;
     }
 
-    // 3. 开始批量更新 (使用 WriteBatch 性能更高)
+    // 3. Start batch update (using WriteBatch for higher performance)
     const batch = db.batch();
 
     const memberDocs = memberSnapshot.docs;
@@ -138,15 +138,15 @@ async function assignMemberToProfile() {
       const profileRef = db.collection('profile').doc(profileDoc.id);
       const memberRef = db.collection('member').doc(memberDoc.id);
 
-      // 在 profile 中记录所属的 member_id
+      // Record the associated member_id in the profile
       batch.update(profileRef, { member_id: memberDoc.id });
 
-      // 在 member 中记录所属的 profile_id
+      // Record the associated profile_id in the member
       batch.update(memberRef, { profile_ID: profileDoc.id });
 
     });
 
-    // 4. 提交批量操作
+    // 4. Commit all batch
     await batch.commit();
     console.log('Success : update profile : member_id');
 
@@ -155,88 +155,99 @@ async function assignMemberToProfile() {
   }
 }
 
-// 给request分配member, facility, 和staff
+// Assign member, facility, and staff to requests
 async function populateRequestCollections(CollectionName) {
   try {
-    console.log('开始同步',CollectionName, '集合字段...');
+    console.log('Starting synchronization of', CollectionName, 'collection fields...');
 
-    // 1. 获取所有 member ID
+    // Generate 7 possible dates (Today + next 6 days)
+    const dateRange = [];
+    for (let i = 0; i <= 6; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      dateRange.push(d.toISOString().split('T')[0]);
+    }
+
+    // 1. Get all member IDs
     const memberSnapshot = await db.collection('member').get();
     const memberIds = memberSnapshot.docs.map(doc => doc.id);
 
-    // 2. 获取所有 facility 数据（包含其内部的 staff_id）
+    // 2. Get all facility data (including internal staff_id)
     const facilitySnapshot = await db.collection('facility').get();
     const facilities = facilitySnapshot.docs.map(doc => ({
       id: doc.id,
-      staff_id: doc.data().staff_id // 获取场馆预设的负责人ID
+      staff_id: doc.data().staff_id // Get the facility's preset person-in-charge ID
     }));
 
     if (memberIds.length === 0 || facilities.length === 0) {
-      console.error('错误：member 或 facility 集合为空，无法分配。');
+      console.error('Error: member or facility collection is empty, cannot assign.');
       return;
     }
 
-    // 3. 获取所有待补全的 CollectionName
+    // 3. Get all CollectionNames to be completed
     const requestSnapshot = await db.collection(CollectionName).get();
     
     const batch = db.batch();
     let count = 0;
 
     requestSnapshot.docs.forEach((doc, index) => {
-      // 策略：循环分配，模拟不同人申请不同场地
+      // Strategy: Cyclic assignment to simulate different members applying for different venues
       const randomMemberId = memberIds[index % memberIds.length];
       const targetFacility = facilities[index % facilities.length];
+      // Randomly pick a date from the 7-day range
+      const randomDate = dateRange[Math.floor(Math.random() * dateRange.length)];
 
       const requestRef = db.collection(CollectionName).doc(doc.id);
       
       batch.update(requestRef, {
         member_id: randomMemberId,
         facility_id: targetFacility.id,
-        staff_id: targetFacility.staff_id || "" // 自动关联该场馆的负责人
+        staff_id: targetFacility.staff_id || "", // Automatically associate with the venue's staff
+        date: randomDate // Set the date to a random day within today and the next 7 days
       });
 
       count++;
     });
 
-    // 4. 提交批量更新
+    // 4. Submit batch updates
     if (count > 0) {
       await batch.commit();
-      console.log(`成功更新 ${count} 条申请记录！`);
+      console.log(`Successfully updated ${count} application records!`);
     } else {
-      console.log('没有发现需要更新的文档。');
+      console.log('No documents found to update.');
     }
 
   } catch (error) {
-    console.error('更新过程中出错:', error);
+    console.error('Error during update process:', error);
   }
 }
 
-// 向matching中填写sender_id和reciever_id
+// Fill sender_id and reciever_id in matching collection
 async function randomizeMatchingIds() {
   try {
-    console.log('开始随机分配好友申请的发送者和接收者...');
+    console.log('Starting random assignment of friend request senders and receivers...');
 
-    // 1. 获取所有 member ID
+    // 1. Get all member IDs
     const memberSnapshot = await db.collection('member').get();
     const memberIds = memberSnapshot.docs.map(doc => doc.id);
 
     if (memberIds.length < 2) {
-      console.error('错误：成员数量不足 2 人，无法建立好友申请。');
+      console.error('Error: Insufficient members (need at least 2) to create friend requests.');
       return;
     }
 
-    // 2. 获取所有待处理的 matching 记录
+    // 2. Get all pending matching records
     const matchingSnapshot = await db.collection('matching').get();
     
     const batch = db.batch();
     let count = 0;
 
     matchingSnapshot.docs.forEach((doc) => {
-      // 3. 随机逻辑：从数组中随机抽取两个不同的 ID
+      // 3. Random logic: Randomly select two different IDs from the array
       let senderIdx = Math.floor(Math.random() * memberIds.length);
       let recieverIdx = Math.floor(Math.random() * memberIds.length);
 
-      // 确保发送者和接收者不是同一个人
+      // Ensure sender and receiver are not the same person
       while (recieverIdx === senderIdx) {
         recieverIdx = Math.floor(Math.random() * memberIds.length);
       }
@@ -244,7 +255,7 @@ async function randomizeMatchingIds() {
       const senderId = memberIds[senderIdx];
       const recieverId = memberIds[recieverIdx];
 
-      // 4. 更新匹配记录
+      // 4. Update matching records
       const matchingRef = db.collection('matching').doc(doc.id);
       batch.update(matchingRef, {
         sender_id: senderId,
@@ -254,27 +265,27 @@ async function randomizeMatchingIds() {
       count++;
     });
 
-    // 5. 提交批量更新
+    // 5. Submit batch updates
     if (count > 0) {
       await batch.commit();
-      console.log(`成功为 ${count} 条匹配记录随机分配了 ID！`);
+      console.log(`Successfully assigned IDs for ${count} matching records!`);
     }
 
   } catch (error) {
-    console.error('随机分配过程中出错:', error);
+    console.error('Error during random assignment:', error);
   }
 }
 
-// 为每个member简历一个friends关联表
+// Create a friends relationship table for each member
 async function createFriendsCollection() {
   try {
-    console.log('开始为所有成员初始化好友表...');
+    console.log('Initializing friend tables for all members...');
 
-    // 1. 获取所有 member
+    // 1. Get all members
     const memberSnapshot = await db.collection('member').get();
 
     if (memberSnapshot.empty) {
-      console.log('未发现成员数据。');
+      console.log('No member data found.');
       return;
     }
 
@@ -284,38 +295,38 @@ async function createFriendsCollection() {
     memberSnapshot.docs.forEach((doc) => {
       const memberId = doc.id;
       
-      // 2. 在 friends 集合中创建一个新文档
-      // 建议：使用与 member 相同的 ID 作为 friends 文档的 ID，方便后续查询
+      // 2. Create a new document in the friends collection
+      // Suggestion: Use the member ID as the friends document ID for easier querying
       const friendRef = db.collection('friends').doc(memberId);
       
       batch.set(friendRef, {
         member_id: memberId,
-        friends_ids: [] // 初始化为空数组 (Array[String])
+        friends_ids: [] // Initialize as an empty array (Array[String])
       });
 
       count++;
 
     });
 
-    // 3. 提交所有更改
+    // 3. Submit all changes
     await batch.commit();
-    console.log(`成功！已为 ${count} 个成员创建了好友关联表。`);
+    console.log(`Success! Created friend relationship tables for ${count} members.`);
 
   } catch (error) {
-    console.error('初始化失败:', error);
+    console.error('Initialization failed:', error);
   }
 }
 async function syncFriendships() {
-  console.log('正在监听 matching 集合的状态变更...');
+  console.log('Monitoring status changes in the matching collection...');
 
   try {
-    // 1. 获取所有状态为 'accepted' 的匹配记录
+    // 1. Get all matching records with status 'accepted'
     const matchingSnapshot = await db.collection('matching')
       .where('status', '==', 'accepted')
       .get();
 
     if (matchingSnapshot.empty) {
-      console.log('没有发现已接受(accepted)的好友请求。');
+      console.log('No accepted friend requests found.');
       return;
     }
 
@@ -329,13 +340,13 @@ async function syncFriendships() {
 
       if (!senderId || !recieverId) continue;
 
-      // 2. 获取双向的 friends 文档引用
-      // 假设 friends 集合的文档 ID 与 member_id 一致
+      // 2. Get bidirectional friends document references
+      // Assume friends collection document IDs match member_id
       const senderFriendRef = db.collection('friends').doc(senderId);
       const recieverFriendRef = db.collection('friends').doc(recieverId);
 
-      // 3. 使用 arrayUnion 原子操作添加好友 ID
-      // 这样可以避免重复添加，且不需要先读取数组内容
+      // 3. Use arrayUnion atomic operation to add friend IDs
+      // This avoids duplicates and the need to read array content first
       batch.update(senderFriendRef, {
         friends_ids: admin.firestore.FieldValue.arrayUnion(recieverId)
       });
@@ -347,23 +358,23 @@ async function syncFriendships() {
       updateCount++;
     }
 
-    // 4. 提交批量更新
+    // 4. Submit batch updates
     await batch.commit();
-    console.log(`同步完成！已处理 ${updateCount} 对双向好友关系。`);
+    console.log(`Sync complete! Processed ${updateCount} bidirectional friend relationships.`);
 
   } catch (error) {
-    console.error('同步好友关系时出错:', error);
+    console.error('Error syncing friend relationships:', error);
   }
 }
 
 async function generateNotification() {
   try {
-    console.log('开始根据当前状态生成个性化通知...');
+    console.log('Generating personalized notifications based on current status...');
 
     const batch = db.batch();
     let notificationCount = 0;
 
-    // 1. 定义 Request 状态对应的消息模板
+    // 1. Define message templates for Request statuses
     const requestMessages = {
       "pending": "Your facility request has been uploaded and is waiting to be checked.",
       "accepted": "Your facility request has been accepted.",
@@ -374,14 +385,14 @@ async function generateNotification() {
       "cancelled": "Your facility request has been successfully cancelled."
     };
 
-    // 2. 定义 Repair 状态对应的消息模板
+    // 2. Define message templates for Repair statuses
     const repairMessages = {
       "pending": "Your repair report is received. Our maintenance team will look into it shortly.",
       "resolved": "Great news! The issue you reported has been resolved. Thanks for your patience."
     };
 
     
-    // 3. 处理 Request 集合
+    // 3. Process Request collection
     const requestSnapshot = await db.collection('request').get();
     requestSnapshot.docs.forEach(doc => {
       const data = doc.data();
@@ -398,7 +409,7 @@ async function generateNotification() {
       }
     });
     
-    // 4. 处理 Repair 集合
+    // 4. Process Repair collection
     const repairSnapshot = await db.collection('repair').get();
     repairSnapshot.docs.forEach(doc => {
       const data = doc.data();
@@ -415,22 +426,46 @@ async function generateNotification() {
       }
     });
     
-    // 5. 提交更新
+    // 5. Submit updates
     if (notificationCount > 0) {
       await batch.commit();
-      console.log(`成功！已根据当前状态生成 ${notificationCount} 条通知。`);
+      console.log(`Success! Generated ${notificationCount} notifications based on current status.`);
     }
 
   } catch (error) {
-    console.error('生成通知失败:', error);
+    console.error('Failed to generate notifications:', error);
   }
 }
 
-async function syncUsersToAuth() {
-  console.log('开始同步 Firestore 用户到 Firebase Authentication...');
+/**
+ * Deletes all users from Firebase Authentication in batches.
+ */
+async function clearAllAuthUsers() {
+  console.log('Clearing all users from Firebase Authentication...');
+  let nextPageToken;
+  let totalDeleted = 0;
 
+  do {
+    const listUsersResult = await auth.listUsers(1000, nextPageToken);
+    const uids = listUsersResult.users.map((userRecord) => userRecord.uid);
+    if (uids.length > 0) {
+      await auth.deleteUsers(uids);
+      totalDeleted += uids.length;
+    }
+    nextPageToken = listUsersResult.pageToken;
+  } while (nextPageToken);
+
+  console.log(`Successfully cleared ${totalDeleted} users from Firebase Auth.`);
+}
+
+async function syncUsersToAuth() {
   try {
-    // 1. 定义要读取的集合
+    // First, clear all existing users in Firebase Auth
+    await clearAllAuthUsers();
+
+    console.log('Syncing Firestore users to Firebase Authentication...');
+
+    // 1. Define collections to read
     const collections = ['member', 'admin_staff'];
     const usersToImport = [];
 
@@ -441,10 +476,10 @@ async function syncUsersToAuth() {
         const data = doc.data();
         if (data.email) {
           usersToImport.push({
-            uid: doc.id, // 使用 Firestore 的文档 ID 作为 Auth UID，保持一致性
+            uid: doc.id, // Use Firestore doc ID as Auth UID for consistency
             email: data.email,
-            emailVerified: true, // 标记为已验证
-            password: '123456',  // 统一初始密码
+            emailVerified: true, // Mark as verified
+            password: '123456',  // Standard initial password
             displayName: data.name
           });
         }
@@ -452,7 +487,7 @@ async function syncUsersToAuth() {
     }
 
     if (usersToImport.length === 0) {
-      console.log('没有找到有效的邮箱信息。');
+      console.log('No valid email info found.');
       return;
     }
 
@@ -460,30 +495,30 @@ async function syncUsersToAuth() {
     for (const user of usersToImport) {
       try {
         await auth.createUser(user);
-        console.log(`成功创建用户: ${user.email}`);
+        console.log(`Successfully created user: ${user.email}`);
       } catch (err) {
         if (err.code === 'auth/email-already-exists') {
-          console.log(`跳过已存在的邮箱: ${user.email}`);
+          console.log(`Skipping existing email: ${user.email}`);
         } else {
-          console.error(`创建 ${user.email} 失败:`, err.message);
+          console.error(`Failed to create ${user.email}:`, err.message);
         }
       }
     }
     
-    console.log('--- 同步完成 ---');
+    console.log('--- Sync Complete ---');
   } catch (error) {
-    console.error('同步过程中出现致命错误:', error);
+    console.error('Fatal error during sync process:', error);
   }
 }
 
 async function generateTimeSlots() {
   try {
-    console.log('开始生成未来 7 天的时间段...');
+    console.log('Generating time slots for the next 7 days...');
 
     const facilitySnapshot = await db.collection('facility').get();
     if (facilitySnapshot.empty) return;
 
-    // 1. 初始化第一个 batch
+    // 1. Initialize the first batch
     let batch = db.batch(); 
     let slotCount = 0;
 
@@ -528,7 +563,7 @@ async function generateTimeSlots() {
       await batch.commit();
     }
     
-    console.log(`Generating time slot : ${slotCount} 。`);
+    console.log(`Generating time slots: ${slotCount}`);
 
   } catch (error) {
     console.error('Error:', error);
@@ -538,7 +573,7 @@ async function generateTimeSlots() {
 
 async function syncRequestsToTimeSlots() {
   try {
-    console.log('开始同步申请记录到时间槽 (支持跨时段匹配)...');
+    console.log('Syncing application records to time slots (supporting cross-period matching)...');
 
     const requestSnapshot = await db.collection('request').get();
     if (requestSnapshot.empty) return;
@@ -552,18 +587,18 @@ async function syncRequestsToTimeSlots() {
 
       const { facility_id, date, start_time, end_time } = requestData;
       
-      // 将申请时间转为数字进行比较
+      // Convert application times to numbers for comparison
       const reqStart = parseInt(start_time);
       const reqEnd = parseInt(end_time);
 
-      // 1. 获取该场馆在该日期的所有时间槽
-      // 获取 Request 的日期（假设存的是原生 Timestamp）
+      // 1. Get all time slots for this facility on this date
+      // Get the Request date (assuming it's a native Timestamp)
       const reqDate = requestData.date; 
 
-      // 查询时
+      // Query time
       const slotsSnapshot = await db.collection('time_slot')
         .where('facility_id', '==', facility_id)
-        .where('date', '==', reqDate) // 匹配一整天
+        .where('date', '==', reqDate) // Match the entire day
         .get();
 
       if (!slotsSnapshot.empty) {
@@ -572,8 +607,8 @@ async function syncRequestsToTimeSlots() {
           const slotStart = parseInt(slotData.start_time);
           const slotEnd = parseInt(slotData.end_time);
 
-          // 2. 核心逻辑：判断包含关系
-          // 条件：TimeSlot 在 Request 的时间范围内
+          // 2. Core logic: Determine inclusion relationship
+          // Condition: TimeSlot is within the Request time range
           if (slotStart >= reqStart && slotEnd <= reqEnd) {
             const slotRef = db.collection('time_slot').doc(slotDoc.id);
             
@@ -584,10 +619,11 @@ async function syncRequestsToTimeSlots() {
 
             updateCount++;
 
-            // 每 500 次操作提交一次并重置 batch
+            // Submit every 500 operations and reset batch
             if (updateCount % 500 === 0) {
               await batch.commit();
-              console.log(`已处理 ${updateCount} 个时间槽锁定...`);
+              console.lo
+              g(`Processed ${updateCount} time slot locks...`);
               batch = db.batch();
             }
           }
@@ -595,20 +631,19 @@ async function syncRequestsToTimeSlots() {
       }
     }
 
-    // 3. 提交剩余更新
     if (updateCount % 500 !== 0) {
       await batch.commit();
     }
 
-    console.log(`✅ 同步完成！共锁定 ${updateCount} 个符合包含关系的时间段。`);
+    console.log(`Sync complete! Locked ${updateCount} time slots meeting the inclusion criteria.`);
 
   } catch (error) {
-    console.error('❌ 同步失败:', error);
+    console.error('❌ Sync failed:', error);
   }
 }
 
 /**
- * 递归删除集合中的所有文档 (Firestore 限制一次删除最多 500 条)
+ * Recursively delete all documents in a collection (Firestore limit of 500 per batch)
  */
 
 async function resetAndImportAll(Subfolder) {
@@ -617,7 +652,7 @@ async function resetAndImportAll(Subfolder) {
   const dataDir = path.join(__dirname, 'BasicData/',Subfolder);
   
   try {
-    // 1. 读取 data 文件夹下所有文件
+    // 1. Read all files in the data folder
     const files = fs.readdirSync(dataDir).filter(file => file.endsWith('.json'));
     
     if (files.length === 0) {
@@ -627,25 +662,25 @@ async function resetAndImportAll(Subfolder) {
 
     for (const file of files) {
 
-      // 2. 以文件名（去除 .json）作为集合名称
+      // 2. Use filename (removing .json) as collection name
       const collectionName = path.parse(file).name;
       const filePath = path.join(dataDir, file);
       
-      // 3. 读取并解析 JSON 内容
+      // 3. Read and parse JSON content
       const rawData = fs.readFileSync(filePath, 'utf8');
       const items = JSON.parse(rawData);
 
-      // 5. 批量写入新数据
+      // 5. Batch write new data
       const batch = db.batch();
       items.forEach((item) => {
 
-        // 如果 JSON 中没提供 id，则自动生成
+        // If no ID provided in JSON, auto-generate it
         const docId = item.id || db.collection(collectionName).doc().id;
         const docRef = db.collection(collectionName).doc(docId);
         
         const processedData = {};
   
-        // 遍历所有 key，自动发现需要转换的类型
+        // Iterate through keys to automatically discover types needing conversion
         Object.keys(item).forEach(key => {
         const val = item[key];
         if (val && typeof val === 'object' && val._type === 'timestamp') {
@@ -669,7 +704,7 @@ async function resetAndImportAll(Subfolder) {
 }
 
 /**
- * 递归删除集合函数 (保持之前的逻辑)
+ * Recursive collection deletion function (maintaining previous logic)
  */
 async function deleteCollection(collectionPath, batchSize) {
   const collectionRef = db.collection(collectionPath);
@@ -695,14 +730,10 @@ async function deleteQueryBatch(query, resolve) {
   });
   await batch.commit();
 
-  // 递归处理下一批
+  // Recursively handle the next batch
   process.nextTick(() => {
     deleteQueryBatch(query, resolve);
   });
 }
-
-
-
-
 
 resetProjectDatabase();
