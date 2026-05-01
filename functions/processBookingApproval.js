@@ -144,8 +144,8 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
 
     // 5.3 所有读取完成后，再执行写操作（更新 request）
     const completedAt = normalizedStatus === "accepted"
-      ? ""  // accepted 时写空字符串
-      : new Date().toISOString();  // 其他状态写时间戳
+      ? ""  // accepted 时保持空字符串
+      : FieldValue.serverTimestamp();  // rejected/suggested 时使用 Firestore Timestamp
 
     transaction.update(requestRef, {
       status: normalizedStatus,

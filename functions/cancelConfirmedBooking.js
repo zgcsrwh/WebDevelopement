@@ -115,7 +115,7 @@ exports.cancelConfirmedBooking = functions.https.onCall(async (data, context) =>
     // 3.9 更新 request
     transaction.update(requestRef, {
       status: "cancelled",
-      completed_at: new Date().toISOString(),
+      completed_at: FieldValue.serverTimestamp(),
       updated_at: FieldValue.serverTimestamp()
     });
 

@@ -525,7 +525,11 @@ async function main() {
 
         // 检查 completed_at
         if (requestData.completed_at) {
-          console.log(`  ✓ Request completed_at: ${requestData.completed_at}`);
+          // 兼容 Firestore Timestamp 和 ISO string
+          const completedAt = requestData.completed_at?.toDate
+            ? requestData.completed_at.toDate().toISOString()
+            : requestData.completed_at;
+          console.log(`  ✓ Request completed_at: ${completedAt}`);
         }
 
         // 检查 slot 状态
