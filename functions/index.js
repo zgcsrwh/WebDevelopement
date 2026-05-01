@@ -16,3 +16,7 @@ exports.submitBookingRequest = submitBookingRequest;
 // 导入 processBookingApproval
 const { processBookingApproval } = require("./processBookingApproval");
 exports.processBookingApproval = processBookingApproval;
+
+// 导入 cancelConfirmedBooking
+const { cancelConfirmedBooking } = require("./cancelConfirmedBooking");
+exports.cancelConfirmedBooking = cancelConfirmedBooking;
