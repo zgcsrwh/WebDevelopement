@@ -200,6 +200,10 @@ export function AuthProvider({ children }) {
     setAuthLoading(true);
     try {
       const credential = await signInWithPopup(auth, googleProvider);
+      
+      // Store the uid in a tmp doc in firestor
+      const uid = credential.user.uid;     
+
       const context = normalizeSessionContext(
         await getUserContextOnLogin(
           credential.user.email || "member@example.com",
@@ -210,6 +214,27 @@ export function AuthProvider({ children }) {
         await signOut(auth);
         throw new Error("This account has been suspended or deactivated by an administrator.");
       }
+      
+      const tmpMember = await FirestoreFunc.filterSingle("member", [{ field: "email", operator: "==", value: credential.user.email }]);
+      console.log(tmpMember)
+      if (!tmpMember || tmpMember.length == 0)
+      {
+        const name = context.profile.name;
+        const email = context.profile.email;
+        const password = "";
+        const address = "";
+        const dateOfBirth = "2026-01-01";
+        await createUserProfile({
+          name,
+          email,
+          password,
+          address,
+          dateOfBirth,
+          uid,
+      });
+      }
+
+
       setSessionRole(context.role);
       setSessionProfile(context.profile);
       return context;

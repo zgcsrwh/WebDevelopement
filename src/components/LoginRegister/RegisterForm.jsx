@@ -465,11 +465,6 @@ const RegisterForm = ({ onSwitch }) => {
           </button>
         ) : (
           <div className={styles.verificationActions}>
-            <p className={styles.verificationHint}>
-              {checkingVerification
-                ? "Checking verification status..."
-                : "Waiting for email verification. Registration will complete automatically..."}
-            </p>
             <button
               type="button"
               className={styles.submitBtn}
@@ -480,7 +475,7 @@ const RegisterForm = ({ onSwitch }) => {
             </button>
             <button
               type="button"
-              className={styles.secondaryBtn}
+              className={styles.submitBtn}
               onClick={resetVerificationProgress}
               disabled={submitting}
             >

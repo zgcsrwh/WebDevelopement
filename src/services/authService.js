@@ -21,7 +21,6 @@ function normalizeStatusValue(value = "active") {
 
 function buildProfilePayload({ name, email, address, password, dateOfBirth, uid, date_of_birth: dateOfBirthLegacy }) {
   const resolvedDateOfBirth = dateOfBirth || dateOfBirthLegacy || "";
-
   return {
     name: String(name || "").trim(),
     email: String(email || "").trim().toLowerCase(),
@@ -82,8 +81,6 @@ async function createUserProfileDirect(payload) {
 
 export async function createUserProfile(payload) {
   const profilePayload = buildProfilePayload(payload);
-  console.log(profilePayload)
-
   const response = await callSubmitAction(
     "createUserProfile",
     {
