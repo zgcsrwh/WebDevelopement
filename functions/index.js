@@ -11,5 +11,8 @@ admin.initializeApp();
 
 // 导入 submitBookingRequest
 const { submitBookingRequest } = require("./submitBookingRequest");
-
 exports.submitBookingRequest = submitBookingRequest;
+
+// 导入 processBookingApproval
+const { processBookingApproval } = require("./processBookingApproval");
+exports.processBookingApproval = processBookingApproval;
