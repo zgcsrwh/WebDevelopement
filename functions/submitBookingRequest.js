@@ -350,7 +350,7 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
       member_id: memberId,
       facility_id: data.facility_id,
       staff_id: facility.staff_id || "",
-      attendant: data.attendent,
+      attendent: data.attendent,
       activity_description: data.activity_description.trim(),
       status: "pending",
       staff_response: "",

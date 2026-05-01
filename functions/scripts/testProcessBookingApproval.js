@@ -351,7 +351,7 @@ async function main() {
       date: tomorrowDate,
       start_time: "09",
       end_time: "10",
-      attendant: 2,
+      attendent: 2,
       activity_description: "Test booking for approval",
       participant_ids: [],
       created_at: admin.firestore.FieldValue.serverTimestamp()
@@ -386,7 +386,7 @@ async function main() {
       date: tomorrowDate,
       start_time: "09",
       end_time: "10",
-      attendant: 2,
+      attendent: 2,
       activity_description: "Test wrong staff",
       participant_ids: [],
       created_at: admin.firestore.FieldValue.serverTimestamp()
@@ -423,7 +423,7 @@ async function main() {
         date: tomorrowDate,
         start_time: "09",
         end_time: "10",
-        attendant: 2,
+        attendent: 2,
         activity_description: "Test already accepted"
       });
       currentScenario.payload.request_id = requestRef.id;
@@ -450,7 +450,7 @@ async function main() {
       date: tomorrowDate,
       start_time: "09",
       end_time: "10",
-      attendant: 2,
+      attendent: 2,
       activity_description: "Test no slot"
     });
     currentScenario.payload.request_id = requestRef.id;
