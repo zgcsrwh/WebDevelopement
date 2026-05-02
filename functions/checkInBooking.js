@@ -11,84 +11,8 @@ const { FieldValue } = require("firebase-admin/firestore");
 
 const db = admin.firestore();
 
-/**
- * 解析 booking 开始时间
- *
- * request.date + request.start_time 表示 Europe/London 本地业务时间
- * 该 helper 会将其转换为 UTC instant
- *
- * 原理：
- * 1. 假设输入是 UTC 时间
- * 2. 用 toLocaleString(timeZone: 'Europe/London') 查看这个 UTC 时间在 London 看来是几点
- * 3. 计算假设的 hour 和 London 视角的 hour 的差异
- * 4. 用差异修正，得到正确的 UTC instant
- *
- * 这样可兼容 BST/GMT，并避免 Cloud Functions 运行时区导致判断偏移
- *
- * @param {string} dateStr - YYYY-MM-DD 格式 (如 "2026-05-02")
- * @param {string} startTimeStr - "09" 或 "09:00" 格式
- * @returns {Date|null} UTC instant，或 null (如果输入无效)
- */
-function parseBookingStart(dateStr, startTimeStr) {
-  if (!dateStr || !startTimeStr) {
-    return null;
-  }
-
-  // 解析 hour 和 minute
-  const timeParts = String(startTimeStr).split(":");
-  const hourStr = timeParts[0].padStart(2, "0");
-  const minuteStr = timeParts[1] || "00";
-
-  // 校验 year/month/day
-  const dateParts = dateStr.split("-");
-  if (dateParts.length !== 3) {
-    return null;
-  }
-  const year = parseInt(dateParts[0]);
-  const month = parseInt(dateParts[1]);
-  const day = parseInt(dateParts[2]);
-
-  if (isNaN(year) || isNaN(month) || isNaN(day)) {
-    return null;
-  }
-  if (month < 1 || month > 12 || day < 1 || day > 31) {
-    return null;
-  }
-
-  const hour = parseInt(hourStr), minute = parseInt(minuteStr);
-  if (isNaN(hour) || isNaN(minute)) {
-    return null;
-  }
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-    return null;
-  }
-
-  // 1. 假设 dateStr-hour 是 UTC 时间
-  const assumedUTC = new Date(Date.UTC(year, month - 1, day, hour, minute));
-
-  // 2. 获取这个 assumedUTC 在 Europe/London 看来是几点
-  const londonView = assumedUTC.toLocaleString("en-GB", {
-    timeZone: "Europe/London",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-  const [viewHour, viewMinute] = londonView.split(":").map(Number);
-
-  if (isNaN(viewHour) || isNaN(viewMinute)) {
-    return null;
-  }
-
-  // 3. 计算差异并修正
-  const diffMinutes = (hour - viewHour) * 60 + (minute - viewMinute);
-  const correctUTC = new Date(assumedUTC.getTime() + diffMinutes * 60 * 1000);
-
-  if (Number.isNaN(correctUTC.getTime())) {
-    return null;
-  }
-
-  return correctUTC;
-}
+// 从公共时间工具引入
+const { parseBookingStart } = require("./utils/time");
 
 exports.checkInBooking = functions.https.onCall(async (data, context) => {
   // 1. 校验认证
