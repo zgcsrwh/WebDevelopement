@@ -24,3 +24,7 @@ exports.cancelConfirmedBooking = cancelConfirmedBooking;
 // 导入 withdrawPendingBooking
 const { withdrawPendingBooking } = require("./withdrawPendingBooking");
 exports.withdrawPendingBooking = withdrawPendingBooking;
+
+// 导入 checkInBooking
+const { checkInBooking } = require("./checkInBooking");
+exports.checkInBooking = checkInBooking;
