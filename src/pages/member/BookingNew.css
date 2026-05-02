@@ -171,6 +171,16 @@
   font-weight: 600;
 }
 
+.booking-new__labelTail,
+.booking-new__requiredMark {
+  white-space: nowrap;
+}
+
+.booking-new__requiredMark {
+  display: inline-block;
+  margin-left: 0.16rem;
+}
+
 .booking-new__field input,
 .booking-new__field select,
 .booking-new__field textarea,

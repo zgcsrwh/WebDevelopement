@@ -29,6 +29,12 @@
   margin: 0;
 }
 
+.partner-card__message {
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .partner-page__layout {
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(300px, 336px);

@@ -359,12 +359,12 @@
 .notification-bell__modalOverlay {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  z-index: 5000;
   display: flex;
   justify-content: center;
   padding: 24px 14px;
-  background: rgba(233, 240, 245, 0.96);
-  backdrop-filter: blur(3px);
+  background: rgba(20, 31, 40, 0.42);
+  backdrop-filter: blur(6px);
   overflow-y: auto;
 }
 

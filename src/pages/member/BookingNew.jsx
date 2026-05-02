@@ -437,7 +437,9 @@ export default function BookingNew() {
 
           <div className="booking-new__grid">
             <div className="booking-new__field">
-              <label htmlFor="booking-date">Booking Date *</label>
+              <label htmlFor="booking-date">
+                Booking Date <span className="booking-new__requiredMark">*</span>
+              </label>
               <input
                 id="booking-date"
                 type="date"
@@ -456,7 +458,11 @@ export default function BookingNew() {
 
             <div className="booking-new__field">
               <label htmlFor="booking-attendees">
-                Total Attendees <span className="booking-new__labelNote">(You + Partners + Offline Friends)</span> *
+                Total Attendees{" "}
+                <span className="booking-new__labelTail">
+                  <span className="booking-new__labelNote">(You + Partners + Offline Friends)</span>
+                  <span className="booking-new__requiredMark">*</span>
+                </span>
               </label>
               <input
                 id="booking-attendees"
@@ -490,7 +496,9 @@ export default function BookingNew() {
             </div>
 
             <div className="booking-new__field">
-              <label htmlFor="booking-start-time">Start Time *</label>
+              <label htmlFor="booking-start-time">
+                Start Time <span className="booking-new__requiredMark">*</span>
+              </label>
               <select
                 id="booking-start-time"
                 value={normalizedStartTime}
@@ -507,7 +515,9 @@ export default function BookingNew() {
             </div>
 
             <div className="booking-new__field">
-              <label htmlFor="booking-end-time">End Time *</label>
+              <label htmlFor="booking-end-time">
+                End Time <span className="booking-new__requiredMark">*</span>
+              </label>
               <input
                 id="booking-end-time"
                 value={normalizedEndTime}
@@ -586,7 +596,9 @@ export default function BookingNew() {
             ) : null}
 
             <div className="booking-new__field booking-new__field--full">
-              <label htmlFor="booking-description">Activity Description *</label>
+              <label htmlFor="booking-description">
+                Activity Description <span className="booking-new__requiredMark">*</span>
+              </label>
               <textarea
                 id="booking-description"
                 value={form.activityDescription}

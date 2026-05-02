@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Bell, CalendarDays, CheckCheck, LoaderCircle, ShieldAlert, Users, Wrench, X } from "lucide-react";
 import "../../pages/pageStyles.css";
 import {
@@ -133,7 +134,7 @@ function normalizeNotificationItem(item) {
 }
 
 function ModalShell({ title, description, onClose, children }) {
-  return (
+  const modal = (
     <div className="notification-bell__modalOverlay" role="presentation">
       <div className="notification-bell__modal" role="dialog" aria-modal="true" aria-labelledby="notification-bell-modal-title">
         <div className="notification-bell__modalBody">
@@ -156,6 +157,12 @@ function ModalShell({ title, description, onClose, children }) {
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") {
+    return modal;
+  }
+
+  return createPortal(modal, document.body);
 }
 
 function ModalAlert({ tone = "error", title, message }) {

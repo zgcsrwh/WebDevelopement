@@ -417,6 +417,7 @@ export default function Facilities() {
         <section className="member-facilities-grid">
           {filteredItems.map((facility) => {
             const visibleSlots = facility.memberVisibleSlots.slice(0, 2);
+            const remainingSlots = Math.max(facility.memberVisibleSlots.length - visibleSlots.length, 0);
             const isBookable = facility.status === "normal" && facility.memberVisibleSlots.length > 0;
             const hasSlots = facility.memberVisibleSlots.length > 0;
 
@@ -450,6 +451,9 @@ export default function Facilities() {
                           {slot}
                         </span>
                       ))}
+                      {remainingSlots > 0 ? (
+                        <span className="member-facility-card__slotMore">+{remainingSlots}</span>
+                      ) : null}
                     </div>
                   ) : (
                     <p className="member-facility-card__emptySlots">No available time slots for the selected date.</p>

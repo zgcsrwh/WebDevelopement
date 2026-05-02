@@ -167,11 +167,7 @@ export async function upsertMatchProfile(payload, actor) {
   const interests = Array.isArray(payload.interests) ? payload.interests.filter(Boolean) : [];
   const availableTime = Array.isArray(payload.available_time) ? payload.available_time.filter(Boolean) : [];
   const normalizedSlots = availableTime.map((slot) => String(slot).trim().toLowerCase());
-  const uniqueTimeSegments = new Set(
-    normalizedSlots
-      .map((slot) => slot.split("_").slice(1).join("_"))
-      .filter(Boolean),
-  );
+  const uniqueAvailabilitySlots = new Set(normalizedSlots.filter(Boolean));
 
   if (!hasMeaningfulText(nickname) || !hasMeaningfulText(selfDescription)) {
     throw createAppError("invalid-argument", "Please complete the nickname and profile description.");
@@ -189,8 +185,8 @@ export async function upsertMatchProfile(payload, actor) {
     throw createAppError("invalid-argument", "Available time can include up to 3 entries.");
   }
 
-  if (uniqueTimeSegments.size !== normalizedSlots.length) {
-    throw createAppError("invalid-argument", "Availability time slots cannot repeat.");
+  if (uniqueAvailabilitySlots.size !== normalizedSlots.length) {
+    throw createAppError("invalid-argument", "Availability options cannot repeat.");
   }
 
   const existingProfile = await getOwnProfile(resolvedActor.id);

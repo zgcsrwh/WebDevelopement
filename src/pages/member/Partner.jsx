@@ -45,10 +45,6 @@ function formatAvailabilityLabel(value = "") {
   return `${toTitleText(day)} • ${toTitleText(period)}`;
 }
 
-function getTimeSegment(value = "") {
-  return String(value).split("_").slice(1).join("_");
-}
-
 function validatePartnerForm(form) {
   const errors = {};
 
@@ -72,9 +68,9 @@ function validatePartnerForm(form) {
   } else if (form.availableTime.length > 3) {
     errors.availableTime = "You can add up to 3 availability options.";
   } else {
-    const timeSegments = form.availableTime.map((value) => getTimeSegment(value)).filter(Boolean);
-    if (new Set(timeSegments).size !== timeSegments.length) {
-      errors.availableTime = "Availability time slots cannot repeat.";
+    const availabilitySlots = form.availableTime.map((value) => String(value || "").trim()).filter(Boolean);
+    if (new Set(availabilitySlots).size !== availabilitySlots.length) {
+      errors.availableTime = "Availability options cannot repeat.";
     }
   }
 
@@ -199,9 +195,6 @@ export default function Partner() {
   function addAvailabilityOption() {
     const nextValue = `${availabilityDraft.day}_${availabilityDraft.period}`;
     const hasExactDuplicate = form.availableTime.includes(nextValue);
-    const hasTimeDuplicate = form.availableTime.some(
-      (entry) => getTimeSegment(entry) === availabilityDraft.period,
-    );
 
     setError("");
     setMessage("");
@@ -215,10 +208,10 @@ export default function Partner() {
       return;
     }
 
-    if (hasExactDuplicate || hasTimeDuplicate) {
+    if (hasExactDuplicate) {
       setFieldErrors((previous) => ({
         ...previous,
-        availableTime: "Availability time slots cannot repeat.",
+        availableTime: "Availability options cannot repeat.",
       }));
       return;
     }
@@ -316,9 +309,6 @@ export default function Partner() {
         </p>
       </section>
 
-      {error ? <div className="errorMessage partner-page__message">{error}</div> : null}
-      {message ? <div className="successMessage partner-page__message">{message}</div> : null}
-
       <div className="partner-page__layout">
         <article className="partner-card partner-card--editor">
           <div className="partner-card__toggleRow">
@@ -338,6 +328,9 @@ export default function Partner() {
           </div>
 
           <div className="partner-card__divider" />
+
+          {error ? <div className="errorMessage partner-card__message">{error}</div> : null}
+          {message ? <div className="successMessage partner-card__message">{message}</div> : null}
 
           <div className="partner-avatarSection">
             <div className="partner-avatarSection__circle">

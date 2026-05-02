@@ -283,6 +283,15 @@
   font-weight: 700;
 }
 
+.member-facility-card__slotMore {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  color: #546b78;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .member-facility-card__emptySlots {
   color: #7d8d98;
   font-size: 0.88rem;

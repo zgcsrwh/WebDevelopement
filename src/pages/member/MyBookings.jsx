@@ -24,7 +24,6 @@ const BOOKING_STATUS_OPTIONS = [
   "cancelled",
   "no_show",
 ];
-const HISTORY_STATUSES = new Set(["rejected", "alternative suggested", "completed", "cancelled", "no_show"]);
 const TODAY_KEY = new Date().toISOString().slice(0, 10);
 
 function normalizeBookingStatus(value = "") {
@@ -96,26 +95,6 @@ function sortBookingsNewestFirst(items) {
   });
 }
 
-function matchesTab(status, tab) {
-  if (tab === "All") {
-    return true;
-  }
-
-  if (tab === "Upcoming") {
-    return status === "upcoming";
-  }
-
-  if (tab === "Pending") {
-    return status === "pending";
-  }
-
-  if (tab === "History") {
-    return HISTORY_STATUSES.has(status);
-  }
-
-  return true;
-}
-
 function formatTitle(booking) {
   const facilityName = String(booking.facilityName || "Facility").trim();
   const sportType = String(booking.sportType || "").trim();
@@ -173,7 +152,6 @@ export default function MyBookings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [activeTab, setActiveTab] = useState("All");
   const [draftFilters, setDraftFilters] = useState({ status: ALL_STATUS_VALUE, date: "" });
   const [appliedFilters, setAppliedFilters] = useState({ status: ALL_STATUS_VALUE, date: "" });
   const [pendingAction, setPendingAction] = useState(null);
@@ -227,9 +205,9 @@ export default function MyBookings() {
         return false;
       }
 
-      return matchesTab(status, activeTab);
+      return true;
     });
-  }, [activeTab, appliedFilters, items]);
+  }, [appliedFilters, items]);
 
   async function refreshBookings(successMessage = "") {
     setLoading(true);
@@ -259,7 +237,6 @@ export default function MyBookings() {
     const nextFilters = { status: ALL_STATUS_VALUE, date: "" };
     setDraftFilters(nextFilters);
     setAppliedFilters(nextFilters);
-    setActiveTab("All");
     setMessage("");
   }
 
@@ -372,19 +349,6 @@ export default function MyBookings() {
         </div>
       </section>
 
-      <div className="my-bookings__tabs" role="tablist" aria-label="Booking status tabs">
-        {["All", "Upcoming", "Pending", "History"].map((tab) => (
-          <button
-            key={tab}
-            className={`my-bookings__tab${activeTab === tab ? " is-active" : ""}`}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
       <section className="my-bookings__list" aria-live="polite">
         {loading ? (
           <article className="member-empty my-bookings__empty">
@@ -404,37 +368,39 @@ export default function MyBookings() {
                       <h3>{formatTitle(booking)}</h3>
                       <p>{formatDateTimeLine(booking)}</p>
                     </div>
-
-                    <span className={`status-pill ${statusTone(status)}`}>
-                      {status}
-                    </span>
                   </div>
                 </div>
 
-                <div className="my-bookings__itemActions">
-                  <Link className="btn-secondary my-bookings__actionButton" to={getBookingDetailRoute(booking.id)}>
-                    View Details
-                  </Link>
+                <div className="my-bookings__itemControls">
+                  <span className={`status-pill ${statusTone(status)}`}>
+                    {status}
+                  </span>
 
-                  {showWithdraw ? (
-                    <button
-                      className="btn-danger my-bookings__dangerAction"
-                      type="button"
-                      onClick={() => handleRequestAction("withdraw", booking)}
-                    >
-                      Withdraw Request
-                    </button>
-                  ) : null}
+                  <div className="my-bookings__itemActions">
+                    <Link className="btn-secondary my-bookings__actionButton" to={getBookingDetailRoute(booking.id)}>
+                      View Details
+                    </Link>
 
-                  {showCancel ? (
-                    <button
-                      className="btn-danger my-bookings__dangerAction"
-                      type="button"
-                      onClick={() => handleRequestAction("cancel", booking)}
-                    >
-                      Cancel Booking
-                    </button>
-                  ) : null}
+                    {showWithdraw ? (
+                      <button
+                        className="btn-danger my-bookings__dangerAction"
+                        type="button"
+                        onClick={() => handleRequestAction("withdraw", booking)}
+                      >
+                        Withdraw Request
+                      </button>
+                    ) : null}
+
+                    {showCancel ? (
+                      <button
+                        className="btn-danger my-bookings__dangerAction"
+                        type="button"
+                        onClick={() => handleRequestAction("cancel", booking)}
+                      >
+                        Cancel Booking
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </article>
             );

@@ -114,37 +114,6 @@
   justify-content: center;
 }
 
-.my-bookings__tabs {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.my-bookings__tab {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 38px;
-  padding: 0 20px;
-  border-radius: 999px;
-  border: 1px solid #d9e3e8;
-  background: #ffffff;
-  color: #7a8a95;
-  font: inherit;
-  font-size: 0.92rem;
-  font-weight: 700;
-  text-align: center;
-  cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
-}
-
-.my-bookings__tab.is-active {
-  border-color: #5a7585;
-  background: #5a7585;
-  color: #ffffff;
-}
-
 .my-bookings__list {
   display: grid;
   gap: 12px;
@@ -173,7 +142,7 @@
 .my-bookings__itemTop {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 16px;
   flex-wrap: wrap;
 }
@@ -196,6 +165,17 @@
   color: #7b8b97;
   font-size: 0.88rem;
   line-height: 1.5;
+}
+
+.my-bookings__itemControls {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.my-bookings__itemControls .status-pill {
+  justify-self: end;
 }
 
 .my-bookings__itemActions {
@@ -272,6 +252,15 @@
 
   .my-bookings__item {
     align-items: stretch;
+  }
+
+  .my-bookings__itemControls {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .my-bookings__itemControls .status-pill {
+    justify-self: start;
   }
 
   .my-bookings__itemActions {
