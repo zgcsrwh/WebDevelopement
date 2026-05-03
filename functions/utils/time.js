@@ -146,10 +146,47 @@ function getNoShowTarget(now = new Date()) {
   return { targetDate: date, targetHour: hour };
 }
 
+/**
+ * 获取 London 业务日期偏移
+ *
+ * 基于 Europe/London 时区计算日期偏移
+ * 可正确处理 GMT/BST 冬令时/夏令时转换
+ *
+ * @param {number} daysOffset - 日期偏移量（0=今天，8=今天+8）
+ * @returns {string} "YYYY-MM-DD" 格式
+ */
+function getLondonDateOffset(daysOffset) {
+  if (typeof daysOffset !== "number" || isNaN(daysOffset)) {
+    daysOffset = 0;
+  }
+
+  // 获取当前 UTC instant
+  const now = new Date();
+
+  // 加上偏移天数
+  const targetInstant = new Date(now.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+
+  // 使用 Intl.DateTimeFormat 获取 Europe/London 时区的日期
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: LONDON_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(targetInstant);
+  const year = parts.find(p => p.type === "year").value;
+  const month = parts.find(p => p.type === "month").value;
+  const day = parts.find(p => p.type === "day").value;
+
+  return `${year}-${month}-${day}`;
+}
+
 // 导出
 module.exports = {
   parseBookingStart,
   getLondonDateHourFromInstant,
   getReminderTarget,
   getNoShowTarget,
+  getLondonDateOffset,
 };

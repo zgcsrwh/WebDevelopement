@@ -36,3 +36,7 @@ exports.sendBookingReminders = sendBookingReminders;
 // 导入 settleNoShowBookings
 const { settleNoShowBookings } = require("./settleNoShowBookings");
 exports.settleNoShowBookings = settleNoShowBookings;
+
+// 导入 upsertFacility
+const { upsertFacility } = require("./upsertFacility");
+exports.upsertFacility = upsertFacility;
