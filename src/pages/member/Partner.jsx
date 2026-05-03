@@ -115,9 +115,12 @@ export default function Partner() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+
+    setLoading(true);
 
     Promise.all([getCurrentMatchProfile(sessionProfile), getFacilitySportTypes()])
       .then(([profile, sportTypes]) => {
@@ -147,6 +150,11 @@ export default function Partner() {
       .catch(() => {
         if (!cancelled) {
           setSportTypeOptions([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
         }
       });
 
@@ -309,8 +317,13 @@ export default function Partner() {
         </p>
       </section>
 
-      <div className="partner-page__layout">
-        <article className="partner-card partner-card--editor">
+      {loading ? (
+        <div className="partner-card" style={{ display: "grid", placeItems: "center", minHeight: "40vh" }}>
+          <p style={{ color: "#748693", fontWeight: 600 }}>Loading profile details...</p>
+        </div>
+      ) : (
+        <div className="partner-page__layout">
+          <article className="partner-card partner-card--editor">
           <div className="partner-card__toggleRow">
             <div>
               <h2>Enable Partner Matching</h2>
@@ -368,7 +381,7 @@ export default function Partner() {
             <input
               id="partner-nickname"
               onChange={(event) => updateField("nickname", event.target.value)}
-              placeholder="Alex M."
+              placeholder="Sportster"
               value={form.nickname}
             />
             {fieldErrors.nickname ? <p className="partner-formField__error">{fieldErrors.nickname}</p> : null}
@@ -440,14 +453,14 @@ export default function Partner() {
                   </option>
                 ))}
               </select>
+              <button className="partner-addOption" onClick={addAvailabilityOption} type="button">
+                + 
+              </button>
             </div>
-
-            <button className="partner-addOption" onClick={addAvailabilityOption} type="button">
-              + Add Option
-            </button>
 
             {form.availableTime.length ? (
               <div className="partner-availabilityList">
+                <label>Selected availability:</label>
                 {form.availableTime.map((entry) => (
                   <div key={entry} className="partner-availabilityItem">
                     <span>{formatAvailabilityLabel(entry)}</span>
@@ -557,7 +570,8 @@ export default function Partner() {
             View Recommendations
           </button>
         </aside>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

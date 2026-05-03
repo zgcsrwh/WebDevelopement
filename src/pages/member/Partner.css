@@ -116,6 +116,18 @@
   background: rgba(219, 228, 235, 0.92);
 }
 
+.partner-basicInfoRow {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+  gap: 1.8rem;
+  align-items: start;
+}
+
+.partner-basicInfoFields {
+  display: grid;
+  gap: 1.1rem;
+}
+
 .partner-avatarSection {
   display: grid;
   justify-items: center;
@@ -301,13 +313,13 @@
 }
 
 .partner-availabilityControls {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  align-items: center;
   gap: 0.85rem;
 }
 
 .partner-availabilityControls select {
-  width: 100%;
+  width: 80%;
   min-width: 0;
   min-height: 2.9rem;
   padding: 0.82rem 2.85rem 0.82rem 0.95rem;
@@ -335,7 +347,8 @@
 
 .partner-addOption {
   min-height: 2.8rem;
-  border: 1px dashed #d1dae2;
+  width: 20%;
+  border: 2px dashed #c1cdd6;
   border-radius: 0.95rem;
   background: #ffffff;
   color: #6f818e;
@@ -350,26 +363,26 @@
 }
 
 .partner-availabilityItem {
-  min-height: 2.65rem;
-  border: 1px solid #dde5eb;
-  border-radius: 0.9rem;
-  padding: 0.65rem 0.85rem;
+  min-height: 2.0rem;
+  border: 1px solid #c7d6e1;
+  border-radius: 0.75rem;
+  padding: 0.4rem 0.85rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  background: #fafcfd;
+  background: #eef4f8;
 }
 
 .partner-availabilityItem span {
-  color: #3f505b;
-  font-weight: 700;
+  color: #1d313d;
+  font-weight: 800;
 }
 
 .partner-availabilityItem button {
   border: none;
   background: transparent;
-  color: #7d8d98;
+  color: #c65f5f;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -547,6 +560,10 @@
 }
 
 @media (max-width: 720px) {
+  .partner-basicInfoRow {
+    grid-template-columns: 1fr;
+  }
+
   .partner-availabilityControls {
     grid-template-columns: 1fr;
   }
