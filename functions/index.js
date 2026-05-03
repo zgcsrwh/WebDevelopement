@@ -40,3 +40,7 @@ exports.settleNoShowBookings = settleNoShowBookings;
 // 导入 upsertFacility
 const { upsertFacility } = require("./upsertFacility");
 exports.upsertFacility = upsertFacility;
+
+// 导入 maintainTimeSlotWindow (scheduled function)
+const { maintainTimeSlotWindow } = require("./maintainTimeSlotWindow");
+exports.maintainTimeSlotWindow = maintainTimeSlotWindow;
