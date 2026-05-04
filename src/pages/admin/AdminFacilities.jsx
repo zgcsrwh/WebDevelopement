@@ -297,11 +297,19 @@ export default function AdminFacilities() {
     const trimmedLocation = String(form.location || "").trim();
     const trimmedStaffId = String(form.staff_id || "").trim();
     const capacity = Number.parseInt(String(form.capacity || "").trim(), 10);
+    const fixedName = String(selectedFacility?.name || form.name || "").trim();
+    const fixedSportType = String(selectedFacility?.sportType || form.sport_type || "").trim();
+    const fixedLocation = String(selectedFacility?.location || form.location || "").trim();
+    const fixedCapacity = Number.parseInt(String(selectedFacility?.capacity ?? form.capacity ?? "").trim(), 10);
     const startTime = parseHourInputValue(form.start_time);
     const endTime = parseHourInputValue(form.end_time);
 
     if (isEditMode && !form.facility_id) {
       nextErrors.facility_id = "Please choose a facility before saving.";
+    }
+
+    if (isEditMode && !selectedFacility) {
+      nextErrors.facility_id = "The selected facility could not be found. Please reopen this drawer.";
     }
 
     if (!isEditMode && !trimmedName) {
@@ -368,6 +376,10 @@ export default function AdminFacilities() {
           : isEditMode
             ? {
                 facility_id: form.facility_id,
+                name: fixedName,
+                sport_type: fixedSportType,
+                capacity: fixedCapacity,
+                location: fixedLocation,
                 ...editablePayload,
               }
             : {
@@ -388,6 +400,9 @@ export default function AdminFacilities() {
     const { errors, payload } = validateForm();
     setFormErrors(errors);
     if (!payload) {
+      if (errors.facility_id) {
+        setFormError(errors.facility_id);
+      }
       return;
     }
 
