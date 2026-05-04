@@ -109,6 +109,72 @@
   line-height: 1.74;
 }
 
+.booking-detail-card__section--participants {
+  display: grid;
+  gap: 18px;
+}
+
+.booking-detail-card__section--participants > label {
+  color: #8a9aa6;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.booking-detail-card__participantsGrid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+  gap: 18px;
+}
+
+.booking-detail-card__participantBlock {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 108px;
+  padding: 20px 22px;
+  border: 1px solid #dce6ec;
+  border-radius: 16px;
+  background: #f8fbfc;
+}
+
+.booking-detail-card__participantBlock span {
+  color: #8a9aa6;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.booking-detail-card__participantBlock strong {
+  color: #1f2f39;
+  font-size: 1.08rem;
+  line-height: 1.4;
+}
+
+.booking-detail-card__participantBlock p {
+  margin: 0;
+  color: #6f7f8b;
+  line-height: 1.6;
+}
+
+.booking-detail-card__friendList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.booking-detail-card__friendList strong {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eef4f7;
+  color: #30424d;
+}
+
 .booking-detail-card__section--statusNote {
   display: grid;
   gap: 22px;
@@ -188,6 +254,10 @@
   .booking-detail-card__section--grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 24px 28px;
+  }
+
+  .booking-detail-card__participantsGrid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -13,6 +13,7 @@ import Partner from "./pages/member/Partner";
 import PartnerDetail from "./pages/member/PartnerDetail";
 import Profile from "./pages/member/Profile";
 import Reports from "./pages/member/Reports";
+import Notifications from "./pages/Notifications";
 import Requests from "./pages/staff/Requests";
 import CheckIn from "./pages/staff/CheckIn";
 import Repair from "./pages/staff/Repair";
@@ -109,6 +110,14 @@ function AppRoutes() {
         element={
           <ShellRoute allowedRoles={["Member"]}>
             <BookingDetail />
+          </ShellRoute>
+        }
+      />
+      <Route
+        path={ROUTE_PATHS.NOTIFICATIONS}
+        element={
+          <ShellRoute allowedRoles={["Member"]}>
+            <Notifications />
           </ShellRoute>
         }
       />

@@ -193,7 +193,8 @@ export async function upsertMatchProfile(payload, actor) {
   const profilePayload = {
     member_id: resolvedActor.id,
     nickname,
-    open_match: Boolean(existingProfile?.open_match),
+    open_match:
+      payload.open_match === undefined ? Boolean(existingProfile?.open_match) : Boolean(payload.open_match),
     interests,
     self_description: selfDescription,
     available_time: normalizedSlots,

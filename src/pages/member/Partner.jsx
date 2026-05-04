@@ -33,6 +33,19 @@ function createEmptyForm() {
   };
 }
 
+function createFormFromProfile(profile) {
+  if (!profile) {
+    return createEmptyForm();
+  }
+
+  return {
+    nickname: profile.nickname || "",
+    selfDescription: profile.bio || "",
+    interests: Array.isArray(profile.interestsRaw) ? [...profile.interestsRaw] : [],
+    availableTime: Array.isArray(profile.availableTimeRaw) ? [...profile.availableTimeRaw] : [],
+  };
+}
+
 function createAvailabilityDraft() {
   return {
     day: DAY_OPTIONS[0],
@@ -109,6 +122,7 @@ export default function Partner() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const [enabled, setEnabled] = useState(false);
+  const [originalMatchProfile, setOriginalMatchProfile] = useState(createEmptyForm);
   const [form, setForm] = useState(createEmptyForm);
   const [selectedAvatarId, setSelectedAvatarId] = useState(avatarOptions[0]?.id || "");
   const [sportTypeOptions, setSportTypeOptions] = useState([]);
@@ -137,16 +151,17 @@ export default function Partner() {
         );
 
         if (!profile) {
+          const emptyForm = createEmptyForm();
+          setEnabled(false);
+          setOriginalMatchProfile(emptyForm);
+          setForm(emptyForm);
           return;
         }
 
+        const nextForm = createFormFromProfile(profile);
         setEnabled(Boolean(profile.openMatch));
-        setForm({
-          nickname: profile.nickname || "",
-          selfDescription: profile.bio || "",
-          interests: profile.interestsRaw || [],
-          availableTime: profile.availableTimeRaw || [],
-        });
+        setOriginalMatchProfile(nextForm);
+        setForm(nextForm);
       })
       .catch(() => {
         if (!cancelled) {
@@ -251,8 +266,18 @@ export default function Partner() {
     }));
   }
 
+  function buildMergedMatchForm() {
+    return {
+      nickname: form.nickname ?? originalMatchProfile.nickname ?? "",
+      selfDescription: form.selfDescription ?? originalMatchProfile.selfDescription ?? "",
+      interests: Array.isArray(form.interests) ? form.interests : originalMatchProfile.interests || [],
+      availableTime: Array.isArray(form.availableTime) ? form.availableTime : originalMatchProfile.availableTime || [],
+    };
+  }
+
   async function handleSave() {
-    const validationErrors = validatePartnerForm(form);
+    const mergedForm = buildMergedMatchForm();
+    const validationErrors = validatePartnerForm(mergedForm);
     setFieldErrors(validationErrors);
     setError("");
     setMessage("");
@@ -265,15 +290,23 @@ export default function Partner() {
     try {
       await upsertMatchProfile(
         {
-          nickname: form.nickname.trim(),
+          nickname: mergedForm.nickname.trim(),
           open_match: enabled,
-          interests: form.interests,
-          self_description: form.selfDescription.trim(),
-          available_time: form.availableTime,
+          interests: mergedForm.interests,
+          self_description: mergedForm.selfDescription.trim(),
+          available_time: mergedForm.availableTime,
         },
         sessionProfile,
       );
 
+      const nextForm = {
+        nickname: mergedForm.nickname.trim(),
+        selfDescription: mergedForm.selfDescription.trim(),
+        interests: [...mergedForm.interests],
+        availableTime: [...mergedForm.availableTime],
+      };
+      setOriginalMatchProfile(nextForm);
+      setForm(nextForm);
       setMessage("Profile saved successfully.");
     } catch (saveError) {
       setError(getErrorMessage(saveError, "Unable to save the profile."));

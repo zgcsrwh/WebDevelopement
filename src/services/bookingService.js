@@ -228,13 +228,56 @@ function normalizeBookingStatusValue(value = "") {
   return rawStatus.replace(/[_-]+/g, " ");
 }
 
+const MEMBER_BOOKING_VISIBLE_STATUSES = new Set([
+  "pending",
+  "rejected",
+  "alternative suggested",
+  "upcoming",
+  "completed",
+  "cancelled",
+  "no_show",
+]);
+
+function normalizeMemberBookingPageStatus(value = "") {
+  const normalizedStatus = normalizeBookingStatusValue(value);
+  const compactStatus = normalizedStatus.replace(/\s+/g, "");
+
+  if (compactStatus === "noshow") {
+    return "no_show";
+  }
+
+  if (normalizedStatus === "suggested" || normalizedStatus === "suggested alternative") {
+    return "alternative suggested";
+  }
+
+  if (normalizedStatus === "complete") {
+    return "completed";
+  }
+
+  return normalizedStatus;
+}
+
 function applyMemberBookingDisplay(item) {
-  const displayStatus = normalizeBookingStatusValue(getMemberBookingDisplayStatus(item.raw || item));
+  const displayStatus = normalizeMemberBookingPageStatus(getMemberBookingDisplayStatus(item.raw || item));
   return {
     ...item,
     status: displayStatus,
     statusLabel: displayStatus || item.statusLabel || "",
   };
+}
+
+function isMemberBookingVisibleToActor(item = {}) {
+  const status = normalizeMemberBookingPageStatus(item.status || item.raw?.status);
+
+  if (!MEMBER_BOOKING_VISIBLE_STATUSES.has(status)) {
+    return false;
+  }
+
+  if (item.isParticipant && !item.isOwner && status === "pending") {
+    return false;
+  }
+
+  return true;
 }
 
 export function getStaffRequestPageStatus(value = "") {
@@ -557,7 +600,7 @@ export async function getBookings(actor) {
   });
 
   const decoratedItems = await decorateRequests(relevantRequests, resolvedActor.id);
-  return decoratedItems.map(applyMemberBookingDisplay);
+  return decoratedItems.map(applyMemberBookingDisplay).filter(isMemberBookingVisibleToActor);
 }
 
 export async function getBookingById(id, actor) {
@@ -574,7 +617,16 @@ export async function getBookingById(id, actor) {
   }
 
   const [booking] = await decorateRequests([request], resolvedActor?.id || "");
-  return booking ? applyMemberBookingDisplay(booking) : null;
+  if (!booking) {
+    return null;
+  }
+
+  const displayBooking = applyMemberBookingDisplay(booking);
+  if (resolvedActor?.role === "Member" && !isMemberBookingVisibleToActor(displayBooking)) {
+    throw createAppError("permission-denied");
+  }
+
+  return displayBooking;
 }
 
 async function submitBookingRequestDirect(payload, actor) {

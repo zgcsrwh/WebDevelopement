@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import "./pageStyles.css";
 import { markAllNotificationsRead, markNotificationRead, subscribeToNotifications } from "../services/notificationService";
 import { useAuth } from "../provider/AuthContext";
+import { getBookingDetailRoute } from "../constants/routes";
 import { displayStatus, statusTone, toTitleText } from "../utils/presentation";
 
 function getNotificationClass(type) {
   if (type === "facility_request") return "status-pending";
   if (type === "repair_report") return "status-active";
   return "status-unlisted";
+}
+
+function isBookingNotification(item) {
+  return item?.type === "facility_request" && Boolean(item.referenceId);
 }
 
 export default function Notifications() {
@@ -57,6 +63,24 @@ export default function Notifications() {
   }, [filter, items]);
 
   const unreadCount = items.filter((item) => !item.isRead).length;
+
+  function markItemReadLocally(id) {
+    setItems((prev) =>
+      prev.map((current) =>
+        current.id === id ? { ...current, isRead: true } : current,
+      ),
+    );
+  }
+
+  function handleOpenBookingNotification(item) {
+    if (item.isRead) {
+      return;
+    }
+
+    markNotificationRead(item.id)
+      .then(() => markItemReadLocally(item.id))
+      .catch(() => {});
+  }
 
   return (
     <div className="page-stack">
@@ -123,16 +147,21 @@ export default function Notifications() {
                   )}
                 </div>
                 <div className="inline-actions">
+                  {isBookingNotification(item) ? (
+                    <Link
+                      className="btn-secondary"
+                      to={getBookingDetailRoute(item.referenceId)}
+                      onClick={() => handleOpenBookingNotification(item)}
+                    >
+                      View Details
+                    </Link>
+                  ) : null}
                   {!item.isRead && (
                     <button
                       className="btn-secondary"
                       onClick={async () => {
                         await markNotificationRead(item.id);
-                        setItems((prev) =>
-                          prev.map((current) =>
-                            current.id === item.id ? { ...current, isRead: true } : current,
-                          ),
-                        );
+                        markItemReadLocally(item.id);
                       }}
                     >
                       Mark read

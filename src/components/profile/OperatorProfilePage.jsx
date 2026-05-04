@@ -237,7 +237,12 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
     const shouldUpdatePassword = passwordDirty;
 
     if (!shouldUpdateAddress && !shouldUpdatePassword) {
-      setPageAlert(buildAlert("No changes", "There are no changes to save.", "error"));
+      if (originalProfile) {
+        setDraftProfile(originalProfile);
+      }
+      resetPasswordState({ collapse: true });
+      setConfirmModalOpen(false);
+      setPageAlert(buildAlert("Profile already up to date", "Your profile details are already saved."));
       return;
     }
 

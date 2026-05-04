@@ -203,6 +203,16 @@ export default function BookingDetail() {
   }, [booking]);
   const statusNotice = useMemo(() => getStatusNotice(normalizedStatus), [normalizedStatus]);
   const staffFeedback = useMemo(() => getStaffFeedback(booking?.feedback), [booking?.feedback]);
+  const invitedFriendNames = useMemo(() => {
+    const applicantName = String(booking?.memberName || "").trim().toLowerCase();
+    const names = Array.isArray(booking?.participantNames) ? booking.participantNames : [];
+
+    return names
+      .map((name) => String(name || "").trim())
+      .filter(Boolean)
+      .filter((name, index, list) => list.indexOf(name) === index)
+      .filter((name) => name.toLowerCase() !== applicantName);
+  }, [booking?.memberName, booking?.participantNames]);
 
   if (loading) {
     return (
@@ -295,6 +305,29 @@ export default function BookingDetail() {
         <section className="booking-detail-card__section booking-detail-card__section--description">
           <label>Activity Description</label>
           <p>{booking.activityDescription || "No activity description was provided for this booking request."}</p>
+        </section>
+
+        <section className="booking-detail-card__section booking-detail-card__section--participants">
+          <label>Participants</label>
+          <div className="booking-detail-card__participantsGrid">
+            <div className="booking-detail-card__participantBlock">
+              <span>Applicant</span>
+              <strong>{booking.memberName || "Member"}</strong>
+            </div>
+
+            <div className="booking-detail-card__participantBlock">
+              <span>Invited Friends</span>
+              {invitedFriendNames.length ? (
+                <div className="booking-detail-card__friendList">
+                  {invitedFriendNames.map((name) => (
+                    <strong key={name}>{name}</strong>
+                  ))}
+                </div>
+              ) : (
+                <p>No invited friends were included.</p>
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="booking-detail-card__section booking-detail-card__section--statusNote">

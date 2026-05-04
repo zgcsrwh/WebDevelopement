@@ -205,7 +205,20 @@ function NotificationSummaryCard({ item, children }) {
   );
 }
 
+function getInvitedFriendNames(detail) {
+  const applicantName = String(detail?.memberName || "").trim().toLowerCase();
+  const names = Array.isArray(detail?.participantNames) ? detail.participantNames : [];
+
+  return names
+    .map((name) => String(name || "").trim())
+    .filter(Boolean)
+    .filter((name, index, list) => list.indexOf(name) === index)
+    .filter((name) => name.toLowerCase() !== applicantName);
+}
+
 function BookingDetailModal({ item, detail, loading, error, onClose }) {
+  const invitedFriendNames = getInvitedFriendNames(detail);
+
   return (
     <ModalShell
       title="Booking Notification"
@@ -248,7 +261,11 @@ function BookingDetailModal({ item, detail, loading, error, onClose }) {
               </div>
               <div className="notification-bell__applicationBox">
                 <span>Participants</span>
-                <p>{(detail.participantNames || []).join(" / ") || "No invited participants."}</p>
+                <p>
+                  Applicant: {detail.memberName || "Member"}
+                  <br />
+                  Invited Friends: {invitedFriendNames.join(" / ") || "No invited friends were included."}
+                </p>
               </div>
             </>
           ) : (

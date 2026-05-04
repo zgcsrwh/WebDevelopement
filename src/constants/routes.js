@@ -9,6 +9,7 @@ export const ROUTE_PATHS = {
   BOOKINGS_NEW: "/bookings/new",
   BOOKINGS: "/bookings",
   BOOKING_DETAIL: "/bookings/:id",
+  NOTIFICATIONS: "/notifications",
   REPORTS: "/reports",
   PARTNER: "/partner",
   PARTNER_DISCOVER: "/partner/discover",

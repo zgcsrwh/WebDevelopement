@@ -166,6 +166,7 @@ export default function Profile() {
     status: "",
     createdAt: "",
   });
+  const [originalProfile, setOriginalProfile] = useState(null);
   const [form, setForm] = useState({
     name: "",
     dateOfBirth: "",
@@ -215,6 +216,7 @@ export default function Profile() {
     };
 
     setProfileView(nextView);
+    setOriginalProfile(nextView);
     setForm({
       name: nextView.name,
       dateOfBirth: nextView.dateOfBirth,
@@ -258,18 +260,27 @@ export default function Profile() {
     [profileView.status],
   );
 
-  function validateBasicForm() {
+  function validateBasicForm(nextForm = form) {
     const errors = {};
-    if (!hasMeaningfulText(form.name)) {
+    if (!hasMeaningfulText(nextForm.name)) {
       errors.name = "Please enter your full name.";
     }
-    if (!form.dateOfBirth) {
+    if (!nextForm.dateOfBirth) {
       errors.dateOfBirth = "Please choose your date of birth.";
     }
-    if (!hasMeaningfulText(form.address)) {
+    if (!hasMeaningfulText(nextForm.address)) {
       errors.address = "Please enter your address.";
     }
     return errors;
+  }
+
+  function buildMergedProfileForm() {
+    const source = originalProfile || profileView;
+    return {
+      name: form.name ?? source.name ?? "",
+      dateOfBirth: form.dateOfBirth ?? source.dateOfBirth ?? "",
+      address: form.address ?? source.address ?? "",
+    };
   }
 
   async function handleProfileAction() {
@@ -277,30 +288,45 @@ export default function Profile() {
     setFieldErrors({});
 
     if (!isEditing) {
+      const source = originalProfile || profileView;
+      setForm({
+        name: source.name || "",
+        dateOfBirth: source.dateOfBirth || "",
+        address: source.address || "",
+      });
       setIsEditing(true);
       return;
     }
 
-    const errors = validateBasicForm();
+    const mergedForm = buildMergedProfileForm();
+    const errors = validateBasicForm(mergedForm);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
     }
 
+    const profilePayload = {
+      name: String(mergedForm.name || "").trim(),
+      dateOfBirth: mergedForm.dateOfBirth,
+      address: String(mergedForm.address || "").trim(),
+    };
+
     setSavingProfile(true);
     try {
-      await updateUserProfile(form, sessionProfile);
-      setProfileView((previous) => ({
-        ...previous,
-        name: form.name.trim(),
-        dateOfBirth: formatDateInput(form.dateOfBirth),
-        address: form.address.trim(),
-      }));
-      setForm((previous) => ({
-        ...previous,
-        name: previous.name.trim(),
-        address: previous.address.trim(),
-      }));
+      await updateUserProfile(profilePayload, sessionProfile);
+      const nextView = {
+        ...profileView,
+        name: profilePayload.name,
+        dateOfBirth: formatDateInput(profilePayload.dateOfBirth),
+        address: profilePayload.address,
+      };
+      setProfileView(nextView);
+      setOriginalProfile(nextView);
+      setForm({
+        name: nextView.name,
+        dateOfBirth: nextView.dateOfBirth,
+        address: nextView.address,
+      });
       setIsEditing(false);
       setProfileAlert(buildAlert("Saved", "Basic information updated successfully."));
     } catch (saveError) {
