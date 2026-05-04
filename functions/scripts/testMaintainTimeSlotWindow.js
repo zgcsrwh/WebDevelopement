@@ -83,6 +83,9 @@ function assertStats(actual, expected) {
   if (expected.skippedExistingSlots !== undefined && actual.skippedExistingSlots !== expected.skippedExistingSlots) {
     throw new Error(`skippedExistingSlots expected ${expected.skippedExistingSlots}, got ${actual.skippedExistingSlots}`);
   }
+  if (expected.deletedExpiredSlots !== undefined && actual.deletedExpiredSlots !== expected.deletedExpiredSlots) {
+    throw new Error(`deletedExpiredSlots expected ${expected.deletedExpiredSlots}, got ${actual.deletedExpiredSlots}`);
+  }
 }
 
 // ============ 测试场景 ============
@@ -783,6 +786,518 @@ async function testInvalidFacilityHours() {
   }
 }
 
+// ============ Cleanup 测试场景 ============
+
+/**
+ * cleanup-deletes-old-open-slots
+ */
+async function testCleanupDeletesOldOpenSlots() {
+  const facilityId = "mtw-facility-cleanup-old-open";
+  const facilityIds = [facilityId];
+  const oldDate = getLondonDateOffset(-3);
+  const slotId = `${facilityId}-${oldDate}-09`;
+
+  console.log("\n=== Test: cleanup-deletes-old-open-slots ===");
+
+  try {
+    // Setup facility
+    await db.collection("facility").doc(facilityId).set({
+      name: "Test Cleanup Old Open",
+      sport_type: "tennis",
+      description: "Test",
+      usage_guidelines: "Test",
+      capacity: 4,
+      location: "Test",
+      start_time: 9,
+      end_time: 12,
+      staff_id: "staff_test",
+      status: "normal",
+      scheduled_change: null,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    // Setup old open slot
+    await db.collection("time_slot").doc(slotId).set({
+      facility_id: facilityId,
+      date: oldDate,
+      start_time: "09",
+      end_time: "10",
+      status: "open",
+      request_id: "",
+      created_at: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`Created old open slot: ${slotId} (date: ${oldDate})`);
+
+    // Execute
+    const result = await processTimeSlotWindow({
+      mode: "daily",
+      facilityId: facilityId
+    });
+    console.log("Result:", JSON.stringify(result, null, 2));
+
+    // Verify stats
+    assertStats(result, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      deletedExpiredSlots: 1,
+      createdSlots: 3,
+      skippedExistingSlots: 0
+    });
+
+    // Verify slot deleted
+    const slotDoc = await db.collection("time_slot").doc(slotId).get();
+    if (slotDoc.exists) {
+      throw new Error(`Slot ${slotId} should be deleted`);
+    }
+
+    console.log("PASS: cleanup-deletes-old-open-slots");
+  } finally {
+    await cleanupTestData(facilityIds);
+  }
+}
+
+/**
+ * cleanup-keeps-old-locked-slots
+ */
+async function testCleanupKeepsOldLockedSlots() {
+  const facilityId = "mtw-facility-cleanup-old-locked";
+  const facilityIds = [facilityId];
+  const requestId = "mtw-request-123";
+  const oldDate = getLondonDateOffset(-1);
+  const slotId = `${facilityId}-${oldDate}-10`;
+
+  console.log("\n=== Test: cleanup-keeps-old-locked-slots ===");
+
+  try {
+    // Setup facility
+    await db.collection("facility").doc(facilityId).set({
+      name: "Test Cleanup Old Locked",
+      sport_type: "tennis",
+      description: "Test",
+      usage_guidelines: "Test",
+      capacity: 4,
+      location: "Test",
+      start_time: 9,
+      end_time: 12,
+      staff_id: "staff_test",
+      status: "normal",
+      scheduled_change: null,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    // Setup old locked slot
+    await db.collection("time_slot").doc(slotId).set({
+      facility_id: facilityId,
+      date: oldDate,
+      start_time: "10",
+      end_time: "11",
+      status: "locked",
+      request_id: requestId,
+      created_at: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`Created old locked slot: ${slotId} (date: ${oldDate})`);
+
+    // Execute
+    const result = await processTimeSlotWindow({
+      mode: "daily",
+      facilityId: facilityId
+    });
+    console.log("Result:", JSON.stringify(result, null, 2));
+
+    // Verify stats
+    assertStats(result, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      deletedExpiredSlots: 0,
+      createdSlots: 3,
+      skippedExistingSlots: 0
+    });
+
+    // Verify slot kept
+    const slotDoc = await db.collection("time_slot").doc(slotId).get();
+    const slotData = slotDoc.data();
+    if (slotData.status !== "locked") {
+      throw new Error(`Slot status should remain "locked", got "${slotData.status}"`);
+    }
+
+    console.log("PASS: cleanup-keeps-old-locked-slots");
+  } finally {
+    await cleanupTestData(facilityIds);
+  }
+}
+
+/**
+ * cleanup-keeps-today-open-slots
+ */
+async function testCleanupKeepsTodayOpenSlots() {
+  const facilityId = "mtw-facility-cleanup-today";
+  const facilityIds = [facilityId];
+  const today = getLondonDateOffset(0);
+  const slotId = `${facilityId}-${today}-09`;
+
+  console.log("\n=== Test: cleanup-keeps-today-open-slots ===");
+
+  try {
+    // Setup facility
+    await db.collection("facility").doc(facilityId).set({
+      name: "Test Cleanup Today",
+      sport_type: "tennis",
+      description: "Test",
+      usage_guidelines: "Test",
+      capacity: 4,
+      location: "Test",
+      start_time: 9,
+      end_time: 12,
+      staff_id: "staff_test",
+      status: "normal",
+      scheduled_change: null,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    // Setup today open slot
+    await db.collection("time_slot").doc(slotId).set({
+      facility_id: facilityId,
+      date: today,
+      start_time: "09",
+      end_time: "10",
+      status: "open",
+      request_id: "",
+      created_at: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`Created today open slot: ${slotId} (date: ${today})`);
+
+    // Execute
+    const result = await processTimeSlotWindow({
+      mode: "daily",
+      facilityId: facilityId
+    });
+    console.log("Result:", JSON.stringify(result, null, 2));
+
+    // Verify stats
+    assertStats(result, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      deletedExpiredSlots: 0,
+      createdSlots: 3,
+      skippedExistingSlots: 0
+    });
+
+    // Verify slot kept
+    const slotDoc = await db.collection("time_slot").doc(slotId).get();
+    if (!slotDoc.exists) {
+      throw new Error(`Slot ${slotId} should be kept`);
+    }
+
+    console.log("PASS: cleanup-keeps-today-open-slots");
+  } finally {
+    await cleanupTestData(facilityIds);
+  }
+}
+
+/**
+ * cleanup-keeps-future-open-slots
+ */
+async function testCleanupKeepsFutureOpenSlots() {
+  const facilityId = "mtw-facility-cleanup-future";
+  const facilityIds = [facilityId];
+  const futureDate = getLondonDateOffset(3);
+  const slotId = `${facilityId}-${futureDate}-11`;
+
+  console.log("\n=== Test: cleanup-keeps-future-open-slots ===");
+
+  try {
+    // Setup facility
+    await db.collection("facility").doc(facilityId).set({
+      name: "Test Cleanup Future",
+      sport_type: "tennis",
+      description: "Test",
+      usage_guidelines: "Test",
+      capacity: 4,
+      location: "Test",
+      start_time: 9,
+      end_time: 12,
+      staff_id: "staff_test",
+      status: "normal",
+      scheduled_change: null,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    // Setup future open slot
+    await db.collection("time_slot").doc(slotId).set({
+      facility_id: facilityId,
+      date: futureDate,
+      start_time: "11",
+      end_time: "12",
+      status: "open",
+      request_id: "",
+      created_at: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`Created future open slot: ${slotId} (date: ${futureDate})`);
+
+    // Execute
+    const result = await processTimeSlotWindow({
+      mode: "daily",
+      facilityId: facilityId
+    });
+    console.log("Result:", JSON.stringify(result, null, 2));
+
+    // Verify stats
+    assertStats(result, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      deletedExpiredSlots: 0,
+      createdSlots: 3,
+      skippedExistingSlots: 0
+    });
+
+    // Verify slot kept
+    const slotDoc = await db.collection("time_slot").doc(slotId).get();
+    if (!slotDoc.exists) {
+      throw new Error(`Slot ${slotId} should be kept`);
+    }
+
+    console.log("PASS: cleanup-keeps-future-open-slots");
+  } finally {
+    await cleanupTestData(facilityIds);
+  }
+}
+
+/**
+ * cleanup-not-run-in-fill-window-mode
+ */
+async function testCleanupNotRunInFillWindowMode() {
+  const facilityId = "mtw-facility-cleanup-fillwindow";
+  const facilityIds = [facilityId];
+  const oldDate = getLondonDateOffset(-2);
+  const slotId = `${facilityId}-${oldDate}-09`;
+
+  console.log("\n=== Test: cleanup-not-run-in-fill-window-mode ===");
+
+  try {
+    // Setup facility
+    await db.collection("facility").doc(facilityId).set({
+      name: "Test Cleanup FillWindow",
+      sport_type: "tennis",
+      description: "Test",
+      usage_guidelines: "Test",
+      capacity: 4,
+      location: "Test",
+      start_time: 9,
+      end_time: 11,
+      staff_id: "staff_test",
+      status: "normal",
+      scheduled_change: null,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    // Setup old open slot
+    await db.collection("time_slot").doc(slotId).set({
+      facility_id: facilityId,
+      date: oldDate,
+      start_time: "09",
+      end_time: "10",
+      status: "open",
+      request_id: "",
+      created_at: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`Created old open slot: ${slotId} (date: ${oldDate})`);
+
+    // Execute fillWindow mode
+    const result = await processTimeSlotWindow({
+      mode: "fillWindow",
+      facilityId: facilityId
+    });
+    console.log("Result:", JSON.stringify(result, null, 2));
+
+    // Verify stats - fillWindow does NOT run cleanup by default
+    assertStats(result, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      deletedExpiredSlots: 0,
+      createdSlots: 16
+    });
+
+    // Verify slot kept
+    const slotDoc = await db.collection("time_slot").doc(slotId).get();
+    if (!slotDoc.exists) {
+      throw new Error(`Slot ${slotId} should be kept in fillWindow mode`);
+    }
+
+    console.log("PASS: cleanup-not-run-in-fill-window-mode");
+  } finally {
+    await cleanupTestData(facilityIds);
+  }
+}
+
+/**
+ * cleanup-does-not-break-daily-generation
+ */
+async function testCleanupDoesNotBreakDailyGeneration() {
+  const facilityId = "mtw-facility-cleanup-generation";
+  const facilityIds = [facilityId];
+  const oldDate = getLondonDateOffset(-1);
+  const oldSlotId = `${facilityId}-${oldDate}-09`;
+  const targetDate = getLondonDateOffset(7);
+
+  console.log("\n=== Test: cleanup-does-not-break-daily-generation ===");
+
+  try {
+    // Setup facility
+    await db.collection("facility").doc(facilityId).set({
+      name: "Test Cleanup Generation",
+      sport_type: "tennis",
+      description: "Test",
+      usage_guidelines: "Test",
+      capacity: 4,
+      location: "Test",
+      start_time: 9,
+      end_time: 12,
+      staff_id: "staff_test",
+      status: "normal",
+      scheduled_change: null,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    // Setup old open slot
+    await db.collection("time_slot").doc(oldSlotId).set({
+      facility_id: facilityId,
+      date: oldDate,
+      start_time: "09",
+      end_time: "10",
+      status: "open",
+      request_id: "",
+      created_at: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`Created old open slot: ${oldSlotId} (date: ${oldDate})`);
+
+    // Execute daily mode
+    const result = await processTimeSlotWindow({
+      mode: "daily",
+      facilityId: facilityId
+    });
+    console.log("Result:", JSON.stringify(result, null, 2));
+
+    // Verify stats
+    assertStats(result, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      deletedExpiredSlots: 1,
+      createdSlots: 3,
+      skippedExistingSlots: 0
+    });
+
+    // Verify old slot deleted
+    const oldSlotDoc = await db.collection("time_slot").doc(oldSlotId).get();
+    if (oldSlotDoc.exists) {
+      throw new Error(`Old slot ${oldSlotId} should be deleted`);
+    }
+
+    // Verify targetDate slots created
+    const targetSlotsSnap = await db
+      .collection("time_slot")
+      .where("facility_id", "==", facilityId)
+      .where("date", "==", targetDate)
+      .get();
+
+    if (targetSlotsSnap.size !== 3) {
+      throw new Error(`Expected 3 slots at ${targetDate}, got ${targetSlotsSnap.size}`);
+    }
+
+    console.log("PASS: cleanup-does-not-break-daily-generation");
+  } finally {
+    await cleanupTestData(facilityIds);
+  }
+}
+
+/**
+ * cleanup-idempotent
+ */
+async function testCleanupIdempotent() {
+  const facilityId = "mtw-facility-cleanup-idempotent";
+  const facilityIds = [facilityId];
+  const oldDate = getLondonDateOffset(-1);
+  const slotId = `${facilityId}-${oldDate}-09`;
+
+  console.log("\n=== Test: cleanup-idempotent ===");
+
+  try {
+    // Setup facility
+    await db.collection("facility").doc(facilityId).set({
+      name: "Test Cleanup Idempotent",
+      sport_type: "tennis",
+      description: "Test",
+      usage_guidelines: "Test",
+      capacity: 4,
+      location: "Test",
+      start_time: 9,
+      end_time: 12,
+      staff_id: "staff_test",
+      status: "normal",
+      scheduled_change: null,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    // Setup old open slot
+    await db.collection("time_slot").doc(slotId).set({
+      facility_id: facilityId,
+      date: oldDate,
+      start_time: "09",
+      end_time: "10",
+      status: "open",
+      request_id: "",
+      created_at: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`Created old open slot: ${slotId} (date: ${oldDate})`);
+
+    // First run
+    const result1 = await processTimeSlotWindow({
+      mode: "daily",
+      facilityId: facilityId
+    });
+    console.log("First result:", JSON.stringify(result1, null, 2));
+
+    // Second run
+    const result2 = await processTimeSlotWindow({
+      mode: "daily",
+      facilityId: facilityId
+    });
+    console.log("Second result:", JSON.stringify(result2, null, 2));
+
+    // Verify stats
+    assertStats(result1, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      deletedExpiredSlots: 1,
+      createdSlots: 3
+    });
+
+    assertStats(result2, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      deletedExpiredSlots: 0,
+      createdSlots: 0
+    });
+
+    console.log("PASS: cleanup-idempotent");
+  } finally {
+    await cleanupTestData(facilityIds);
+  }
+}
+
 // ============ Main ============
 
 async function main() {
@@ -810,6 +1325,14 @@ async function main() {
     console.log("  unknown-mode");
     console.log("  unknown-scheduled-change-type");
     console.log("  invalid-facility-hours");
+    console.log("\nCleanup scenarios:");
+    console.log("  cleanup-deletes-old-open-slots");
+    console.log("  cleanup-keeps-old-locked-slots");
+    console.log("  cleanup-keeps-today-open-slots");
+    console.log("  cleanup-keeps-future-open-slots");
+    console.log("  cleanup-not-run-in-fill-window-mode");
+    console.log("  cleanup-does-not-break-daily-generation");
+    console.log("  cleanup-idempotent");
     process.exit(1);
   }
 
@@ -850,6 +1373,27 @@ async function main() {
         break;
       case "invalid-facility-hours":
         await testInvalidFacilityHours();
+        break;
+      case "cleanup-deletes-old-open-slots":
+        await testCleanupDeletesOldOpenSlots();
+        break;
+      case "cleanup-keeps-old-locked-slots":
+        await testCleanupKeepsOldLockedSlots();
+        break;
+      case "cleanup-keeps-today-open-slots":
+        await testCleanupKeepsTodayOpenSlots();
+        break;
+      case "cleanup-keeps-future-open-slots":
+        await testCleanupKeepsFutureOpenSlots();
+        break;
+      case "cleanup-not-run-in-fill-window-mode":
+        await testCleanupNotRunInFillWindowMode();
+        break;
+      case "cleanup-does-not-break-daily-generation":
+        await testCleanupDoesNotBreakDailyGeneration();
+        break;
+      case "cleanup-idempotent":
+        await testCleanupIdempotent();
         break;
       default:
         console.error(`Unknown scenario: ${scenario}`);

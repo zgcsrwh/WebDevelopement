@@ -57,6 +57,56 @@ function generateSlotId(facilityId, date, hour) {
 }
 
 /**
+ * 清理过期的 open time_slot
+ *
+ * 只删除 date < getLondonDateOffset(0) 且 status === "open" 的 slot
+ * 不删除 locked / unavailable 等其他状态
+ *
+ * @param {object} stats - 统计对象
+ * @returns {Promise<void>}
+ */
+async function cleanupExpiredOpenSlots(stats) {
+  const today = getLondonDateOffset(0);
+  const DELETE_BATCH_SIZE = 450;
+
+  // 查询：date < today 且 status === "open"
+  const expiredSlotsSnap = await db
+    .collection("time_slot")
+    .where("date", "<", today)
+    .where("status", "==", "open")
+    .get();
+
+  if (expiredSlotsSnap.empty) {
+    stats.deletedExpiredSlots = 0;
+    return;
+  }
+
+  // 分批删除
+  let batch = db.batch();
+  let batchCount = 0;
+  let deletedCount = 0;
+
+  for (const slotDoc of expiredSlotsSnap.docs) {
+    batch.delete(slotDoc.ref);
+    batchCount++;
+    deletedCount++;
+
+    if (batchCount >= DELETE_BATCH_SIZE) {
+      await batch.commit();
+      batch = db.batch();
+      batchCount = 0;
+    }
+  }
+
+  // 提交剩余
+  if (batchCount > 0) {
+    await batch.commit();
+  }
+
+  stats.deletedExpiredSlots = deletedCount;
+}
+
+/**
  * 核心处理函数
  *
  * @param {object} options
@@ -64,9 +114,15 @@ function generateSlotId(facilityId, date, hour) {
  * @param {string} options.targetDate - 可选，指定单个日期（如测试用）
  * @param {string} options.facilityId - 可选，指定单个 facility（如测试用）
  * @param {Date} options.now - 可选，默认 new Date()
+ * @param {boolean} options.cleanup - 可选，默认 mode === "daily" 时为 true，fillWindow 时为 false
  * @returns {Promise<object>} 统计结果
  */
-async function processTimeSlotWindow({ mode, targetDate, facilityId, now = new Date() }) {
+async function processTimeSlotWindow({ mode, targetDate, facilityId, now = new Date(), cleanup }) {
+  // ========== 0. cleanup 默认值 ==========
+  if (cleanup === undefined) {
+    cleanup = mode === "daily";
+  }
+
   // ========== 1. 解析 mode 参数 ==========
   const validModes = ["fillWindow", "daily"];
   if (!mode || !validModes.includes(mode)) {
@@ -99,10 +155,16 @@ async function processTimeSlotWindow({ mode, targetDate, facilityId, now = new D
     appliedScheduledChanges: 0,
     createdSlots: 0,
     skippedExistingSlots: 0,
+    deletedExpiredSlots: 0,
     warnings: [],
   };
 
-  // ========== 4. 获取 all facilities（全部） ==========
+  // ========== 4. cleanup（仅 daily mode 默认执行）==========
+  if (cleanup) {
+    await cleanupExpiredOpenSlots(stats);
+  }
+
+  // ========== 5. 获取 all facilities（全部） ==========
   let facilityDocs = [];
 
   if (facilityId) {
@@ -124,7 +186,7 @@ async function processTimeSlotWindow({ mode, targetDate, facilityId, now = new D
     return stats;
   }
 
-  // ========== 5. 遍历每个 facility ==========
+  // ========== 6. 遍历每个 facility ==========
   for (const facilityDoc of facilityDocs) {
     await processFacility({
       facilityDoc,
@@ -323,4 +385,5 @@ module.exports = {
   processTimeSlotWindow,
   toHourNumber,
   generateSlotId,
+  cleanupExpiredOpenSlots,
 };

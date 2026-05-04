@@ -17,6 +17,7 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
+const { parseBookingStart } = require("./utils/time");
 
 const db = admin.firestore();
 
@@ -74,27 +75,46 @@ exports.withdrawPendingBooking = functions.https.onCall(async (data, context) =>
       throw new functions.https.HttpsError("failed-precondition", "Only pending requests can be withdrawn");
     }
 
-    // 4.4 查询所有绑定该 request_id 的 time_slot
+    // 4.4 校验 2 小时锁定期
+    const bookingStart = parseBookingStart(request.date, request.start_time);
+    if (!bookingStart) {
+      throw new functions.https.HttpsError(
+        "failed-precondition",
+        "Invalid booking time"
+      );
+    }
+
+    const now = new Date();
+    const TWO_HOURS = 2 * 60 * 60 * 1000;
+
+    if (bookingStart.getTime() - now.getTime() <= TWO_HOURS) {
+      throw new functions.https.HttpsError(
+        "deadline-exceeded",
+        "Pending booking requests can only be withdrawn at least 2 hours before start time."
+      );
+    }
+
+    // 4.5 查询所有绑定该 request_id 的 time_slot
     const slotsSnapshot = await transaction.get(
       db.collection("time_slot").where("request_id", "==", requestId)
     );
 
-    // 4.5 校验至少找到一个 time_slot
+    // 4.6 校验至少找到一个 time_slot
     if (slotsSnapshot.empty) {
       throw new functions.https.HttpsError("failed-precondition", "Time slot not found, booking state may have changed");
     }
 
-    // 4.6 保存 request 数据到外部变量（用于 transaction 成功后创建 notification）
+    // 4.7 保存 request 数据到外部变量（用于 transaction 成功后创建 notification）
     withdrawnRequest = { id: requestId, ...request };
 
-    // 4.7 更新 request 状态为 cancelled
+    // 4.8 更新 request 状态为 cancelled
     transaction.update(requestRef, {
       status: "cancelled",
       completed_at: FieldValue.serverTimestamp(),
       updated_at: FieldValue.serverTimestamp()
     });
 
-    // 4.8 释放所有 time_slot
+    // 4.9 释放所有 time_slot
     for (const slotDoc of slotsSnapshot.docs) {
       transaction.update(slotDoc.ref, {
         status: "open",
