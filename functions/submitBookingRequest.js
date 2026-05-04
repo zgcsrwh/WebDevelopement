@@ -13,6 +13,8 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 
+const { parseBookingStart, getLondonDateOffset } = require("./utils/time");
+
 const db = admin.firestore();
 
 // ============ 工具函数 ============
@@ -32,15 +34,6 @@ function toHourNumber(value) {
   if (typeof value === "number") return value;
   if (typeof value === "string") return parseInt(value.replace(":00", ""), 10);
   return parseInt(value || 0, 10);
-}
-
-/**
- * 生成日期（today + days）
- */
-function getDateString(daysOffset = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + daysOffset);
-  return d.toISOString().split("T")[0];
 }
 
 /**
@@ -96,11 +89,21 @@ function validateBasicParams(data) {
     throw new functions.https.HttpsError("invalid-argument", "start_time must be less than end_time");
   }
 
-  // 校验日期范围（今天 ~ 今天+7天）
-  const today = getDateString(0);
-  const maxDate = getDateString(7);
+  // 校验日期范围（今天 ~ 今天+7天）- 使用 London 时区
+  const today = getLondonDateOffset(0);
+  const maxDate = getLondonDateOffset(7);
   if (data.date < today || data.date > maxDate) {
     throw new functions.https.HttpsError("invalid-argument", "Date must be between today and 7 days from now");
+  }
+
+  // 校验必须至少提前 2 小时预约
+  const normalizedStartTime = toHourString(startNum);
+  const bookingStart = parseBookingStart(data.date, normalizedStartTime);
+  const now = new Date();
+  const minAllowedStart = new Date(now.getTime() + 2 * 60 * 60 * 1000); // now + 2 hours
+
+  if (bookingStart && bookingStart <= minAllowedStart) {
+    throw new functions.https.HttpsError("invalid-argument", "Bookings must be made at least 2 hours in advance.");
   }
 
   // 校验时长（≤ 4 小时）

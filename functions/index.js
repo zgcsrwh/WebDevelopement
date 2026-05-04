@@ -24,3 +24,23 @@ exports.cancelConfirmedBooking = cancelConfirmedBooking;
 // 导入 withdrawPendingBooking
 const { withdrawPendingBooking } = require("./withdrawPendingBooking");
 exports.withdrawPendingBooking = withdrawPendingBooking;
+
+// 导入 checkInBooking
+const { checkInBooking } = require("./checkInBooking");
+exports.checkInBooking = checkInBooking;
+
+// 导入 sendBookingReminders
+const { sendBookingReminders } = require("./sendBookingReminders");
+exports.sendBookingReminders = sendBookingReminders;
+
+// 导入 settleNoShowBookings
+const { settleNoShowBookings } = require("./settleNoShowBookings");
+exports.settleNoShowBookings = settleNoShowBookings;
+
+// 导入 upsertFacility
+const { upsertFacility } = require("./upsertFacility");
+exports.upsertFacility = upsertFacility;
+
+// 导入 maintainTimeSlotWindow (scheduled function)
+const { maintainTimeSlotWindow } = require("./maintainTimeSlotWindow");
+exports.maintainTimeSlotWindow = maintainTimeSlotWindow;

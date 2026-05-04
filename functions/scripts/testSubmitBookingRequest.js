@@ -26,6 +26,9 @@ const { getFunctions, connectFunctionsEmulator, httpsCallable } = require("fireb
 // Firebase Admin SDK (用于验证结果)
 const admin = require("firebase-admin");
 
+// 本地时间工具
+const { getLondonDateOffset, getLondonDateHourFromInstant } = require("../utils/time");
+
 // ============ Firebase Client SDK 初始化 ============
 
 const firebaseConfig = {
@@ -71,16 +74,31 @@ for (const arg of args) {
 
 // ============ 工具函数 ============
 
+// 使用 Europe/London 日期
 function getTomorrowDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().split("T")[0];
+  return getLondonDateOffset(1);
 }
 
 function getDateString(daysOffset = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + daysOffset);
-  return d.toISOString().split("T")[0];
+  return getLondonDateOffset(daysOffset);
+}
+
+/**
+ * 获取当前 instant + hourOffset 小时后的 London date 和 hour
+ */
+function getLondonDateHourAfterHours(hourOffset) {
+  const now = new Date();
+  const targetInstant = new Date(now.getTime() + hourOffset * 60 * 60 * 1000);
+  const { date, hour } = getLondonDateHourFromInstant(targetInstant);
+  return { date, hour: parseInt(hour, 10) };
+}
+
+/**
+ * 获取当前 London 时间信息
+ */
+function getCurrentLondonInfo() {
+  const { date, hour } = getLondonDateHourFromInstant(new Date());
+  return { date, hour: parseInt(hour, 10) };
 }
 
 /**
@@ -137,13 +155,13 @@ const scenarios = {
     payload: {
       facility_id: "facility-001",
       date: null,
-      start_time: 9,
-      end_time: 10,
+      start_time: 12,
+      end_time: 13,
       attendent: 2,
       activity_description: "Test locked slot"
     },
     preProcess: "locked-slot",
-    startTime: 9,
+    startTime: 12,
     expectedSuccess: null,
     expectedErrorCode: "resource-exhausted",
     verifyDatabase: false,
@@ -200,6 +218,78 @@ const scenarios = {
     verifyDatabase: false,
     needsTimeSlot: true,
     needsOpenSlot: false
+  },
+  // ============ 新增 scenario：2 小时提前规则 ============
+  "past-date": {
+    payload: {
+      facility_id: "facility-001",
+      date: null, // 运行时填充昨天
+      start_time: 9,
+      end_time: 10,
+      attendent: 2,
+      activity_description: "Test past date"
+    },
+    preProcess: null,
+    startTime: 9,
+    expectedSuccess: null,
+    expectedErrorCode: "invalid-argument",
+    verifyDatabase: false,
+    needsTimeSlot: false,
+    needsOpenSlot: false,
+    expectedErrorMessage: "Date must be between today and 7 days from now"
+  },
+  "past-time-today": {
+    payload: {
+      facility_id: "facility-001",
+      date: null, // 运行时填充今天
+      start_time: null, // 动态计算 currentHour - 1
+      end_time: null,
+      attendent: 2,
+      activity_description: "Test past time today"
+    },
+    preProcess: null,
+    startTime: null, // 动态
+    expectedSuccess: null,
+    expectedErrorCode: "invalid-argument",
+    verifyDatabase: false,
+    needsTimeSlot: false,
+    needsOpenSlot: false,
+    expectedErrorMessage: "Bookings must be made at least 2 hours in advance."
+  },
+  "within-2-hours": {
+    payload: {
+      facility_id: "facility-001",
+      date: null, // 运行时填充 tomorrow 11:00
+      start_time: 11,
+      end_time: 12,
+      attendent: 2,
+      activity_description: "Test within 2 hours"
+    },
+    preProcess: null,
+    startTime: 11,
+    expectedSuccess: null,
+    expectedErrorCode: "invalid-argument",
+    verifyDatabase: false,
+    needsTimeSlot: true,
+    needsOpenSlot: true,
+    expectedErrorMessage: "Bookings must be made at least 2 hours in advance."
+  },
+  "more-than-2-hours-before": {
+    payload: {
+      facility_id: "facility-001",
+      date: null, // 运行时填充 tomorrow 09:00
+      start_time: 9,
+      end_time: 10,
+      attendent: 2,
+      activity_description: "Test more than 2 hours before"
+    },
+    preProcess: null,
+    startTime: 9,
+    expectedSuccess: true,
+    expectedErrorCode: null,
+    verifyDatabase: true,
+    needsTimeSlot: true,
+    needsOpenSlot: true
   }
 };
 
@@ -217,7 +307,7 @@ async function testSubmitBookingRequest() {
 
   if (!scenarios[scenario]) {
     console.error(`ERROR: Unknown scenario: ${scenario}`);
-    console.error("Available scenarios: success, locked-slot, over-capacity, duration-too-long, date-out-of-range");
+    console.error("Available scenarios: success, success-iso-date, locked-slot, over-capacity, duration-too-long, date-out-of-range, past-date, past-time-today, within-2-hours, more-than-2-hours-before");
     process.exit(1);
   }
 
@@ -367,8 +457,10 @@ async function testSubmitBookingRequest() {
   // ============ 2. 执行 preProcess（如果需要） ============
   if (prepConfig && prepConfig.preProcess === "locked-slot") {
     console.log("Pre-processing: setting time_slot to locked...");
-    // 使用与 seedLocalEmulator.js 一致的 doc ID 格式
-    const slotId = `facility-001-${tomorrowDate}-9`;
+    // 使用固定 slot：tomorrow 12:00，避免依赖 dynamicSlotInfo
+    const lockedSlotDate = getLondonDateOffset(1);
+    const lockedSlotTime = 12;
+    const slotId = `facility-001-${lockedSlotDate}-${lockedSlotTime}`;
     const slotRef = db.collection("time_slot").doc(slotId);
     await slotRef.update({
       status: "locked",
@@ -401,6 +493,11 @@ async function testSubmitBookingRequest() {
   // 动态填充 date 字段
   if (scenario === "date-out-of-range") {
     payload.date = getDateString(8); // today + 8
+  } else if (scenario === "past-date") {
+    payload.date = getLondonDateOffset(-1); // yesterday
+  } else if (scenario === "past-time-today") {
+    // 动态时间场景，在后面处理
+    payload.date = null;
   } else if (scenario === "success-iso-date") {
     // ISO 格式：如 "2026-05-03T00:00:00.000Z"，后端会标准化为 "2026-05-03"
     payload.date = tomorrowDate + "T00:00:00.000Z";
@@ -408,8 +505,49 @@ async function testSubmitBookingRequest() {
     payload.date = tomorrowDate;
   }
 
+  // ============ 动态时间场景处理（需要在 normalizedDate 之前） ============
+  let dynamicSlotInfo = null;
+
+  if (scenario === "past-time-today") {
+    const now = getCurrentLondonInfo();
+    // 边界情况：如果当前 hour 是 0，没有"更早的小时"，跳过测试
+    if (now.hour === 0) {
+      console.log("WARNING: Current London hour is 0, cannot test past-time-today. Skipping this scenario.");
+      console.log("Use past-date scenario instead to test past date rejection.");
+      process.exit(0);
+    }
+    const pastHour = now.hour - 1;
+    payload.date = now.date;
+    payload.start_time = pastHour;
+    payload.end_time = pastHour + 1;
+    dynamicSlotInfo = { date: now.date, startTime: pastHour };
+  } else if (scenario === "within-2-hours") {
+    // 使用稳定时间：tomorrow 11:00（在 facility 营业时间内，但不足以满足 2 小时要求）
+    payload.date = getLondonDateOffset(1);
+    payload.start_time = 11;
+    payload.end_time = 12;
+    dynamicSlotInfo = { date: getLondonDateOffset(1), startTime: 11 };
+  } else if (scenario === "more-than-2-hours-before") {
+    // 使用稳定时间：tomorrow 09:00（确保在 facility 营业时间内）
+    payload.date = getLondonDateOffset(1);
+    payload.start_time = 9;
+    payload.end_time = 10;
+    dynamicSlotInfo = { date: getLondonDateOffset(1), startTime: 9 };
+  } else if (scenario === "locked-slot") {
+    // 使用固定 slot：tomorrow 12:00，避免和 success 冲突
+    payload.date = getLondonDateOffset(1);
+    payload.start_time = 12;
+    payload.end_time = 13;
+    dynamicSlotInfo = { date: getLondonDateOffset(1), startTime: 12 };
+  }
+
   // 标准化后的 date（用于数据库验证查询）
   const normalizedDate = payload.date.includes("T") ? payload.date.split("T")[0] : payload.date;
+
+  // 如果有动态 slot 信息，更新 scenarioConfig.startTime 用于后续验证
+  if (dynamicSlotInfo && scenarioConfig) {
+    scenarioConfig.startTime = dynamicSlotInfo.startTime;
+  }
 
   console.log(`Payload (${scenario}):`, JSON.stringify(payload, null, 2));
   console.log("");
@@ -456,10 +594,11 @@ async function testSubmitBookingRequest() {
         console.log(`    - end_time: ${requestData.end_time}`);
 
         // 5.2 检查 time_slot 是否变成 locked（使用 normalizedDate 查询）
+        const verifyStartTime = dynamicSlotInfo ? dynamicSlotInfo.startTime : (payload.start_time || 9);
         const lockedSlotQuery = await db.collection("time_slot")
           .where("facility_id", "==", "facility-001")
           .where("date", "==", normalizedDate)
-          .where("start_time", "==", 9)
+          .where("start_time", "==", verifyStartTime)
           .get();
 
         if (lockedSlotQuery.empty) {
@@ -470,6 +609,14 @@ async function testSubmitBookingRequest() {
         const lockedSlotData = lockedSlotQuery.docs[0].data();
         console.log(`  ✓ time_slot status changed to: ${lockedSlotData.status}`);
         console.log(`    - request_id: ${lockedSlotData.request_id}`);
+
+        // 验证 time_slot.request_id 必须等于当前 request_id
+        if (lockedSlotData.request_id !== requestId) {
+          console.error("ERROR: time_slot.request_id does not match request_id!");
+          console.error(`  Expected: ${requestId}`);
+          console.error(`  Got: ${lockedSlotData.request_id}`);
+          process.exit(1);
+        }
 
         // 5.3 检查 notification 是否新增
         const notificationDocs = await db.collection("notification")
@@ -500,6 +647,13 @@ async function testSubmitBookingRequest() {
     if (config.expectedErrorCode) {
       const normalizedCode = normalizeErrorCode(error.code);
       if (normalizedCode === config.expectedErrorCode) {
+        // 可选：验证 error message
+        if (config.expectedErrorMessage && !error.message.includes(config.expectedErrorMessage)) {
+          console.error("ERROR: Error message does not match.");
+          console.error("Expected message to contain:", config.expectedErrorMessage);
+          console.error("Got:", error.message);
+          process.exit(1);
+        }
         console.log("");
         console.log("=".repeat(60));
         console.log("Function Result (Expected Error):");

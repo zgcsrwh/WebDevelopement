@@ -116,9 +116,12 @@ export default function Partner() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
+
+    setLoading(true);
 
     Promise.all([getCurrentMatchProfile(sessionProfile), getFacilitySportTypes()])
       .then(([profile, sportTypes]) => {
@@ -148,6 +151,11 @@ export default function Partner() {
       .catch(() => {
         if (!cancelled) {
           setSportTypeOptions([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
         }
       });
 
@@ -375,7 +383,7 @@ export default function Partner() {
             <input
               id="partner-nickname"
               onChange={(event) => updateField("nickname", event.target.value)}
-              placeholder="Alex M."
+              placeholder="Sportster"
               value={form.nickname}
             />
             {fieldErrors.nickname ? <p className="partner-formField__error">{fieldErrors.nickname}</p> : null}
@@ -447,14 +455,14 @@ export default function Partner() {
                   </option>
                 ))}
               </select>
+              <button className="partner-addOption" onClick={addAvailabilityOption} type="button">
+                + 
+              </button>
             </div>
-
-            <button className="partner-addOption" onClick={addAvailabilityOption} type="button">
-              + Add Option
-            </button>
 
             {form.availableTime.length ? (
               <div className="partner-availabilityList">
+                <label>Selected availability:</label>
                 {form.availableTime.map((entry) => (
                   <div key={entry} className="partner-availabilityItem">
                     <span>{formatAvailabilityLabel(entry)}</span>

@@ -41,27 +41,30 @@ async function seed() {
 
   // Setting the basic collection information
   await resetAndImportAll("1_People");
-  await resetAndImportAll("2_Facility");
-  await resetAndImportAll("3_Request");
-  await resetAndImportAll("4_Other");
+  //await resetAndImportAll("2_Facility");
+  //await resetAndImportAll("3_Request");
+  //await resetAndImportAll("4_Other");
 
   // Connecting the mapping id and generate supplementray information
   // Warning : Do not change the sequence
-  await assignStaffToFacilities();
-  await assignMemberToProfile();
-  await populateRequestCollections("request");
-  await populateRequestCollections("repair");
-  await randomizeMatchingIds();
+  //await assignStaffToFacilities();
+  //await assignMemberToProfile();
+  //await populateRequestCollections("request");
+  //await populateRequestCollections("repair");
+  //await randomizeMatchingIds();
  
   // Generate supplementary information
-  await createFriendsCollection();
-  await syncFriendships();
-  await generateNotification();
-  await generateTimeSlots();
-  await syncRequestsToTimeSlots();
+  //await createFriendsCollection();
+  //await syncFriendships();
+  //await generateNotification();
+  //await generateTimeSlots();
+  //await syncRequestsToTimeSlots();
 
   // Clear and generate authenticartion information
   await syncUsersToAuth();
+
+  await testViewFacility();
+
 
     console.log('Data import successfully');
     process.exit(0);
@@ -71,6 +74,58 @@ async function seed() {
   }
 }
 
+async function testViewFacility() {
+
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowString = tomorrow.toISOString().slice(0, 10);
+
+    // Add a Facility Information
+    const batch = db.batch();
+    const facilityRef = db.collection('facility').doc("fac_ID_1");
+
+    batch.set(facilityRef, {
+      name: "Test Venue",
+      sport_type: "Basketball",
+      capacity: 3,
+      status: "normal",
+      start_time: 6,
+      end_time: 10,
+      description: "My Test Description",
+      location : "My Test Location",
+      staff_id : "ABCDEFG",
+      usage_guidelines: "My Test Usage Guidelines"
+    });
+
+    batch.set(db.collection('time_slot').doc("ts_1"), { facility_id: "fac_ID_1", date: today, start_time: "6", end_time: "7", status: "open", request_id: "" });
+    batch.set(db.collection('time_slot').doc("ts_2"), { facility_id: "fac_ID_1", date: today, start_time: "7", end_time: "8", status: "open", request_id: "" });
+    batch.set(db.collection('time_slot').doc("ts_3"), { facility_id: "fac_ID_1", date: today, start_time: "8", end_time: "9", status: "locked", request_id: "" });
+    batch.set(db.collection('time_slot').doc("ts_4"), { facility_id: "fac_ID_1", date: today, start_time: "9", end_time: "10", status: "open", request_id: "" });
+
+    batch.set(db.collection('time_slot').doc("ts_5"), { facility_id: "fac_ID_1", date: tomorrowString, start_time: "6", end_time: "7", status: "locked", request_id: "" });
+    batch.set(db.collection('time_slot').doc("ts_6"), { facility_id: "fac_ID_1", date: tomorrowString, start_time: "7", end_time: "8", status: "locked", request_id: "" });
+    batch.set(db.collection('time_slot').doc("ts_7"), { facility_id: "fac_ID_1", date: tomorrowString, start_time: "8", end_time: "9", status: "locked", request_id: "" });
+    batch.set(db.collection('time_slot').doc("ts_8"), { facility_id: "fac_ID_1", date: tomorrowString, start_time: "9", end_time: "10", status: "locked", request_id: "" });
+    
+    // Add a fixing Facility Information
+    const facilityRef2 = db.collection('facility').doc("fac_ID_2");
+
+    batch.set(facilityRef2, {
+      name: "Fixing Venue",
+      sport_type: "Tennis",
+      capacity: 6,
+      status: "fixing",
+      start_time: 12,
+      end_time: 14,
+      description: "My Test Description",
+      location : "My Test Location",
+      staff_id : "ABCDEFG",
+      usage_guidelines: "My Test Usage Guidelines"
+    });
+
+    await batch.commit();
+};
 
 // 给场馆分配员工ID
 async function assignStaffToFacilities() {
