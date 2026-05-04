@@ -3,27 +3,6 @@
   gap: 24px;
 }
 
-.member-page-heading {
-  display: grid;
-  gap: 14px;
-}
-
-.member-page-heading h1 {
-  margin: 0;
-  color: var(--color-text);
-  font-size: clamp(3rem, 5vw, 4.2rem);
-  line-height: 0.96;
-  letter-spacing: -0.04em;
-}
-
-.member-page-heading p {
-  margin: 0;
-  color: var(--color-text-soft);
-  font-size: clamp(1.12rem, 1.8vw, 1.32rem);
-  line-height: 1.55;
-}
-
-.member-hero,
 .member-card,
 .member-stat,
 .member-empty {
@@ -33,19 +12,11 @@
   box-shadow: var(--shadow-soft);
 }
 
-.member-hero {
-  padding: 28px 32px;
-  display: grid;
-  gap: 22px;
-}
-
-.member-hero__top,
 .member-card__head,
 .member-record__top,
 .member-record__footer,
 .member-modal__actions,
-.member-summary-row,
-.member-hero__profile {
+.member-summary-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -53,7 +24,6 @@
   flex-wrap: wrap;
 }
 
-.member-hero__eyebrow,
 .member-card__eyebrow,
 .member-detail-box label,
 .member-meta-label {
@@ -69,7 +39,6 @@
   color: #cb6158;
 }
 
-.member-hero h1,
 .member-card h2,
 .member-card h3,
 .member-record h3 {
@@ -77,12 +46,6 @@
   color: var(--color-text);
 }
 
-.member-hero h1 {
-  font-size: clamp(2rem, 3vw, 2.65rem);
-  line-height: 1.05;
-}
-
-.member-hero p,
 .member-card p,
 .member-empty p,
 .member-record p,
@@ -93,7 +56,6 @@
   line-height: 1.6;
 }
 
-.member-hero__actions,
 .member-card__actions,
 .member-inline-actions,
 .member-chip-row,
@@ -156,7 +118,6 @@
   max-width: 760px;
 }
 
-.member-filter-grid,
 .member-detail-grid,
 .member-form-grid,
 .member-split,
@@ -165,13 +126,11 @@
   gap: 16px;
 }
 
-.member-filter-grid,
 .member-form-grid {
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
-.member-form-grid .is-wide,
-.member-filter-grid .is-wide {
+.member-form-grid .is-wide {
   grid-column: 1 / -1;
 }
 
@@ -542,7 +501,6 @@
 }
 
 @media (max-width: 760px) {
-  .member-hero,
   .member-card,
   .member-empty,
   .member-modal {
@@ -554,8 +512,6 @@
     grid-template-columns: 1fr;
   }
 
-  .member-hero__actions .btn,
-  .member-hero__actions .btn-secondary,
   .member-card__actions .btn,
   .member-card__actions .btn-secondary,
   .member-inline-actions .btn,
@@ -570,7 +526,6 @@
 
   .member-record__footer,
   .member-modal__actions,
-  .member-hero__top,
   .member-card__head {
     flex-direction: column;
     align-items: stretch;

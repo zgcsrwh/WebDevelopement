@@ -13,6 +13,9 @@ import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS, getBookingDetailRoute } from "../../constants/routes";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
+import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import PageLayout from "../../components/common/PageLayout";
+import { ButtonLink } from "../../components/common/Button";
 
 const ALL_STATUS_VALUE = "all";
 const BOOKING_STATUS_OPTIONS = [
@@ -24,14 +27,41 @@ const BOOKING_STATUS_OPTIONS = [
   "cancelled",
   "no_show",
 ];
-const TODAY_KEY = new Date().toISOString().slice(0, 10);
+const BOOKING_VISIBLE_STATUS_SET = new Set(BOOKING_STATUS_OPTIONS);
+
+function getDateInputKey(daysFromToday = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromToday);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+const MAX_ACTIVITY_DATE_KEY = getDateInputKey(7);
 
 function normalizeBookingStatus(value = "") {
   const source = Array.isArray(value) ? value.find(Boolean) : value;
-  return String(source || "")
+  const normalized = String(source || "")
     .trim()
     .toLowerCase()
-    .replace(/-+/g, " ");
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  const compact = normalized.replace(/\s+/g, "");
+  if (compact === "noshow") {
+    return "no_show";
+  }
+
+  if (normalized === "suggested" || normalized === "suggested alternative") {
+    return "alternative suggested";
+  }
+
+  if (normalized === "complete") {
+    return "completed";
+  }
+
+  return normalized;
 }
 
 function normalizeDateKey(value = "") {
@@ -152,8 +182,7 @@ export default function MyBookings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [draftFilters, setDraftFilters] = useState({ status: ALL_STATUS_VALUE, date: "" });
-  const [appliedFilters, setAppliedFilters] = useState({ status: ALL_STATUS_VALUE, date: "" });
+  const [filters, setFilters] = useState({ status: ALL_STATUS_VALUE, date: "" });
   const [pendingAction, setPendingAction] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -197,17 +226,21 @@ export default function MyBookings() {
       const status = normalizeBookingStatus(booking.status || booking.raw?.status);
       const date = normalizeDateKey(booking.date);
 
-      if (appliedFilters.status !== ALL_STATUS_VALUE && status !== appliedFilters.status) {
+      if (!BOOKING_VISIBLE_STATUS_SET.has(status)) {
         return false;
       }
 
-      if (appliedFilters.date && date !== appliedFilters.date) {
+      if (filters.status !== ALL_STATUS_VALUE && status !== filters.status) {
+        return false;
+      }
+
+      if (filters.date && date !== filters.date) {
         return false;
       }
 
       return true;
     });
-  }, [appliedFilters, items]);
+  }, [filters, items]);
 
   async function refreshBookings(successMessage = "") {
     setLoading(true);
@@ -225,18 +258,9 @@ export default function MyBookings() {
     }
   }
 
-  function handleApplyFilters() {
-    setAppliedFilters({
-      status: draftFilters.status,
-      date: draftFilters.date,
-    });
-    setMessage("");
-  }
-
   function handleClearFilters() {
     const nextFilters = { status: ALL_STATUS_VALUE, date: "" };
-    setDraftFilters(nextFilters);
-    setAppliedFilters(nextFilters);
+    setFilters(nextFilters);
     setMessage("");
   }
 
@@ -280,21 +304,16 @@ export default function MyBookings() {
   }
 
   return (
-    <div className="member-workspace my-bookings-page">
-      <section className="member-hero my-bookings__hero">
-        <div className="member-hero__top">
-          <div>
-            <h1>My Bookings</h1>
-            <p>View your booking records and check the latest reservation status.</p>
-          </div>
-          <div className="member-hero__actions">
-            <Link className="btn my-bookings__heroButton" to={ROUTE_PATHS.FACILITIES}>
-              Book New Facility
-            </Link>
-          </div>
-        </div>
-      </section>
-
+    <PageLayout
+      className="my-bookings-page"
+      title="My Bookings"
+      subtitle="View your booking records and check the latest reservation status."
+      actions={
+        <ButtonLink className="my-bookings__heroButton" to={ROUTE_PATHS.FACILITIES}>
+          Book New Facility
+        </ButtonLink>
+      }
+    >
       {error ? (
         <div className="member-alert member-alert--error">
           <strong>Action failed</strong>
@@ -309,14 +328,19 @@ export default function MyBookings() {
         </div>
       ) : null}
 
-      <section className="member-card my-bookings__filters">
-        <div className="my-bookings__filterGrid">
-          <div className="my-bookings__field">
-            <label htmlFor="booking-status-filter">Status</label>
+      <FilterPanel
+        className="my-bookings__filters"
+        columns={2}
+        onClear={handleClearFilters}
+      >
+          <FilterField id="booking-status-filter" label="Status">
             <select
               id="booking-status-filter"
-              value={draftFilters.status}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, status: event.target.value }))}
+              value={filters.status}
+              onChange={(event) => {
+                setFilters((prev) => ({ ...prev, status: event.target.value }));
+                setMessage("");
+              }}
             >
               <option value={ALL_STATUS_VALUE}>All Status</option>
               {BOOKING_STATUS_OPTIONS.map((status) => (
@@ -325,29 +349,21 @@ export default function MyBookings() {
                 </option>
               ))}
             </select>
-          </div>
+          </FilterField>
 
-          <div className="my-bookings__field">
-            <label htmlFor="booking-date-filter">Date</label>
+          <FilterField id="booking-date-filter" label="Activity Date">
             <input
               id="booking-date-filter"
               type="date"
-              max={TODAY_KEY}
-              value={draftFilters.date}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, date: event.target.value }))}
+              max={MAX_ACTIVITY_DATE_KEY}
+              value={filters.date}
+              onChange={(event) => {
+                setFilters((prev) => ({ ...prev, date: event.target.value }));
+                setMessage("");
+              }}
             />
-          </div>
-        </div>
-
-        <div className="my-bookings__filterActions">
-          <button className="btn-ghost my-bookings__filterButton" type="button" onClick={handleClearFilters}>
-            Clear
-          </button>
-          <button className="btn my-bookings__filterButton" type="button" onClick={handleApplyFilters}>
-            Apply
-          </button>
-        </div>
-      </section>
+          </FilterField>
+      </FilterPanel>
 
       <section className="my-bookings__list" aria-live="polite">
         {loading ? (
@@ -438,6 +454,6 @@ export default function MyBookings() {
           </div>
         </div>
       ) : null}
-    </div>
+    </PageLayout>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import "../pageStyles.css";
 import "../workspaceStyles.css";
 import "./AdminFacilities.css";
@@ -9,10 +9,22 @@ import { useAuth } from "../../provider/AuthContext";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
 import { countMeaningfulCharacters } from "../../utils/text";
+import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import PageLayout from "../../components/common/PageLayout";
+import { Button } from "../../components/common/Button";
 
 const SPORT_TYPE_OPTIONS = ["Badminton", "Basketball", "Swimming", "Soccer", "Tennis"];
 const FACILITY_DESCRIPTION_MAX_LENGTH = 500;
 const FACILITY_GUIDELINES_MAX_LENGTH = 500;
+
+function buildHourOptions(startHour, endHour) {
+  return Array.from({ length: endHour - startHour + 1 }, (_, index) =>
+    `${String(startHour + index).padStart(2, "0")}:00`,
+  );
+}
+
+const START_HOUR_OPTIONS = buildHourOptions(6, 22);
+const END_HOUR_OPTIONS = buildHourOptions(7, 23);
 
 function formatHourInputValue(value) {
   const hour = Number.parseInt(String(value ?? ""), 10);
@@ -79,7 +91,7 @@ export default function AdminFacilities() {
   const [pageError, setPageError] = useState("");
   const [pageMessage, setPageMessage] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState("");
   const [form, setForm] = useState(getEmptyForm());
@@ -124,13 +136,22 @@ export default function AdminFacilities() {
   }, [sessionProfile]);
 
   const filteredItems = useMemo(() => {
-    const query = appliedSearch.trim().toLowerCase();
-    if (!query) {
-      return items;
-    }
+    const query = searchInput.trim().toLowerCase();
+    return items.filter((item) => {
+      const nameMatch = !query || String(item.name || "").toLowerCase().includes(query);
+      const typeMatch = typeFilter === "all" || String(item.sportType || "").toLowerCase() === typeFilter;
+      return nameMatch && typeMatch;
+    });
+  }, [items, searchInput, typeFilter]);
 
-    return items.filter((item) => String(item.name || "").toLowerCase().includes(query));
-  }, [appliedSearch, items]);
+  const facilityTypeOptions = useMemo(() => {
+    const types = items
+      .map((item) => String(item.sportType || "").trim())
+      .filter(Boolean)
+      .filter((type, index, list) => list.findIndex((item) => item.toLowerCase() === type.toLowerCase()) === index)
+      .sort((left, right) => left.localeCompare(right));
+    return [{ value: "all", label: "All Types" }, ...types.map((type) => ({ value: type.toLowerCase(), label: type }))];
+  }, [items]);
 
   const selectedFacility = useMemo(
     () => items.find((item) => item.id === form.facility_id) || null,
@@ -138,15 +159,26 @@ export default function AdminFacilities() {
   );
   const isEditMode = drawerMode === "edit";
 
-  function applySearch() {
+  function clearFilters() {
+    setSearchInput("");
+    setTypeFilter("all");
+    setPageError("");
     setPageMessage("");
-    if (!searchInput.trim()) {
-      setPageError("Please enter a facility name before searching.");
+  }
+
+  function handleLimitedTextField(field, value, maxLength, label) {
+    if (countMeaningfulCharacters(value) > maxLength) {
+      setFormErrors((previous) => ({
+        ...previous,
+        [field]: `${label} must be ${maxLength} characters or fewer.`,
+      }));
+      setFormError("");
       return;
     }
 
-    setAppliedSearch(searchInput.trim());
-    setPageError("");
+    setForm((previous) => ({ ...previous, [field]: value }));
+    setFormErrors((previous) => ({ ...previous, [field]: "" }));
+    setFormError("");
   }
 
   function openCreateDrawer() {
@@ -222,11 +254,15 @@ export default function AdminFacilities() {
     const startTime = parseHourInputValue(form.start_time);
     const endTime = parseHourInputValue(form.end_time);
 
-    if (!trimmedName) {
+    if (isEditMode && !form.facility_id) {
+      nextErrors.facility_id = "Please choose a facility before saving.";
+    }
+
+    if (!isEditMode && !trimmedName) {
       nextErrors.name = "Facility name is required.";
     }
 
-    if (!trimmedSportType) {
+    if (!isEditMode && !trimmedSportType) {
       nextErrors.sport_type = "Sport type is required.";
     }
 
@@ -242,11 +278,11 @@ export default function AdminFacilities() {
       nextErrors.usage_guidelines = `Usage guidelines must be ${FACILITY_GUIDELINES_MAX_LENGTH} characters or fewer.`;
     }
 
-    if (!trimmedLocation) {
+    if (!isEditMode && !trimmedLocation) {
       nextErrors.location = "Location is required.";
     }
 
-    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 200) {
+    if (!isEditMode && (!Number.isInteger(capacity) || capacity < 1 || capacity > 200)) {
       nextErrors.capacity = "Capacity must be a whole number from 1 to 200.";
     }
 
@@ -270,23 +306,31 @@ export default function AdminFacilities() {
       nextErrors.staff_id = "Please assign one staff member.";
     }
 
+    const editablePayload = {
+      description: trimmedDescription,
+      usage_guidelines: trimmedGuidelines,
+      start_time: startTime,
+      end_time: endTime,
+      staff_id: trimmedStaffId,
+    };
+
     return {
       errors: nextErrors,
       payload:
         Object.keys(nextErrors).length > 0
           ? null
-          : {
-              facility_id: form.facility_id,
-              name: trimmedName,
-              sport_type: trimmedSportType,
-              description: trimmedDescription,
-              usage_guidelines: trimmedGuidelines,
-              capacity,
-              location: trimmedLocation,
-              start_time: startTime,
-              end_time: endTime,
-              staff_id: trimmedStaffId,
-            },
+          : isEditMode
+            ? {
+                facility_id: form.facility_id,
+                ...editablePayload,
+              }
+            : {
+                name: trimmedName,
+                sport_type: trimmedSportType,
+                capacity,
+                location: trimmedLocation,
+                ...editablePayload,
+              },
     };
   }
 
@@ -348,35 +392,54 @@ export default function AdminFacilities() {
     }
   }
 
+  const filterActions = (
+      <Button className="admin-facilities-page__addButton" type="button" onClick={openCreateDrawer}>
+        <Plus size={18} aria-hidden="true" />
+        <span>Add New Facility</span>
+      </Button>
+  );
+
   return (
-    <div className="admin-facilities-page">
-      <section className="admin-facilities-page__hero">
-        <div>
-          <h1>Facilities Management</h1>
-          <p>Update operating dates and manage facility statuses.</p>
-        </div>
+    <PageLayout
+      className="admin-facilities-page"
+      title="Facilities Management"
+      subtitle="Update operating dates and manage facility statuses."
+    >
+      <FilterPanel columns={2} onClear={clearFilters} extraActions={filterActions}>
+        <FilterField id="admin-facilities-search" label="">
+          <input
+            id="admin-facilities-search"
+            type="text"
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value);
+              setPageError("");
+              setPageMessage("");
+            }}
+            placeholder="Search facilities..."
+            aria-label="Search facilities"
+          />
+        </FilterField>
 
-        <div className="admin-facilities-page__toolbar">
-          <div className="admin-facilities-page__search">
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search facilities..."
-              aria-label="Search facilities"
-            />
-            <button className="btn-secondary admin-facilities-page__searchButton" type="button" onClick={applySearch}>
-              <Search size={18} aria-hidden="true" />
-              <span>Search</span>
-            </button>
-          </div>
-
-          <button className="btn admin-facilities-page__addButton" type="button" onClick={openCreateDrawer}>
-            <Plus size={18} aria-hidden="true" />
-            <span>Add New Facility</span>
-          </button>
-        </div>
-      </section>
+        <FilterField id="admin-facilities-type" label="">
+          <select
+            id="admin-facilities-type"
+            value={typeFilter}
+            onChange={(event) => {
+              setTypeFilter(event.target.value);
+              setPageError("");
+              setPageMessage("");
+            }}
+            aria-label="Filter facility type"
+          >
+            {facilityTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </FilterField>
+      </FilterPanel>
 
       {pageError ? (
         <section className="workspace-surface">
@@ -394,7 +457,7 @@ export default function AdminFacilities() {
         {loading ? (
           <div className="admin-facilities-page__empty">Loading facilities...</div>
         ) : filteredItems.length === 0 ? (
-          <div className="admin-facilities-page__empty">No facilities match the current search.</div>
+          <div className="admin-facilities-page__empty">No facilities match the current filters.</div>
         ) : (
           <div className="admin-facilities-page__tableWrap">
             <table className="admin-facilities-page__table">
@@ -556,31 +619,39 @@ export default function AdminFacilities() {
                 </>
               )}
 
-              <div className="admin-facilities-page__timeGrid">
-                <div className="admin-facilities-page__field">
-                  <label htmlFor="facility-start">Time Start (HH:00)</label>
-                  <input
-                    id="facility-start"
-                    type="time"
-                    step="3600"
-                    value={form.start_time}
-                    onChange={(event) => setForm((prev) => ({ ...prev, start_time: event.target.value }))}
-                  />
-                  {formErrors.start_time ? <p className="admin-facilities-page__fieldError">{formErrors.start_time}</p> : null}
-                </div>
+                <div className="admin-facilities-page__timeGrid">
+                  <div className="admin-facilities-page__field">
+                    <label htmlFor="facility-start">Time Start (HH:00)</label>
+                    <select
+                      id="facility-start"
+                      value={form.start_time}
+                      onChange={(event) => setForm((prev) => ({ ...prev, start_time: event.target.value }))}
+                    >
+                      {START_HOUR_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.start_time ? <p className="admin-facilities-page__fieldError">{formErrors.start_time}</p> : null}
+                  </div>
 
-                <div className="admin-facilities-page__field">
-                  <label htmlFor="facility-end">Time End (HH:00)</label>
-                  <input
-                    id="facility-end"
-                    type="time"
-                    step="3600"
-                    value={form.end_time}
-                    onChange={(event) => setForm((prev) => ({ ...prev, end_time: event.target.value }))}
-                  />
-                  {formErrors.end_time ? <p className="admin-facilities-page__fieldError">{formErrors.end_time}</p> : null}
+                  <div className="admin-facilities-page__field">
+                    <label htmlFor="facility-end">Time End (HH:00)</label>
+                    <select
+                      id="facility-end"
+                      value={form.end_time}
+                      onChange={(event) => setForm((prev) => ({ ...prev, end_time: event.target.value }))}
+                    >
+                      {END_HOUR_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.end_time ? <p className="admin-facilities-page__fieldError">{formErrors.end_time}</p> : null}
+                  </div>
                 </div>
-              </div>
 
               <p className="admin-facilities-page__helper">
                 Opening-hour changes are handled with the existing seven-day rule. The separate operating end date field will be added after backend alignment.
@@ -596,7 +667,14 @@ export default function AdminFacilities() {
                   id="facility-description"
                   rows="5"
                   value={form.description}
-                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                  onChange={(event) =>
+                    handleLimitedTextField(
+                      "description",
+                      event.target.value,
+                      FACILITY_DESCRIPTION_MAX_LENGTH,
+                      "Description",
+                    )
+                  }
                   placeholder="Brief description of the facility..."
                 />
                 <p className="admin-facilities-page__fieldHint">
@@ -611,7 +689,14 @@ export default function AdminFacilities() {
                   id="facility-guidelines"
                   rows="5"
                   value={form.usage_guidelines}
-                  onChange={(event) => setForm((prev) => ({ ...prev, usage_guidelines: event.target.value }))}
+                  onChange={(event) =>
+                    handleLimitedTextField(
+                      "usage_guidelines",
+                      event.target.value,
+                      FACILITY_GUIDELINES_MAX_LENGTH,
+                      "Usage guidelines",
+                    )
+                  }
                   placeholder="Rules and regulations..."
                 />
                 <p className="admin-facilities-page__fieldHint">
@@ -674,6 +759,6 @@ export default function AdminFacilities() {
           </div>
         </div>
       ) : null}
-    </div>
+    </PageLayout>
   );
 }

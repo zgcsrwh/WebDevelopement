@@ -1,10 +1,12 @@
-import { useEffect, useState, useMemo } from "react";
+﻿import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "../pageStyles.css";
 import "./FacilitiesMap.css";
+import PageLayout from "../../components/common/PageLayout";
+import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import { ROUTE_PATHS, getBookingNewRoute } from "../../constants/routes";
 import { getFacilities } from "../../services/bookingService";
 
@@ -70,7 +72,7 @@ function extractVenueName(facilityName) {
   if (!facilityName) return "";
   
   // Try splitting by common delimiters
-  const delimiters = [" - ", "-", " – ", "–"];
+  const delimiters = [" - ", "-", " – ", "—"];
   for (const delimiter of delimiters) {
     if (facilityName.includes(delimiter)) {
       const parts = facilityName.split(delimiter);
@@ -291,39 +293,35 @@ function getIconForSportTypes(sportTypes) {
   }
 
   return (
-    <div className="facilities-map-page">
-      <section className="facilities-map-header">
-        <div className="facilities-map-header__body">
-          <div className="facilities-map-header__title-row">
-            <h1>Facility Map</h1>
-            <button
-              className="btn-secondary facilities-map-header__back"
-              type="button"
-              onClick={() => navigate(ROUTE_PATHS.FACILITIES)}
-            >
-              ← Back to lists
-            </button>
-          </div>
-        </div>
-      </section>
+    <PageLayout
+      className="facilities-map-page"
+      backTo={ROUTE_PATHS.FACILITIES}
+      backLabel="Back to Facilities"
+      title="Facility Map"
+      subtitle="View venue locations and facility groups on the map."
+    >
 
       {sportTypes.length > 0 && (
-        <section className="facilities-map-filters">
-          <span className="facilities-map-filters__label">Filter：</span>
-          <div className="facilities-map-filters__chips">
-            {sportTypes.map(type => (
-              <button
-                key={type}
-                className={`facilities-map-filter-chip ${selectedTypes.has(type) ? "is-active" : ""}`}
-                type="button"
-                onClick={() => toggleSportType(type)}
-              >
-                <span className={`facilities-map-filter-chip__dot facilities-map-filter-chip__dot--${type.toLowerCase()}`} />
-                {type}
-              </button>
-            ))}
-          </div>
-        </section>
+        <FilterPanel
+          className="facilities-map-filters"
+          onClear={() => setSelectedTypes(new Set(sportTypes))}
+        >
+          <FilterField id="facilities-map-sport-types" label="Sport Type">
+            <div id="facilities-map-sport-types" className="facilities-map-filters__chips" role="group">
+              {sportTypes.map(type => (
+                <button
+                  key={type}
+                  className={`facilities-map-filter-chip ${selectedTypes.has(type) ? "is-active" : ""}`}
+                  type="button"
+                  onClick={() => toggleSportType(type)}
+                >
+                  <span className={`facilities-map-filter-chip__dot facilities-map-filter-chip__dot--${type.toLowerCase()}`} />
+                  {type}
+                </button>
+              ))}
+            </div>
+          </FilterField>
+        </FilterPanel>
       )}
 
       {loading && (
@@ -419,6 +417,6 @@ function getIconForSportTypes(sportTypes) {
 
         </section>
       )}
-    </div>
+    </PageLayout>
   );
 }

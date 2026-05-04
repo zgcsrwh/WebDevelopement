@@ -67,7 +67,7 @@ async function checkAccountDeletableDirect(actor) {
   const participantRequests = allRequests.filter((item) => getParticipantIds(item).includes(resolvedActor.id));
 
   const blockingReasons = [];
-  const activeStatuses = ["pending", "accepted", "in_progress", "suggested"];
+  const activeStatuses = ["pending", "accepted", "suggested"];
   if (requests.some((item) => activeStatuses.includes(String(item.status || "").toLowerCase()))) {
     blockingReasons.push("You still have an unfinished booking request or active booking.");
   }

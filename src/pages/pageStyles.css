@@ -66,7 +66,6 @@
   padding: 24px 26px;
 }
 
-.filter-grid,
 .stats-grid,
 .dashboard-grid,
 .cards-grid,
@@ -74,10 +73,6 @@
 .split-layout {
   display: grid;
   gap: 18px;
-}
-
-.filter-grid {
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 .stats-grid {
@@ -201,8 +196,7 @@
   grid-column: 1 / -1;
 }
 
-.field-grid label,
-.filter-grid label {
+.field-grid label {
   display: block;
   margin-bottom: 8px;
   color: #354854;
@@ -212,9 +206,7 @@
 
 .field-grid input,
 .field-grid select,
-.field-grid textarea,
-.filter-grid input,
-.filter-grid select {
+.field-grid textarea {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid #d7dde2;
@@ -226,8 +218,7 @@
 }
 
 .field-grid input,
-.field-grid textarea,
-.filter-grid input {
+.field-grid textarea {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -241,9 +232,7 @@
 
 .field-grid input:focus,
 .field-grid select:focus,
-.field-grid textarea:focus,
-.filter-grid input:focus,
-.filter-grid select:focus {
+.field-grid textarea:focus {
   outline: none;
   border-color: #5a7585;
   box-shadow: 0 0 0 3px rgba(90, 117, 133, 0.14);
@@ -357,74 +346,6 @@
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-}
-
-.btn,
-.btn-secondary,
-.btn-ghost,
-.btn-danger {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 20px;
-  min-height: 54px;
-  padding: 0 24px;
-  font: inherit;
-  font-weight: 700;
-  text-align: center;
-  text-decoration: none;
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-}
-
-.btn {
-  background: #5a7585;
-  color: #ffffff;
-  box-shadow: 0 10px 20px rgba(90, 117, 133, 0.18);
-}
-
-.btn:hover {
-  background: #4b6573;
-}
-
-.btn-secondary {
-  background: #edf2f5;
-  color: #344753;
-  border: 1px solid #dbe3e8;
-}
-
-.btn-secondary:hover {
-  background: #e3eaee;
-}
-
-.btn-ghost {
-  background: transparent;
-  color: #5a7585;
-  border: 1px solid #ccd7de;
-}
-
-.btn-ghost:hover {
-  background: #f2f6f8;
-}
-
-.btn-danger {
-  background: #a75d55;
-  color: #ffffff;
-}
-
-.btn-danger:hover {
-  background: #914d46;
-}
-
-.btn:disabled,
-.btn-secondary:disabled,
-.btn-ghost:disabled,
-.btn-danger:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-  box-shadow: none;
 }
 
 .errorMessage,

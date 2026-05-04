@@ -3,7 +3,6 @@
   gap: 28px;
 }
 
-.admin-facilities-page__hero,
 .admin-facilities-page__tableCard {
   background: #ffffff;
   border: 1px solid #e1e8ec;
@@ -11,67 +10,12 @@
   box-shadow: 0 12px 34px rgba(21, 35, 43, 0.06);
 }
 
-.admin-facilities-page__hero {
-  padding: 30px 30px 24px;
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  align-items: center;
-}
-
-.admin-facilities-page__hero h1 {
-  margin: 0 0 8px;
-  font-size: clamp(2rem, 2.8vw, 3rem);
-  line-height: 1;
-  color: #172231;
-}
-
-.admin-facilities-page__hero p {
-  margin: 0;
-  font-size: 1rem;
-  color: #667989;
-}
-
-.admin-facilities-page__toolbar {
-  display: flex;
-  gap: 18px;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
-}
-
-.admin-facilities-page__search {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.admin-facilities-page__search input {
-  width: clamp(210px, 20vw, 300px);
-  min-width: 210px;
-  min-height: 58px;
-  border-radius: 18px;
-  border: 1px solid #d7e0e6;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
-  padding: 0 18px;
-  color: #203040;
-  font: inherit;
-  font-size: 1rem;
-}
-
-.admin-facilities-page__searchButton,
 .admin-facilities-page__addButton {
-  min-height: 58px;
+  min-height: 52px;
   padding-inline: 22px;
-  border-radius: 18px;
+  border-radius: 16px;
   gap: 10px;
   white-space: nowrap;
-}
-
-.admin-facilities-page__addButton {
   min-width: 220px;
 }
 
@@ -85,6 +29,7 @@
 
 .admin-facilities-page__table {
   width: 100%;
+  min-width: 920px;
   border-collapse: collapse;
 }
 
@@ -103,6 +48,7 @@
   text-transform: uppercase;
   color: #647585;
   background: #ffffff;
+  white-space: nowrap;
 }
 
 .admin-facilities-page__table tbody tr:last-child td {
@@ -268,6 +214,17 @@
   resize: vertical;
 }
 
+.admin-facilities-page__field select {
+  padding-right: 52px;
+  background-image: var(--control-chevron);
+  background-position: calc(100% - 22px) 50%;
+  background-size: 14px 14px;
+  background-repeat: no-repeat;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
 .admin-facilities-page__fieldError {
   margin: 0;
   color: #b64a4a;
@@ -382,29 +339,7 @@
   text-transform: uppercase;
 }
 
-@media (max-width: 1080px) {
-  .admin-facilities-page__hero {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .admin-facilities-page__toolbar {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .admin-facilities-page__search {
-    flex: 1 1 100%;
-  }
-
-  .admin-facilities-page__search input,
-  .admin-facilities-page__addButton {
-    width: 100%;
-  }
-}
-
 @media (max-width: 720px) {
-  .admin-facilities-page__hero,
   .admin-facilities-page__table th,
   .admin-facilities-page__table td,
   .admin-facilities-page__drawerHead,
@@ -413,21 +348,6 @@
   .admin-facilities-page__confirmCard {
     padding-left: 20px;
     padding-right: 20px;
-  }
-
-  .admin-facilities-page__search {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .admin-facilities-page__search input {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .admin-facilities-page__searchButton,
-  .admin-facilities-page__addButton {
-    width: 100%;
   }
 
   .admin-facilities-page__timeGrid {

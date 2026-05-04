@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import "../pageStyles.css";
 import "./Requests.css";
 import {
+  getAllFacilityFilterOptions,
   getStaffRequestConflictSummary,
   getStaffRequestPageStatus,
   getStaffRequests,
@@ -13,15 +14,12 @@ import { getErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
 import { formatStaffCardTimestamp, formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 import { hasMeaningfulText } from "../../utils/text";
+import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import PageLayout from "../../components/common/PageLayout";
 
-const STATUS_FILTER_OPTIONS = [
-  { value: "no show", label: "no show" },
-  { value: "pending", label: "pending" },
-  { value: "completed", label: "complete" },
-  { value: "in progress", label: "in-progress" },
-  { value: "rejected", label: "rejected" },
-  { value: "alternative suggested", label: "alternative suggested" },
-];
+const STAFF_REQUEST_STATUSES = ["pending", "accepted", "rejected", "alternative suggested", "cancelled"];
+const STAFF_REQUEST_STATUS_SET = new Set(STAFF_REQUEST_STATUSES);
+const STATUS_FILTER_OPTIONS = STAFF_REQUEST_STATUSES.map((status) => ({ value: status, label: status }));
 
 function sortStaffRequests(items = []) {
   return [...items].sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
@@ -75,22 +73,13 @@ function toPageItem(item) {
   };
 }
 
-function getFacilityOptions(items = []) {
-  return [...new Set(items.map((item) => item.facilityName).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right))
-    .map((facilityName) => ({ id: facilityName, name: facilityName }));
-}
-
 export default function Requests() {
   const { sessionProfile } = useAuth();
   const [items, setItems] = useState([]);
   const [facilityOptions, setFacilityOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState("");
-  const [draftDate, setDraftDate] = useState("");
-  const [draftFacility, setDraftFacility] = useState("");
-  const [draftStatus, setDraftStatus] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({
+  const [filters, setFilters] = useState({
     date: "",
     facility: "",
     status: "",
@@ -111,9 +100,15 @@ export default function Requests() {
   async function refresh(preferredId = "") {
     setLoading(true);
     try {
-      const mappedRequests = sortStaffRequests((await getStaffRequests(sessionProfile)).map(toPageItem));
+      const [nextRequests, nextFacilities] = await Promise.all([
+        getStaffRequests(sessionProfile),
+        getAllFacilityFilterOptions(),
+      ]);
+      const mappedRequests = sortStaffRequests(
+        nextRequests.map(toPageItem).filter((item) => STAFF_REQUEST_STATUS_SET.has(item.pageStatus)),
+      );
       setItems(mappedRequests);
-      setFacilityOptions(getFacilityOptions(mappedRequests));
+      setFacilityOptions(nextFacilities);
 
       setSelectedId((current) => {
         const candidate = preferredId || current;
@@ -134,14 +129,21 @@ export default function Requests() {
 
     async function loadPage() {
       try {
-        const nextRequests = await getStaffRequests(sessionProfile);
+        const [nextRequests, nextFacilities] = await Promise.all([
+          getStaffRequests(sessionProfile),
+          getAllFacilityFilterOptions(),
+        ]);
         if (cancelled) {
           return;
         }
 
-        const mappedRequests = sortStaffRequests(nextRequests.map(toPageItem));
+        const mappedRequests = sortStaffRequests(
+          nextRequests
+            .map(toPageItem)
+            .filter((item) => STAFF_REQUEST_STATUS_SET.has(item.pageStatus)),
+        );
         setItems(mappedRequests);
-        setFacilityOptions(getFacilityOptions(mappedRequests));
+        setFacilityOptions(nextFacilities);
         setSelectedId("");
         setPageError("");
       } catch (loadError) {
@@ -167,13 +169,20 @@ export default function Requests() {
   const visibleItems = useMemo(() => {
     return sortStaffRequests(
       items.filter((item) => {
-        const dateMatch = !appliedFilters.date || item.date === appliedFilters.date;
-        const facilityMatch = !appliedFilters.facility || item.facilityName === appliedFilters.facility;
-        const statusMatch = !appliedFilters.status || item.pageStatus === appliedFilters.status;
+        if (!STAFF_REQUEST_STATUS_SET.has(item.pageStatus)) {
+          return false;
+        }
+
+        const dateMatch = !filters.date || item.date === filters.date;
+        const facilityMatch =
+          !filters.facility ||
+          item.facilityId === filters.facility ||
+          item.facilityName === filters.facility;
+        const statusMatch = !filters.status || item.pageStatus === filters.status;
         return dateMatch && facilityMatch && statusMatch;
       }),
     );
-  }, [appliedFilters.date, appliedFilters.facility, appliedFilters.status, items]);
+  }, [filters.date, filters.facility, filters.status, items]);
 
   useEffect(() => {
     if (!visibleItems.length) {
@@ -222,11 +231,11 @@ export default function Requests() {
     };
   }, [selectedItem, sessionProfile]);
 
-  function applyFilters() {
-    setAppliedFilters({
-      date: draftDate,
-      facility: draftFacility,
-      status: draftStatus,
+  function clearFilters() {
+    setFilters({
+      date: "",
+      facility: "",
+      status: "",
     });
     setPageError("");
     setPageMessage("");
@@ -264,7 +273,7 @@ export default function Requests() {
       await processBookingApproval(
         {
           request_id: selectedItem.id,
-          status: ["accepted"],
+          status: "accepted",
           staff_response: "",
         },
         undefined,
@@ -303,7 +312,7 @@ export default function Requests() {
       await processBookingApproval(
         {
           request_id: selectedItem.id,
-          status: [decision.type],
+          status: decision.type,
           staff_response: decision.text.trim(),
         },
         undefined,
@@ -325,13 +334,11 @@ export default function Requests() {
   }
 
   return (
-    <div className="staff-requests-page">
-      <section className="staff-requests-page__hero">
-        <div>
-          <h1>Booking Requests</h1>
-          <p>Review and manage pending facility booking requests.</p>
-        </div>
-      </section>
+    <PageLayout
+      className="staff-requests-page"
+      title="Booking Requests"
+      subtitle="Review and manage pending facility booking requests."
+    >
 
       {pageError ? (
         <section className="staff-requests-banner staff-requests-banner--error">
@@ -347,42 +354,54 @@ export default function Requests() {
         </section>
       ) : null}
 
-      <section className="staff-requests-filters">
-        <div className="staff-requests-filters__grid">
-          <div className="staff-requests-filters__field">
-            <label htmlFor="staff-request-date">Date</label>
+      <FilterPanel
+        className="staff-requests-filters"
+        columns={3}
+        onClear={clearFilters}
+      >
+          <FilterField id="staff-request-date" label="Date">
             <input
               id="staff-request-date"
               type="date"
               min={staffCreatedDate}
               max={maxFilterDate}
-              value={draftDate}
-              onChange={(event) => setDraftDate(event.target.value)}
+              value={filters.date}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, date: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+              }}
             />
-          </div>
+          </FilterField>
 
-          <div className="staff-requests-filters__field">
-            <label htmlFor="staff-request-facility">Facility</label>
+          <FilterField id="staff-request-facility" label="Facility">
             <select
               id="staff-request-facility"
-              value={draftFacility}
-              onChange={(event) => setDraftFacility(event.target.value)}
+              value={filters.facility}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, facility: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+              }}
             >
               <option value="">All Facilities</option>
-              {facilityOptions.map((facility) => (
-                <option key={facility.id} value={facility.name}>
-                  {facility.name}
-                </option>
-              ))}
+                {facilityOptions.map((facility) => (
+                  <option key={facility.id} value={facility.id}>
+                    {facility.name}
+                  </option>
+                ))}
             </select>
-          </div>
+          </FilterField>
 
-          <div className="staff-requests-filters__field">
-            <label htmlFor="staff-request-status">Status</label>
+          <FilterField id="staff-request-status" label="Status">
             <select
               id="staff-request-status"
-              value={draftStatus}
-              onChange={(event) => setDraftStatus(event.target.value)}
+              value={filters.status}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, status: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+              }}
             >
               <option value="">All Status</option>
               {STATUS_FILTER_OPTIONS.map((status) => (
@@ -391,13 +410,8 @@ export default function Requests() {
                 </option>
               ))}
             </select>
-          </div>
-        </div>
-
-        <button className="btn staff-requests-filters__button" type="button" onClick={applyFilters}>
-          Filter
-        </button>
-      </section>
+          </FilterField>
+      </FilterPanel>
 
       <section className="staff-requests-layout">
         <div className="staff-requests-list">
@@ -449,7 +463,7 @@ export default function Requests() {
             <div className="staff-request-detail__card">
               <div className="staff-request-detail__head">
                 <h2>{selectedItem.facilityName}</h2>
-                <p>{getDetailTimestampLabel(selectedItem)}</p>
+                  <p className="staff-request-detail__requestId">{getDetailTimestampLabel(selectedItem)}</p>
               </div>
 
               {conflictSummary ? (
@@ -608,7 +622,7 @@ export default function Requests() {
           </div>
         </div>
       ) : null}
-    </div>
+    </PageLayout>
   );
 }
 

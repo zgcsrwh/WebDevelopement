@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import "../pageStyles.css";
 import "./memberWorkspace.css";
 import "./PartnerDetail.css";
+import PageLayout from "../../components/common/PageLayout";
 import { useAuth } from "../../provider/AuthContext";
 import {
   getMatchRequests,
@@ -157,34 +158,24 @@ export default function PartnerDetail() {
 
   if (isRequestsPage) {
     return (
-      <div className="member-workspace">
-        <section className="member-hero">
-          <div className="member-hero__top">
-            <div>
-              <p className="member-hero__eyebrow">Requests</p>
-              <h1>Partner request inbox</h1>
-              <p>
-                Handle incoming requests, review sent requests, and keep the actions aligned with
-                the matching API.
-              </p>
-            </div>
-              <div className="member-hero__actions">
-                <Link className="member-back-link" to={ROUTE_PATHS.PARTNER}>
-                  ← Back to partner profile
-                </Link>
-              <Link className="btn-secondary" to={ROUTE_PATHS.PARTNER_DISCOVER}>
-                Browse discover page
-              </Link>
-            </div>
-          </div>
-          <div className="member-chip-row">
-            <span className="member-chip">{pendingSummary.incomingPending} incoming pending</span>
-            <span className="member-chip member-chip--soft">
-              {pendingSummary.outgoingPending} outgoing pending
-            </span>
-          </div>
-        </section>
-
+      <PageLayout
+        className="member-workspace"
+        backTo={ROUTE_PATHS.PARTNER}
+        backLabel="Back to partner profile"
+        title="Partner request inbox"
+        subtitle="Handle incoming requests, review sent requests, and keep the actions aligned with the matching API."
+        actions={
+          <Link className="btn-secondary" to={ROUTE_PATHS.PARTNER_DISCOVER}>
+            Browse discover page
+          </Link>
+        }
+      >
+        <div className="member-chip-row">
+          <span className="member-chip">{pendingSummary.incomingPending} incoming pending</span>
+          <span className="member-chip member-chip--soft">
+            {pendingSummary.outgoingPending} outgoing pending
+          </span>
+        </div>
         {error ? (
           <section className="member-alert member-alert--error">
             <strong>Unable to load requests</strong>
@@ -247,7 +238,7 @@ export default function PartnerDetail() {
                               await respondToMatchRequest(
                                 {
                                   match_id: request.id,
-                                  status: ["accepted"],
+                                  status: "accepted",
                                   respond_message: "Happy to join.",
                                 },
                                 sessionProfile,
@@ -269,7 +260,7 @@ export default function PartnerDetail() {
                               await respondToMatchRequest(
                                 {
                                   match_id: request.id,
-                                  status: ["rejected"],
+                                  status: "rejected",
                                   respond_message: "Not available right now.",
                                 },
                                 sessionProfile,
@@ -342,16 +333,13 @@ export default function PartnerDetail() {
             )}
           </article>
         </section>
-      </div>
+      </PageLayout>
     );
   }
 
   if (error && !profile) {
     return (
-      <div className="member-workspace">
-          <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
-            ← Back to Partner Recommendations
-          </Link>
+      <PageLayout className="member-workspace" backTo={ROUTE_PATHS.PARTNER_DISCOVER} backLabel="Back to Partner Recommendations">
         <section className="member-alert member-alert--error">
           <strong>Profile unavailable</strong>
           <p>{error}</p>
@@ -363,29 +351,26 @@ export default function PartnerDetail() {
             </div>
           ) : null}
         </section>
-      </div>
+      </PageLayout>
     );
   }
 
   if (!profile) {
     return (
-      <div className="member-workspace">
-          <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
-            ← Back to Partner Recommendations
-          </Link>
+      <PageLayout className="member-workspace" backTo={ROUTE_PATHS.PARTNER_DISCOVER} backLabel="Back to Partner Recommendations">
         <div className="member-empty">
           <p>No active partner profile was found for this request.</p>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="member-workspace">
-        <Link className="member-back-link" to={ROUTE_PATHS.PARTNER_DISCOVER}>
-          ← Back to Partner Recommendations
-        </Link>
-
+    <PageLayout
+      className="member-workspace"
+      backTo={ROUTE_PATHS.PARTNER_DISCOVER}
+      backLabel="Back to Partner Recommendations"
+    >
       {error ? (
         <section className="member-alert member-alert--error">
           <strong>Request failed</strong>
@@ -477,6 +462,6 @@ export default function PartnerDetail() {
         onCancel={closeRequestModal}
         onConfirm={handleConfirmSend}
       />
-    </div>
+    </PageLayout>
   );
 }

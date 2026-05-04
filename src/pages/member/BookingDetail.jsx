@@ -1,12 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import "../pageStyles.css";
 import "./memberWorkspace.css";
 import "./BookingDetail.css";
+import PageLayout from "../../components/common/PageLayout";
 import { getBookingById } from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getErrorMessage } from "../../utils/errors";
+
+const BOOKING_DETAIL_VISIBLE_STATUSES = new Set([
+  "pending",
+  "rejected",
+  "alternative suggested",
+  "upcoming",
+  "completed",
+  "cancelled",
+  "no_show",
+]);
 
 function formatDateTime(value) {
   if (!value) {
@@ -27,10 +38,26 @@ function formatDateTime(value) {
 }
 
 function normalizeStatus(value = "") {
-  return String(value || "")
+  const normalized = String(value || "")
     .trim()
     .toLowerCase()
-    .replace(/-+/g, " ");
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  const compact = normalized.replace(/\s+/g, "");
+  if (compact === "noshow") {
+    return "no_show";
+  }
+
+  if (normalized === "suggested" || normalized === "suggested alternative") {
+    return "alternative suggested";
+  }
+
+  if (normalized === "complete") {
+    return "completed";
+  }
+
+  return normalized;
 }
 
 function getStatusPillClass(status) {
@@ -46,12 +73,17 @@ function getStatusPillClass(status) {
   return "booking-detail-card__status booking-detail-card__status--neutral";
 }
 
-function getStatusNotice(status, feedback) {
+function getStaffFeedback(feedback = "") {
+  const text = String(feedback || "").trim();
+  return text || "No staff response available.";
+}
+
+function getStatusNotice(status) {
   if (status === "alternative suggested") {
     return {
       tone: "suggested",
-      title: "Staff Feedback / Suggestion",
-      body: feedback || "No staff response available.",
+      title: "Booking Status",
+      body: "Staff suggested an alternative for this booking request.",
       showAction: true,
     };
   }
@@ -169,55 +201,58 @@ export default function BookingDetail() {
 
     return booking.facilityName || "Not available";
   }, [booking]);
-  const statusNotice = useMemo(() => getStatusNotice(normalizedStatus, booking?.feedback), [booking?.feedback, normalizedStatus]);
+  const statusNotice = useMemo(() => getStatusNotice(normalizedStatus), [normalizedStatus]);
+  const staffFeedback = useMemo(() => getStaffFeedback(booking?.feedback), [booking?.feedback]);
 
   if (loading) {
     return (
-      <div className="member-workspace">
+      <PageLayout className="booking-detail-page">
         <div className="member-empty">
           <p>Loading booking details...</p>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="member-workspace">
-          <Link className="member-back-link" to={ROUTE_PATHS.BOOKINGS}>
-            ← Back to my bookings
-          </Link>
+      <PageLayout className="booking-detail-page" backTo={ROUTE_PATHS.BOOKINGS} backLabel="Back to my bookings">
         <section className="member-alert member-alert--error">
           <strong>Booking detail unavailable</strong>
           <p>{error}</p>
         </section>
-      </div>
+      </PageLayout>
     );
   }
 
   if (!booking) {
     return (
-      <div className="member-workspace">
-          <Link className="member-back-link" to={ROUTE_PATHS.BOOKINGS}>
-            ← Back to my bookings
-          </Link>
+      <PageLayout className="booking-detail-page" backTo={ROUTE_PATHS.BOOKINGS} backLabel="Back to my bookings">
         <div className="member-empty">
           <p>No booking detail could be found for this request.</p>
         </div>
-      </div>
+      </PageLayout>
+    );
+  }
+
+  if (!BOOKING_DETAIL_VISIBLE_STATUSES.has(normalizedStatus)) {
+    return (
+      <PageLayout className="booking-detail-page" backTo={ROUTE_PATHS.BOOKINGS} backLabel="Back to my bookings">
+        <section className="member-alert member-alert--error">
+          <strong>Booking detail unavailable</strong>
+          <p>This booking status is no longer available in the current booking workflow.</p>
+        </section>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="member-workspace booking-detail-page">
-        <Link className="member-back-link" to={ROUTE_PATHS.BOOKINGS}>
-          ← Back to my bookings
-        </Link>
-
-      <header className="booking-detail-page__header">
-        <h1>Booking Details</h1>
-      </header>
-
+    <PageLayout
+      className="booking-detail-page"
+      backTo={ROUTE_PATHS.BOOKINGS}
+      backLabel="Back to my bookings"
+      title="Booking Details"
+    >
       <article className="booking-detail-card">
         <section className="booking-detail-card__section booking-detail-card__section--heading">
           <div>
@@ -268,6 +303,11 @@ export default function BookingDetail() {
             <p>{statusNotice.body}</p>
           </div>
 
+          <div className="booking-detail-card__feedback">
+            <strong>Staff Feedback</strong>
+            <p>{staffFeedback}</p>
+          </div>
+
           {statusNotice.showAction ? (
             <div className="booking-detail-card__actions">
               <Link className="btn booking-detail-card__actionButton" to={ROUTE_PATHS.FACILITIES}>
@@ -277,6 +317,6 @@ export default function BookingDetail() {
           ) : null}
         </section>
       </article>
-    </div>
+    </PageLayout>
   );
 }

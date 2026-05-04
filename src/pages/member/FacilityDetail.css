@@ -4,20 +4,6 @@
   width: 100%;
 }
 
-.facility-detail__back {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  color: #7b8b97;
-  font-size: 0.96rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.facility-detail__back:hover {
-  color: #5e798a;
-}
-
 .facility-detail-card {
   display: grid;
   background: #ffffff;
@@ -34,27 +20,6 @@
 
 .facility-detail-card__section:last-child {
   border-bottom: none;
-}
-
-.facility-detail-card__section--hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.facility-detail-card__titleGroup h1 {
-  margin: 0;
-  color: #1f2f39;
-  font-size: 2rem;
-  line-height: 1.12;
-}
-
-.facility-detail-card__subtitle {
-  margin: 6px 0 0;
-  color: #7d8b96;
-  font-size: 1rem;
-  font-weight: 600;
 }
 
 .facility-detail-card .status-pill {
@@ -302,7 +267,6 @@
     padding: 24px 20px;
   }
 
-  .facility-detail-card__section--hero,
   .facility-detail-card__availabilityHead {
     flex-direction: column;
     align-items: stretch;

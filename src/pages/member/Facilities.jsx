@@ -10,6 +10,9 @@ import {
 import { getBookingNewRoute, getFacilityDetailRoute, ROUTE_PATHS } from "../../constants/routes";
 import { getErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
+import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import PageLayout from "../../components/common/PageLayout";
+import { Button } from "../../components/common/Button";
 
 const DEFAULT_FILTERS = {
   date: "",
@@ -132,7 +135,6 @@ export default function Facilities() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [draftFilters, setDraftFilters] = useState(DEFAULT_FILTERS);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
   useEffect(() => {
@@ -152,10 +154,6 @@ export default function Facilities() {
 
         setDateBounds(nextBounds);
         setSportTypeOptions(["All", ...sortAlphabetically(new Set(sportTypes))]);
-        setDraftFilters((previous) => ({
-          ...previous,
-          date: previous.date || nextBounds.defaultDate,
-        }));
         setFilters((previous) => ({
           ...previous,
           date: previous.date || nextBounds.defaultDate,
@@ -175,10 +173,6 @@ export default function Facilities() {
 
         setDateBounds(fallbackBounds);
         setSportTypeOptions(["All"]);
-        setDraftFilters((previous) => ({
-          ...previous,
-          date: previous.date || fallbackBounds.defaultDate,
-        }));
         setFilters((previous) => ({
           ...previous,
           date: previous.date || fallbackBounds.defaultDate,
@@ -233,16 +227,7 @@ export default function Facilities() {
       memberVisibleSlots: getDisplayableTimeSlots(item.availableSlots || []),
     }));
   }, [items]);
-  const timeOptions = useMemo(() => getTimeOptions(displayItems, draftFilters.type), [displayItems, draftFilters.type]);
-
-  useEffect(() => {
-    if (!timeOptions.includes(draftFilters.time)) {
-      setDraftFilters((previous) => ({
-        ...previous,
-        time: "All",
-      }));
-    }
-  }, [draftFilters.time, timeOptions]);
+  const timeOptions = useMemo(() => getTimeOptions(displayItems, filters.type), [displayItems, filters.type]);
 
   useEffect(() => {
     if (!timeOptions.includes(filters.time)) {
@@ -264,15 +249,12 @@ export default function Facilities() {
     });
   }, [displayItems, filters]);
 
-  function updateDraftFilter(field, value) {
-    setDraftFilters((previous) => ({
+  function updateFilter(field, value) {
+    setFilters((previous) => ({
       ...previous,
       [field]: value,
+      ...(field === "type" ? { time: "All" } : {}),
     }));
-  }
-
-  function applyFilters() {
-    setFilters(draftFilters);
   }
 
   function clearFilters() {
@@ -283,65 +265,57 @@ export default function Facilities() {
       time: "All",
     };
 
-    setDraftFilters(resetFilters);
     setFilters(resetFilters);
   }
 
   return (
-    <div className="member-facilities-page">
-      <section className="member-facilities-header">
-        <div className="member-facilities-header__body">
-          <div className="member-facilities-header__title-row">
-            <h1>Facilities</h1>
-            <button
-              className="btn member-facilities-header__map-btn"
-              type="button"
-              onClick={() => navigate(ROUTE_PATHS.FACILITIES_MAP)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
-                <line x1="9" y1="3" x2="9" y2="18" />
-                <line x1="15" y1="6" x2="15" y2="21" />
-              </svg>
-              Map Mode
-            </button>
-          </div>
-          <p className="member-facilities-header__subtitle">
-            Browse available sports venues and make a reservation.
-          </p>
-        </div>
-      </section>
+    <PageLayout
+      className="member-facilities-page"
+      title="Facilities"
+      subtitle="Browse available sports venues and make a reservation."
+      actions={
+        <Button className="member-facilities-header__map-btn" type="button" onClick={() => navigate(ROUTE_PATHS.FACILITIES_MAP)}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
+            <line x1="9" y1="3" x2="9" y2="18" />
+            <line x1="15" y1="6" x2="15" y2="21" />
+          </svg>
+          Map Mode
+        </Button>
+      }
+    >
 
-      <section className="member-facilities-toolbar">
-        <div className="member-facilities-toolbar__grid">
-          <div className="member-facilities-toolbar__field member-facilities-toolbar__field--date">
-            <label htmlFor="facilities-date">Date</label>
+      <FilterPanel
+        className="member-facilities-toolbar"
+        columns={4}
+        onClear={clearFilters}
+      >
+          <FilterField id="facilities-date" label="Date">
             <input
               id="facilities-date"
               type="date"
-              value={draftFilters.date}
+              value={filters.date}
               min={dateBounds.minDate}
               max={dateBounds.maxDate}
-              onChange={(event) => updateDraftFilter("date", event.target.value)}
+              onChange={(event) => updateFilter("date", event.target.value)}
             />
-          </div>
+          </FilterField>
 
-          <div className="member-facilities-toolbar__field">
-            <label htmlFor="facilities-type">Venue Type</label>
+          <FilterField id="facilities-type" label="Venue Type">
             <select
               id="facilities-type"
-              value={draftFilters.type}
-              onChange={(event) => updateDraftFilter("type", event.target.value)}
+              value={filters.type}
+              onChange={(event) => updateFilter("type", event.target.value)}
             >
               {sportTypeOptions.map((type) => (
                 <option key={type} value={type}>
@@ -349,14 +323,13 @@ export default function Facilities() {
                 </option>
               ))}
             </select>
-          </div>
+          </FilterField>
 
-          <div className="member-facilities-toolbar__field">
-            <label htmlFor="facilities-time">Time Slot (1h)</label>
+          <FilterField id="facilities-time" label="Time Slot (1h)">
             <select
               id="facilities-time"
-              value={draftFilters.time}
-              onChange={(event) => updateDraftFilter("time", event.target.value)}
+              value={filters.time}
+              onChange={(event) => updateFilter("time", event.target.value)}
             >
               {timeOptions.map((option) => (
                 <option key={option} value={option}>
@@ -364,14 +337,13 @@ export default function Facilities() {
                 </option>
               ))}
             </select>
-          </div>
+          </FilterField>
 
-          <div className="member-facilities-toolbar__field">
-            <label htmlFor="facilities-availability">Availability</label>
+          <FilterField id="facilities-availability" label="Availability">
             <select
               id="facilities-availability"
-              value={draftFilters.availability}
-              onChange={(event) => updateDraftFilter("availability", event.target.value)}
+              value={filters.availability}
+              onChange={(event) => updateFilter("availability", event.target.value)}
             >
               {AVAILABILITY_OPTIONS.map((status) => (
                 <option key={status.value} value={status.value}>
@@ -379,18 +351,8 @@ export default function Facilities() {
                 </option>
               ))}
             </select>
-          </div>
-        </div>
-
-        <div className="member-facilities-toolbar__actions">
-          <button className="btn-ghost" type="button" onClick={clearFilters}>
-            Clear
-          </button>
-          <button className="btn" type="button" onClick={applyFilters}>
-            Apply
-          </button>
-        </div>
-      </section>
+          </FilterField>
+      </FilterPanel>
 
       {loading && (
         <section className="member-facilities-feedback">
@@ -475,6 +437,6 @@ export default function Facilities() {
           })}
         </section>
       )}
-    </div>
+    </PageLayout>
   );
 }

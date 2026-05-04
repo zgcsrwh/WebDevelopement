@@ -166,7 +166,7 @@ export async function submitRepairTicket(payload, actor) {
     {
       facility_id: payload.facility_id,
       repair_description: payload.repair_description,
-      type: Array.isArray(payload.type) ? payload.type : [payload.type].filter(Boolean),
+      type: Array.isArray(payload.type) ? String(payload.type[0] || "").trim() : String(payload.type || "").trim(),
     },
   );
 }
@@ -239,7 +239,7 @@ export async function updateTicketStatus(payload, actor) {
     "updateTicketStatus",
     {
       repairt_id: payload.repairt_id || payload.id,
-      status: Array.isArray(payload.status) ? payload.status : [payload.status].filter(Boolean),
+      status: Array.isArray(payload.status) ? String(payload.status[0] || "").trim() : String(payload.status || "").trim(),
     },
   );
 }

@@ -11,7 +11,7 @@
   top: 0;
   z-index: 50;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 24px;
   min-height: 112px;
@@ -27,6 +27,8 @@
   font-size: clamp(1.7rem, 2.1vw, 2.05rem);
   font-weight: 800;
   letter-spacing: -0.02em;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .member-shell__brandRow {
@@ -55,6 +57,7 @@
   justify-content: center;
   gap: 6px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .member-shell__navLink {
@@ -63,7 +66,7 @@
   align-items: center;
   justify-content: center;
   min-height: 112px;
-  padding: 0 22px;
+  padding: 0 clamp(12px, 1.2vw, 22px);
   color: #667887;
   text-decoration: none;
   font-size: 1rem;
@@ -95,6 +98,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 14px;
+  min-width: 0;
 }
 
 .member-shell__iconButton,
@@ -156,7 +160,7 @@
   height: 100%;
   display: grid;
   place-items: center;
-  font-family: "Manrope", "Inter", sans-serif;
+  font-family: var(--font-heading);
   font-weight: 800;
 }
 

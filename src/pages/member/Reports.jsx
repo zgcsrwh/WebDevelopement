@@ -7,6 +7,7 @@ import { useAuth } from "../../provider/AuthContext";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import { statusTone, toTitleText } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
+import PageLayout from "../../components/common/PageLayout";
 
 const FAULT_PART_OPTIONS = ["light", "equipment", "surface", "electricity", "other"];
 
@@ -105,6 +106,16 @@ export default function Reports() {
   }, [items]);
 
   function updateField(key, value) {
+    if (key === "description" && countMeaningfulCharacters(value) > 500) {
+      setFieldErrors((previous) => ({
+        ...previous,
+        description: "Issue description must stay within 500 characters.",
+      }));
+      setError("");
+      setMessage("");
+      return;
+    }
+
     setForm((previous) => ({
       ...previous,
       [key]: value,
@@ -158,7 +169,7 @@ export default function Reports() {
         {
           facility_id: form.facilityId,
           repair_description: form.description.trim(),
-          type: [form.type],
+          type: form.type,
         },
         sessionProfile,
       );
@@ -182,11 +193,11 @@ export default function Reports() {
   }
 
   return (
-    <div className="member-workspace reports-page">
-      <section className="reports-page__heading">
-        <h1>Facility Reports</h1>
-        <p>Report equipment malfunctions or facility issues to help us maintain a safe environment.</p>
-      </section>
+    <PageLayout
+      className="reports-page"
+      title="Facility Reports"
+      subtitle="Report equipment malfunctions or facility issues to help us maintain a safe environment."
+    >
 
       <article className="reports-card">
         <div className="reports-card__head">
@@ -290,7 +301,7 @@ export default function Reports() {
 
                 <p className="reports-history__meta">
                   <span>{item.createdAt}</span>
-                  <span className="reports-history__separator">•</span>
+                  <span className="reports-history__separator">/</span>
                   <span className="reports-history__part">Faulty Part: {formatFaultyPart(item.type)}</span>
                 </p>
               </article>
@@ -302,6 +313,6 @@ export default function Reports() {
           </div>
         )}
       </section>
-    </div>
+    </PageLayout>
   );
 }

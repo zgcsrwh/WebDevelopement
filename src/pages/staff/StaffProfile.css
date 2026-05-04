@@ -65,7 +65,7 @@
   width: 100%;
   height: 100%;
   color: #ffffff;
-  font-family: "Manrope", "Inter", sans-serif;
+  font-family: var(--font-heading);
   font-size: 3.4rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -101,7 +101,7 @@
 .staff-profile__heroText h1 {
   margin: 0;
   color: #182c3c;
-  font-family: "Manrope", "Inter", sans-serif;
+  font-family: var(--font-heading);
   font-size: 3rem;
   font-weight: 800;
   line-height: 1.06;
@@ -245,7 +245,7 @@
   border: 1px solid #6a8394;
   background: #698394;
   color: #ffffff;
-  font-family: "Manrope", "Inter", sans-serif;
+  font-family: var(--font-body);
   font-size: 1rem;
   font-weight: 800;
   cursor: pointer;

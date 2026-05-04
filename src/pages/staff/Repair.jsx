@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import "../pageStyles.css";
 import "./Repair.css";
+import { getAllFacilityFilterOptions } from "../../services/bookingService";
 import { getRepairTickets, updateTicketStatus } from "../../services/reportService";
 import { useAuth } from "../../provider/AuthContext";
 import { getErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
 import { formatStaffCardTimestamp, formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
+import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import PageLayout from "../../components/common/PageLayout";
 
 function sortRepairItems(items = []) {
   return [...items].sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
@@ -35,10 +38,7 @@ export default function Repair() {
   const [facilityOptions, setFacilityOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState("");
-  const [draftFacility, setDraftFacility] = useState("");
-  const [draftDate, setDraftDate] = useState("");
-  const [draftStatus, setDraftStatus] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({
+  const [filters, setFilters] = useState({
     facility: "",
     date: "",
     status: "",
@@ -57,16 +57,16 @@ export default function Repair() {
   async function refresh(preferredId = "") {
     setLoading(true);
     try {
+      const [ticketItems, facilityItems] = await Promise.all([
+        getRepairTickets(sessionProfile),
+        getAllFacilityFilterOptions(),
+      ]);
       const nextItems = sortRepairItems(
-        (await getRepairTickets(sessionProfile)).filter((item) => ["pending", "resolved"].includes(item.status)),
+        ticketItems.filter((item) => ["pending", "resolved"].includes(item.status)),
       );
 
       setItems(nextItems);
-      setFacilityOptions(
-        [...new Set(nextItems.map((item) => item.facility).filter(Boolean))]
-          .sort((left, right) => left.localeCompare(right))
-          .map((facilityName) => ({ id: facilityName, name: facilityName })),
-      );
+      setFacilityOptions(facilityItems);
       setSelectedId((current) => {
         const candidate = preferredId || current;
         if (candidate && nextItems.some((item) => item.id === candidate)) {
@@ -91,13 +91,16 @@ export default function Repair() {
   const visibleItems = useMemo(() => {
     return sortRepairItems(
       items.filter((item) => {
-        const facilityMatch = !appliedFilters.facility || item.facility === appliedFilters.facility;
-        const dateMatch = !appliedFilters.date || toDateInputValue(item.createdAt) === appliedFilters.date;
-        const statusMatch = !appliedFilters.status || item.status === appliedFilters.status;
+        const facilityMatch =
+          !filters.facility ||
+          item.facilityId === filters.facility ||
+          item.facility === filters.facility;
+        const dateMatch = !filters.date || toDateInputValue(item.createdAt) === filters.date;
+        const statusMatch = !filters.status || item.status === filters.status;
         return facilityMatch && dateMatch && statusMatch;
       }),
     );
-  }, [appliedFilters.date, appliedFilters.facility, appliedFilters.status, items]);
+  }, [filters.date, filters.facility, filters.status, items]);
 
   useEffect(() => {
     if (selectedId && !visibleItems.some((item) => item.id === selectedId)) {
@@ -110,11 +113,11 @@ export default function Repair() {
     [selectedId, visibleItems],
   );
 
-  function applyFilters() {
-    setAppliedFilters({
-      facility: draftFacility,
-      date: draftDate,
-      status: draftStatus,
+  function clearFilters() {
+    setFilters({
+      facility: "",
+      date: "",
+      status: "",
     });
     setPageError("");
     setPageMessage("");
@@ -140,7 +143,7 @@ export default function Repair() {
       await updateTicketStatus(
         {
           repairt_id: selectedItem.id,
-          status: ["resolved"],
+          status: "resolved",
         },
         sessionProfile,
       );
@@ -154,13 +157,11 @@ export default function Repair() {
   }
 
   return (
-    <div className="staff-repair-page">
-      <section className="staff-repair-page__hero">
-        <div>
-          <h1>Facility Repair Tickets</h1>
-          <p>Track and resolve maintenance issues reported by members.</p>
-        </div>
-      </section>
+    <PageLayout
+      className="staff-repair-page"
+      title="Facility Repair Tickets"
+      subtitle="Track and resolve maintenance issues reported by members."
+    >
 
       {pageError ? (
         <section className="staff-repair-banner staff-repair-banner--error">
@@ -176,54 +177,64 @@ export default function Repair() {
         </section>
       ) : null}
 
-      <section className="staff-repair-filters">
-        <div className="staff-repair-filters__grid">
-          <div className="staff-repair-filters__field">
-            <label htmlFor="staff-repair-facility">Facility</label>
+      <FilterPanel
+        className="staff-repair-filters"
+        columns={3}
+        onClear={clearFilters}
+      >
+          <FilterField id="staff-repair-facility" label="Facility">
             <select
               id="staff-repair-facility"
-              value={draftFacility}
-              onChange={(event) => setDraftFacility(event.target.value)}
+              value={filters.facility}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, facility: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+                setDetailError("");
+              }}
             >
               <option value="">All Facilities</option>
-              {facilityOptions.map((facility) => (
-                <option key={facility.id} value={facility.name}>
-                  {facility.name}
-                </option>
-              ))}
+                {facilityOptions.map((facility) => (
+                  <option key={facility.id} value={facility.id}>
+                    {facility.name}
+                  </option>
+                ))}
             </select>
-          </div>
+          </FilterField>
 
-          <div className="staff-repair-filters__field">
-            <label htmlFor="staff-repair-date">Date</label>
+          <FilterField id="staff-repair-date" label="Date">
             <input
               id="staff-repair-date"
               type="date"
               min={staffCreatedDate}
               max={maxFilterDate}
-              value={draftDate}
-              onChange={(event) => setDraftDate(event.target.value)}
+              value={filters.date}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, date: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+                setDetailError("");
+              }}
             />
-          </div>
+          </FilterField>
 
-          <div className="staff-repair-filters__field">
-            <label htmlFor="staff-repair-status">Status</label>
+          <FilterField id="staff-repair-status" label="Status">
             <select
               id="staff-repair-status"
-              value={draftStatus}
-              onChange={(event) => setDraftStatus(event.target.value)}
+              value={filters.status}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, status: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+                setDetailError("");
+              }}
             >
               <option value="">All Status</option>
               <option value="pending">pending</option>
               <option value="resolved">resolved</option>
             </select>
-          </div>
-        </div>
-
-        <button className="btn staff-repair-filters__button" type="button" onClick={applyFilters}>
-          Filter
-        </button>
-      </section>
+          </FilterField>
+      </FilterPanel>
 
       <section className="staff-repair-layout">
         <div className="staff-repair-list">
@@ -330,6 +341,6 @@ export default function Repair() {
           )}
         </aside>
       </section>
-    </div>
+    </PageLayout>
   );
 }

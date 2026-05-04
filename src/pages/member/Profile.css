@@ -23,7 +23,7 @@
   flex-direction: column;
   gap: 2px;
   color: #11161a;
-  font-family: "Manrope", "Inter", sans-serif;
+  font-family: var(--font-heading);
   font-size: 18px;
   font-weight: 800;
   line-height: 1.05;
@@ -171,7 +171,7 @@
 .profile-main__heading h1 {
   margin: 0;
   color: #132534;
-  font-family: "Manrope", "Inter", sans-serif;
+  font-family: var(--font-heading);
   font-size: 42px;
   font-weight: 800;
   line-height: 1.05;
@@ -325,7 +325,7 @@
   border-radius: 16px;
   background: #6d8799;
   color: #ffffff;
-  font-family: "Manrope", "Inter", sans-serif;
+  font-family: var(--font-body);
   font-size: 16px;
   font-weight: 800;
   text-decoration: none;

@@ -13,9 +13,11 @@ import { useAuth } from "../../provider/AuthContext";
 import { getErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
+import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import PageLayout from "../../components/common/PageLayout";
 
 const ALL_STATUS_VALUE = "all";
-const CHECK_IN_PAGE_STATUSES = new Set(["accepted", "in_progress", "no_show"]);
+const CHECK_IN_PAGE_STATUSES = new Set(["accepted", "cancelled", "no_show", "completed"]);
 
 function formatDateLabel(value = "") {
   if (!value) {
@@ -82,11 +84,19 @@ function getStatusBanner(item, canCheckIn) {
     };
   }
 
-  if (item.pageStatus === "in_progress") {
+  if (item.pageStatus === "completed") {
     return {
-      tone: "in_progress",
-      title: "Session in Progress",
-      body: "This session has already been checked in.",
+      tone: "completed",
+      title: "Completed",
+      body: "This booking has already been completed.",
+    };
+  }
+
+  if (item.pageStatus === "cancelled") {
+    return {
+      tone: "cancelled",
+      title: "Cancelled",
+      body: "This booking was cancelled and can no longer be checked in.",
     };
   }
 
@@ -108,8 +118,12 @@ function getHistoryEntries(item, pageStatus) {
     entries.push(`Staff last updated this booking on ${formatStaffDateTime(item.completedAt)}`);
   }
 
-  if (pageStatus === "in_progress") {
-    entries.push("Arrival has been confirmed and the session is now in progress.");
+  if (pageStatus === "completed") {
+    entries.push("This booking has already been completed.");
+  }
+
+  if (pageStatus === "cancelled") {
+    entries.push("This booking was cancelled before check-in.");
   }
 
   if (pageStatus === "no_show") {
@@ -120,8 +134,12 @@ function getHistoryEntries(item, pageStatus) {
 }
 
 function getReadonlyMessage(item) {
-  if (item.pageStatus === "in_progress") {
-    return "This session has already been checked in.";
+  if (item.pageStatus === "completed") {
+    return "This booking has already been completed and is read-only.";
+  }
+
+  if (item.pageStatus === "cancelled") {
+    return "This booking was cancelled and can no longer be checked in.";
   }
 
   if (item.pageStatus === "no_show") {
@@ -136,10 +154,7 @@ export default function CheckIn() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState("");
-  const [draftSearch, setDraftSearch] = useState("");
-  const [draftDate, setDraftDate] = useState("");
-  const [draftStatus, setDraftStatus] = useState(ALL_STATUS_VALUE);
-  const [appliedFilters, setAppliedFilters] = useState({
+  const [filters, setFilters] = useState({
     search: "",
     date: "",
     status: ALL_STATUS_VALUE,
@@ -255,17 +270,17 @@ export default function CheckIn() {
   }, [items, now]);
 
   const visibleItems = useMemo(() => {
-    const normalizedSearch = appliedFilters.search.trim().toLowerCase();
+    const normalizedSearch = filters.search.trim().toLowerCase();
 
     return sortCheckInItems(
       pageItems.filter((item) => {
         const searchMatch = !normalizedSearch || item.memberName.toLowerCase().includes(normalizedSearch);
-        const dateMatch = !appliedFilters.date || item.date === appliedFilters.date;
-        const statusMatch = appliedFilters.status === ALL_STATUS_VALUE || item.pageStatus === appliedFilters.status;
+        const dateMatch = !filters.date || item.date === filters.date;
+        const statusMatch = filters.status === ALL_STATUS_VALUE || item.pageStatus === filters.status;
         return searchMatch && dateMatch && statusMatch;
       }),
     );
-  }, [appliedFilters.date, appliedFilters.search, appliedFilters.status, pageItems]);
+  }, [filters.date, filters.search, filters.status, pageItems]);
 
   useEffect(() => {
     if (!visibleItems.length) {
@@ -287,11 +302,11 @@ export default function CheckIn() {
     [now, selectedItem],
   );
 
-  function applyFilters() {
-    setAppliedFilters({
-      search: draftSearch,
-      date: draftDate,
-      status: draftStatus,
+  function clearFilters() {
+    setFilters({
+      search: "",
+      date: "",
+      status: ALL_STATUS_VALUE,
     });
     setPageError("");
     setPageMessage("");
@@ -312,7 +327,7 @@ export default function CheckIn() {
 
     try {
       await checkInBooking({ request_id: selectedItem.id }, sessionProfile);
-      setPageMessage(`Request ${selectedItem.id} was updated to in_progress.`);
+      setPageMessage(`Request ${selectedItem.id} was checked in successfully.`);
       await refresh(selectedItem.id);
     } catch (checkInError) {
       setPageError(getErrorMessage(checkInError, "Unable to confirm arrival for this booking."));
@@ -322,13 +337,11 @@ export default function CheckIn() {
   }
 
   return (
-    <div className="staff-checkin-page">
-      <section className="staff-checkin-page__hero">
-        <div>
-          <h1>Bookings Archive</h1>
-          <p>Track, verify, and manage all booking statuses from here.</p>
-        </div>
-      </section>
+    <PageLayout
+      className="staff-checkin-page"
+      title="Bookings Archive"
+      subtitle="Track, verify, and manage all booking statuses from here."
+    >
 
       {pageError ? (
         <section className="staff-checkin-banner staff-checkin-banner--error">
@@ -344,50 +357,58 @@ export default function CheckIn() {
         </section>
       ) : null}
 
-      <section className="staff-checkin-filters">
-        <div className="staff-checkin-filters__grid">
-          <div className="staff-checkin-filters__field">
-            <label htmlFor="staff-checkin-member">Member Name</label>
+      <FilterPanel
+        className="staff-checkin-filters"
+        columns={3}
+        onClear={clearFilters}
+      >
+          <FilterField id="staff-checkin-member" label="Member Name">
             <input
               id="staff-checkin-member"
               type="text"
-              value={draftSearch}
-              onChange={(event) => setDraftSearch(event.target.value)}
+              value={filters.search}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, search: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+              }}
               placeholder="Search member name"
             />
-          </div>
+          </FilterField>
 
-          <div className="staff-checkin-filters__field">
-            <label htmlFor="staff-checkin-date">Date</label>
+          <FilterField id="staff-checkin-date" label="Date">
             <input
               id="staff-checkin-date"
               type="date"
               min={staffCreatedDate}
               max={maxFilterDate}
-              value={draftDate}
-              onChange={(event) => setDraftDate(event.target.value)}
+              value={filters.date}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, date: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+              }}
             />
-          </div>
+          </FilterField>
 
-          <div className="staff-checkin-filters__field">
-            <label htmlFor="staff-checkin-status">Status</label>
+          <FilterField id="staff-checkin-status" label="Status">
             <select
               id="staff-checkin-status"
-              value={draftStatus}
-              onChange={(event) => setDraftStatus(event.target.value)}
+              value={filters.status}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, status: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+              }}
             >
               <option value={ALL_STATUS_VALUE}>All Status</option>
               <option value="accepted">accepted</option>
-              <option value="in_progress">in_progress</option>
+              <option value="cancelled">cancelled</option>
               <option value="no_show">no_show</option>
+              <option value="completed">completed</option>
             </select>
-          </div>
-        </div>
-
-        <button className="btn staff-checkin-filters__button" type="button" onClick={applyFilters}>
-          Filter
-        </button>
-      </section>
+          </FilterField>
+      </FilterPanel>
 
       <section className="staff-checkin-layout">
         <div className="staff-checkin-list">
@@ -453,10 +474,8 @@ export default function CheckIn() {
               </div>
 
               <div className={`staff-checkin-detail__banner is-${selectedItem.pageStatus}`}>
-                {selectedItem.pageStatus === "accepted" ? (
+                {["accepted", "completed"].includes(selectedItem.pageStatus) ? (
                   <CheckCircle2 size={24} />
-                ) : selectedItem.pageStatus === "in_progress" ? (
-                  <Clock3 size={24} />
                 ) : (
                   <AlertTriangle size={24} />
                 )}
@@ -535,6 +554,6 @@ export default function CheckIn() {
           )}
         </aside>
       </section>
-    </div>
+    </PageLayout>
   );
 }

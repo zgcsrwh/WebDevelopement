@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { countMeaningfulCharacters } from "../../utils/text";
 import "./MatchRequestModal.css";
+
+const MATCH_REQUEST_MAX_LENGTH = 200;
 
 export default function MatchRequestModal({
   open,
@@ -11,15 +14,33 @@ export default function MatchRequestModal({
   onCancel,
   onConfirm,
 }) {
+  const [limitError, setLimitError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setLimitError("");
+    }
+  }, [open]);
+
   if (!open) {
     return null;
   }
 
   const count = countMeaningfulCharacters(value);
   const counterClassName =
-    count > 200
+    count > MATCH_REQUEST_MAX_LENGTH
       ? "match-request-modal__counter match-request-modal__counter--error"
       : "match-request-modal__counter";
+
+  function handleMessageChange(nextValue) {
+    if (countMeaningfulCharacters(nextValue) > MATCH_REQUEST_MAX_LENGTH) {
+      setLimitError("Application description must be 200 characters or fewer.");
+      return;
+    }
+
+    setLimitError("");
+    onChange(nextValue);
+  }
 
   return (
     <div className="member-modal-overlay match-request-modal__overlay" role="presentation">
@@ -44,13 +65,14 @@ export default function MatchRequestModal({
             </div>
             <textarea
               id="match-request-message"
-              onChange={(event) => onChange(event.target.value)}
+              onChange={(event) => handleMessageChange(event.target.value)}
               placeholder="Write a short request message..."
               value={value}
             />
             <div className="match-request-modal__fieldFoot">
-              <span className={counterClassName}>{count}/200</span>
+              <span className={counterClassName}>{count}/{MATCH_REQUEST_MAX_LENGTH}</span>
             </div>
+            {limitError ? <p className="match-request-modal__error">{limitError}</p> : null}
           </div>
 
           {error ? <p className="match-request-modal__error">{error}</p> : null}

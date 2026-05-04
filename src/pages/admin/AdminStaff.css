@@ -3,7 +3,6 @@
   gap: 28px;
 }
 
-.admin-staff-page__hero,
 .admin-staff-page__tableCard {
   background: #ffffff;
   border: 1px solid #e1e8ec;
@@ -11,67 +10,12 @@
   box-shadow: 0 12px 34px rgba(21, 35, 43, 0.06);
 }
 
-.admin-staff-page__hero {
-  padding: 30px 30px 24px;
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  align-items: center;
-}
-
-.admin-staff-page__hero h1 {
-  margin: 0 0 8px;
-  font-size: clamp(2rem, 2.8vw, 3rem);
-  line-height: 1;
-  color: #172231;
-}
-
-.admin-staff-page__hero p {
-  margin: 0;
-  font-size: 1rem;
-  color: #667989;
-}
-
-.admin-staff-page__toolbar {
-  display: flex;
-  gap: 18px;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
-}
-
-.admin-staff-page__search {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.admin-staff-page__search input {
-  width: clamp(220px, 22vw, 320px);
-  min-width: 220px;
-  min-height: 58px;
-  border-radius: 18px;
-  border: 1px solid #d7e0e6;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
-  padding: 0 18px;
-  color: #203040;
-  font: inherit;
-  font-size: 1rem;
-}
-
-.admin-staff-page__searchButton,
 .admin-staff-page__addButton {
-  min-height: 58px;
+  min-height: 52px;
   padding-inline: 22px;
-  border-radius: 18px;
+  border-radius: 16px;
   gap: 10px;
   white-space: nowrap;
-}
-
-.admin-staff-page__addButton {
   min-width: 210px;
 }
 
@@ -85,6 +29,7 @@
 
 .admin-staff-page__table {
   width: 100%;
+  min-width: 960px;
   border-collapse: collapse;
 }
 
@@ -103,6 +48,7 @@
   text-transform: uppercase;
   color: #647585;
   background: #ffffff;
+  white-space: nowrap;
 }
 
 .admin-staff-page__table tbody tr:last-child td {
@@ -297,29 +243,7 @@
   text-transform: uppercase;
 }
 
-@media (max-width: 1080px) {
-  .admin-staff-page__hero {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .admin-staff-page__toolbar {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .admin-staff-page__search {
-    flex: 1 1 100%;
-  }
-
-  .admin-staff-page__search input,
-  .admin-staff-page__addButton {
-    width: 100%;
-  }
-}
-
 @media (max-width: 720px) {
-  .admin-staff-page__hero,
   .admin-staff-page__table th,
   .admin-staff-page__table td,
   .admin-staff-page__modalHead,
@@ -328,20 +252,6 @@
   .admin-staff-page__confirmCard {
     padding-left: 20px;
     padding-right: 20px;
-  }
-
-  .admin-staff-page__search {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .admin-staff-page__search input {
-    min-width: 0;
-  }
-
-  .admin-staff-page__searchButton,
-  .admin-staff-page__addButton {
-    width: 100%;
   }
 
   .admin-staff-page__table th,

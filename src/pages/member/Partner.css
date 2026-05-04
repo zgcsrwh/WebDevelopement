@@ -1,28 +1,6 @@
 .partner-page {
   display: grid;
   gap: 1.5rem;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-}
-
-.partner-page__heading {
-  display: grid;
-  gap: 0.45rem;
-}
-
-.partner-page__heading h1 {
-  margin: 0;
-  color: #1d313d;
-  font-size: 2.05rem;
-  font-weight: 800;
-  line-height: 1.08;
-}
-
-.partner-page__heading p {
-  max-width: 42rem;
-  margin: 0;
-  color: #748693;
-  font-size: 0.96rem;
-  line-height: 1.58;
 }
 
 .partner-page__message {
@@ -225,15 +203,10 @@
 
 .partner-formField select {
   padding: 0.82rem 2.85rem 0.82rem 0.95rem;
-  background-image:
-    linear-gradient(45deg, transparent 50%, #617786 50%),
-    linear-gradient(135deg, #617786 50%, transparent 50%),
-    linear-gradient(180deg, #ffffff 0%, #f7fbfd 100%);
-  background-position:
-    calc(100% - 20px) calc(50% - 3px),
-    calc(100% - 14px) calc(50% - 3px),
-    0 0;
-  background-size: 6px 6px, 6px 6px, 100% 100%;
+  background-color: #ffffff;
+  background-image: var(--control-chevron);
+  background-position: calc(100% - 18px) 50%;
+  background-size: 14px 14px;
   background-repeat: no-repeat;
   appearance: none;
   -webkit-appearance: none;
@@ -314,15 +287,9 @@
   border: 1px solid rgba(203, 214, 223, 0.95);
   border-radius: 0.95rem;
   background-color: #ffffff;
-  background-image:
-    linear-gradient(45deg, transparent 50%, #617786 50%),
-    linear-gradient(135deg, #617786 50%, transparent 50%),
-    linear-gradient(180deg, #ffffff 0%, #f7fbfd 100%);
-  background-position:
-    calc(100% - 20px) calc(50% - 3px),
-    calc(100% - 14px) calc(50% - 3px),
-    0 0;
-  background-size: 6px 6px, 6px 6px, 100% 100%;
+  background-image: var(--control-chevron);
+  background-position: calc(100% - 18px) 50%;
+  background-size: 14px 14px;
   background-repeat: no-repeat;
   color: #1c313c;
   font: inherit;

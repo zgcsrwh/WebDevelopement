@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import "../pageStyles.css";
 import "./FacilityDetail.css";
+import PageLayout from "../../components/common/PageLayout";
 import { getFacilityById, getFacilityDateBounds, getTimeSlotsByFacility } from "../../services/bookingService";
 import { ROUTE_PATHS, getBookingNewRoute } from "../../constants/routes";
 import { getErrorMessage } from "../../utils/errors";
@@ -161,26 +162,23 @@ export default function FacilityDetail() {
 
   if (loading) {
     return (
-      <div className="facility-detail-page">
+      <PageLayout className="facility-detail-page">
         <section className="member-facilities-feedback">
           <h2>Loading facility</h2>
           <p>Fetching the venue details and booking slots.</p>
         </section>
-      </div>
+      </PageLayout>
     );
   }
 
   if (error || !facility) {
     return (
-      <div className="facility-detail-page">
-        <Link className="facility-detail__back" to={ROUTE_PATHS.FACILITIES}>
-          ← Back to Facilities
-        </Link>
+      <PageLayout className="facility-detail-page" backTo={ROUTE_PATHS.FACILITIES} backLabel="Back to Facilities">
         <section className="member-facilities-feedback member-facilities-feedback--error">
           <h2>Facility details are unavailable</h2>
           <p>{error || "This facility could not be loaded."}</p>
         </section>
-      </div>
+      </PageLayout>
     );
   }
 
@@ -189,21 +187,19 @@ export default function FacilityDetail() {
   const canBook = facility.status === "normal" && openSlots.length > 0;
 
   return (
-    <div className="facility-detail-page">
-      <Link className="facility-detail__back" to={ROUTE_PATHS.FACILITIES}>
-        ← Back to Facilities
-      </Link>
-
+    <PageLayout
+      className="facility-detail-page"
+      backTo={ROUTE_PATHS.FACILITIES}
+      backLabel="Back to Facilities"
+      title={facilityHeading.title}
+      subtitle={facilityHeading.subtitle || facility.sportType}
+      actions={
+        <span className={`status-pill ${statusTone(facility.status)}`}>
+          {facility.statusLabel || displayStatus(facility.status)}
+        </span>
+      }
+    >
       <article className="facility-detail-card">
-        <section className="facility-detail-card__section facility-detail-card__section--hero">
-          <div className="facility-detail-card__titleGroup">
-            <h1>{facilityHeading.title}</h1>
-          </div>
-          <span className={`status-pill ${statusTone(facility.status)}`}>
-            {facility.statusLabel || displayStatus(facility.status)}
-          </span>
-        </section>
-
         <section className="facility-detail-card__section facility-detail-card__section--info">
           <div className="facility-detail-card__infoItem facility-detail-card__infoItem--blue">
             <span className="facility-detail-card__infoLabel">Sport type</span>
@@ -271,12 +267,12 @@ export default function FacilityDetail() {
                   <div
                     key={slot.id || `${slot.date}-${slot.start_time}-${slot.end_time}`}
                     className={`facility-detail-card__slot ${isOpen ? "is-open" : "is-locked"}`}
-                  >
-                    <span>{slot.timeLabel}</span>
-                    {!isOpen && <small>(Booked)</small>}
-                  </div>
-                );
-              })}
+                    >
+                      <span>{slot.timeLabel}</span>
+                      {!isOpen && <small>({displayStatus(slot.status || "unavailable")})</small>}
+                    </div>
+                  );
+                })}
 
               {slots.length === 0 && (
                 <div className="facility-detail-card__slot facility-detail-card__slot--empty">
@@ -303,6 +299,6 @@ export default function FacilityDetail() {
           )}
         </section>
       </article>
-    </div>
+    </PageLayout>
   );
 }

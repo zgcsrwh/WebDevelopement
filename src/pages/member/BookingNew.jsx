@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "../pageStyles.css";
 import "./BookingNew.css";
+import PageLayout from "../../components/common/PageLayout";
 import { useAuth } from "../../provider/AuthContext";
 import {
   getFacilityById,
@@ -14,6 +15,8 @@ import { ROUTE_PATHS, getFacilityDetailRoute } from "../../constants/routes";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
+
+const ACTIVITY_DESCRIPTION_MAX_LENGTH = 100;
 
 function parseSlot(slot = "") {
   const parts = String(slot).split(" - ");
@@ -69,7 +72,7 @@ function parseGuidelines(value = "") {
   }
 
   return String(value || "")
-    .split(/\r?\n|[•]/)
+    .split(/\r?\n|\u2022/)
     .map((entry) => entry.trim())
     .filter(Boolean);
 }
@@ -77,7 +80,7 @@ function parseGuidelines(value = "") {
 function getFriendMeta(friend) {
   const sport = friend.sport || "Sports";
   const firstAvailability = Array.isArray(friend.availability) ? friend.availability[0] : "";
-  return firstAvailability ? `${sport} · ${firstAvailability}` : sport;
+  return firstAvailability ? `${sport} - ${firstAvailability}` : sport;
 }
 
 export default function BookingNew() {
@@ -107,6 +110,7 @@ export default function BookingNew() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [descriptionError, setDescriptionError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -288,10 +292,15 @@ export default function BookingNew() {
       [key]: value,
     }));
     setError("");
+    if (key === "activityDescription") {
+      setDescriptionError("");
+    }
   }
 
   function handleDescriptionChange(nextValue) {
-    if (countMeaningfulCharacters(nextValue) > 100) {
+    if (countMeaningfulCharacters(nextValue) > ACTIVITY_DESCRIPTION_MAX_LENGTH) {
+      setDescriptionError(`Activity description cannot exceed ${ACTIVITY_DESCRIPTION_MAX_LENGTH} characters.`);
+      setError("");
       return;
     }
 
@@ -359,11 +368,13 @@ export default function BookingNew() {
       return;
     }
     if (!hasMeaningfulText(form.activityDescription)) {
+      setDescriptionError("Please enter a short activity description before submitting the booking request.");
       setError("Please enter a short activity description before submitting the booking request.");
       return;
     }
-    if (descriptionCount > 100) {
-      setError("Activity description cannot exceed 100 characters.");
+    if (descriptionCount > ACTIVITY_DESCRIPTION_MAX_LENGTH) {
+      setDescriptionError(`Activity description cannot exceed ${ACTIVITY_DESCRIPTION_MAX_LENGTH} characters.`);
+      setError(`Activity description cannot exceed ${ACTIVITY_DESCRIPTION_MAX_LENGTH} characters.`);
       return;
     }
 
@@ -390,22 +401,13 @@ export default function BookingNew() {
   }
 
   return (
-    <div className="booking-new-page">
-        <button
-          className="member-back-link booking-new__back"
-          type="button"
-          onClick={() =>
-            navigate(requestedFacilityId ? getFacilityDetailRoute(requestedFacilityId) : ROUTE_PATHS.FACILITIES)
-          }
-        >
-          ← Back to Facility Details
-        </button>
-
-      <section className="booking-new__intro">
-        <h1>New Booking</h1>
-        <p>Fill in the request details for your selected facility</p>
-      </section>
-
+    <PageLayout
+      className="booking-new-page"
+      backTo={requestedFacilityId ? getFacilityDetailRoute(requestedFacilityId) : ROUTE_PATHS.FACILITIES}
+      backLabel="Back to Facility Details"
+      title="New Booking"
+      subtitle="Fill in the request details for your selected facility."
+    >
       {error ? (
         <section className="booking-new__alert booking-new__alert--error">
           <strong>Unable to continue</strong>
@@ -504,15 +506,18 @@ export default function BookingNew() {
                 value={normalizedStartTime}
                 disabled={!facility || !isFacilityBookable(facility.status) || !startOptions.length}
                 onChange={(event) => setFormValue("startTime", event.target.value)}
-              >
-                <option value="">Select start time</option>
-                {startOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
+                >
+                  <option value="">Select start time</option>
+                  {startOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                {facility && isFacilityBookable(facility.status) && !startOptions.length ? (
+                  <p className="booking-new__fieldHelp">No open time slots are available for this date.</p>
+                ) : null}
+              </div>
 
             <div className="booking-new__field">
               <label htmlFor="booking-end-time">
@@ -541,7 +546,7 @@ export default function BookingNew() {
               >
                 <span>{summarizeSelectedFriends(selectedFriends)}</span>
                 <span className="booking-new__inviteCaret" aria-hidden="true">
-                  {inviteOpen ? "▲" : "▼"}
+                  {inviteOpen ? "^" : "v"}
                 </span>
               </button>
 
@@ -606,8 +611,9 @@ export default function BookingNew() {
                 placeholder="Briefly describe your activity (e.g. casual match, practicing drills)..."
               />
               <div className="booking-new__fieldFoot">
-                <span className="booking-new__counter">{descriptionCount}/100</span>
+                <span className="booking-new__counter">{descriptionCount}/{ACTIVITY_DESCRIPTION_MAX_LENGTH}</span>
               </div>
+              {descriptionError ? <p className="booking-new__fieldError">{descriptionError}</p> : null}
             </div>
           </div>
 
@@ -646,6 +652,6 @@ export default function BookingNew() {
           </ul>
         </aside>
       </div>
-    </div>
+    </PageLayout>
   );
 }

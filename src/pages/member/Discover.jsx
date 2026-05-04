@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Dumbbell } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import "../pageStyles.css";
 import "./memberWorkspace.css";
 import "./Discover.css";
@@ -16,6 +16,8 @@ import { getAvatarForActor } from "../../utils/avatar";
 import { getErrorMessage } from "../../utils/errors";
 import { countMeaningfulCharacters } from "../../utils/text";
 import MatchRequestModal from "../../components/member/MatchRequestModal";
+import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import PageLayout from "../../components/common/PageLayout";
 
 const DAY_OPTIONS = [
   { value: "any", label: "Any Day" },
@@ -165,18 +167,13 @@ export default function Discover() {
   }
 
   return (
-    <div className="member-workspace discover-page">
-      <div className="discover-page__header">
-        <div>
-          <h1 className="member-page-title">Partner Recommendations</h1>
-          <p className="member-page-subtitle">
-            Find your perfect sports partner. Only displaying active members.
-          </p>
-        </div>
-        <Link className="btn btn-secondary discover-page__back" to={ROUTE_PATHS.PARTNER}>
-            Back to Match Profile
-          </Link>
-      </div>
+    <PageLayout
+      className="discover-page"
+      backTo={ROUTE_PATHS.PARTNER}
+      backLabel="Back to Match Profile"
+      title="Partner Recommendations"
+      subtitle="Find your perfect sports partner. Only displaying active members."
+    >
 
       {error ? (
         <section className="member-alert member-alert--error">
@@ -191,11 +188,14 @@ export default function Discover() {
         </section>
       ) : null}
 
-      <section className="member-card discover-page__filters">
-        <div className="discover-page__filtersGrid">
-          <label className="form-field discover-page__field">
-            <span>Sport</span>
+      <FilterPanel
+        className="discover-page__filters"
+        columns={3}
+        onClear={() => setFilters({ sport: "all", day: "any", time: "any" })}
+      >
+          <FilterField id="discover-sport" label="Sport">
             <select
+              id="discover-sport"
               value={filters.sport}
               onChange={(event) => setFilters((prev) => ({ ...prev, sport: event.target.value }))}
             >
@@ -204,12 +204,13 @@ export default function Discover() {
                 <option key={sport} value={sport}>
                   {sport}
                 </option>
-              ))}
+                ))}
             </select>
-          </label>
-          <label className="form-field discover-page__field">
-            <span>Day</span>
+          </FilterField>
+
+          <FilterField id="discover-day" label="Day">
             <select
+              id="discover-day"
               value={filters.day}
               onChange={(event) => setFilters((prev) => ({ ...prev, day: event.target.value }))}
             >
@@ -217,12 +218,13 @@ export default function Discover() {
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
-              ))}
+                ))}
             </select>
-          </label>
-          <label className="form-field discover-page__field">
-            <span>Time</span>
+          </FilterField>
+
+          <FilterField id="discover-time" label="Time">
             <select
+              id="discover-time"
               value={filters.time}
               onChange={(event) => setFilters((prev) => ({ ...prev, time: event.target.value }))}
             >
@@ -230,18 +232,10 @@ export default function Discover() {
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
-              ))}
+                ))}
             </select>
-          </label>
-          <button
-            className="btn btn-secondary discover-page__clear"
-            type="button"
-            onClick={() => setFilters({ sport: "all", day: "any", time: "any" })}
-          >
-            Clear Filters
-          </button>
-        </div>
-      </section>
+          </FilterField>
+      </FilterPanel>
 
       {loading ? (
         <div className="member-card member-empty-state">Loading partner recommendations...</div>
@@ -418,6 +412,6 @@ export default function Discover() {
           </div>
         </div>
       ) : null}
-    </div>
+    </PageLayout>
   );
 }

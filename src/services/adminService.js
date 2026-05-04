@@ -305,7 +305,7 @@ export async function createStaffAccount(form, actor) {
     "createStaffAccount",
     {
       name: String(form.name || "").trim(),
-      date_of_birth: form.date_of_birth,
+      date_of_birth: toStoredDateString(form.date_of_birth),
       address: String(form.address || "").trim(),
       email: normalizeEmail(form.email),
       password: String(form.password || ""),
@@ -529,20 +529,51 @@ async function upsertFacilityDirect(form, actor) {
 }
 
 export async function upsertFacility(form, actor) {
+  const payload = {};
+
+  if (Object.prototype.hasOwnProperty.call(form, "facility_id") && form.facility_id) {
+    payload.facility_id = String(form.facility_id).trim();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(form, "name")) {
+    payload.name = String(form.name || "").trim();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(form, "sport_type")) {
+    payload.sport_type = String(form.sport_type || "").trim();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(form, "description")) {
+    payload.description = String(form.description || "").trim();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(form, "usage_guidelines")) {
+    payload.usage_guidelines = String(form.usage_guidelines || "").trim();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(form, "capacity")) {
+    payload.capacity = Number(form.capacity);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(form, "location")) {
+    payload.location = String(form.location || "").trim();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(form, "start_time")) {
+    payload.start_time = Number(form.start_time);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(form, "end_time")) {
+    payload.end_time = Number(form.end_time);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(form, "staff_id")) {
+    payload.staff_id = String(form.staff_id || "").trim();
+  }
+
   return callSubmitAction(
     "upsertFacility",
-    {
-      facility_id: form.facility_id || "",
-      name: String(form.name || "").trim(),
-      sport_type: String(form.sport_type || "").trim(),
-      description: String(form.description || "").trim(),
-      usage_guidelines: String(form.usage_guidelines || "").trim(),
-      capacity: Number(form.capacity || 0),
-      start_time: Number(form.start_time || 0),
-      end_time: Number(form.end_time || 0),
-      location: String(form.location || "").trim(),
-      staff_id: String(form.staff_id || "").trim(),
-    },
+    payload,
   );
 }
 

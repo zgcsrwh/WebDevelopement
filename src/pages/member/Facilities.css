@@ -6,11 +6,6 @@
   justify-items: stretch;
 }
 
-.member-facilities-header {
-  background: transparent;
-}
-
-.member-facilities-header,
 .member-facilities-toolbar,
 .member-facilities-feedback,
 .member-facilities-grid {
@@ -20,154 +15,16 @@
   box-sizing: border-box;
 }
 
-.member-facilities-header__title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-
-.member-facilities-header h1 {
-  margin: 0;
-  color: #1f2f39;
-  font-size: 2.75rem;
-  line-height: 1.02;
-  letter-spacing: -0.03em;
-}
-
-.member-facilities-header__map-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 18px;
-  border-radius: 10px;
-  background: #698295;
-  color: #ffffff;
-  font-size: 0.9rem;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.member-facilities-header__map-btn:hover {
-  background: #5a7385;
-}
-
 .member-facilities-header__map-btn svg {
   flex-shrink: 0;
 }
 
-.member-facilities-header__subtitle {
-  margin: 0;
-  color: #738492;
-  font-size: 1rem;
-  line-height: 1.55;
-}
-
-.member-facilities-toolbar,
 .member-facilities-feedback,
 .member-facility-card {
   background: #ffffff;
   border: 1px solid #e3e9ef;
   border-radius: 18px;
   box-shadow: 0 10px 24px rgba(24, 39, 56, 0.05);
-}
-
-.member-facilities-toolbar {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: flex-end;
-  gap: 18px;
-  padding: 22px 32px;
-}
-
-.member-facilities-toolbar__grid {
-  display: grid;
-  grid-template-columns: repeat(4, 146px);
-  gap: 12px;
-  align-items: end;
-  justify-content: start;
-  min-width: 0;
-}
-
-.member-facilities-toolbar__field {
-  min-width: 0;
-}
-
-.member-facilities-toolbar__field label {
-  display: block;
-  margin: 0 0 8px;
-  color: #6f7f8c;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.member-facilities-toolbar__field input,
-.member-facilities-toolbar__field select {
-  width: 100%;
-  min-width: 0;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid #dbe3ea;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #223643;
-  font-size: 0.82rem;
-  box-shadow: none;
-  box-sizing: border-box;
-}
-
-.member-facilities-toolbar__field input:focus,
-.member-facilities-toolbar__field select:focus {
-  border-color: #90a7b6;
-  box-shadow: 0 0 0 3px rgba(144, 167, 182, 0.12);
-}
-
-.member-facilities-toolbar__field--date input {
-  font-size: 0.76rem;
-  padding-right: 8px;
-}
-
-.member-facilities-toolbar__actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  justify-self: end;
-  padding-bottom: 1px;
-}
-
-.member-facilities-toolbar__actions .btn-ghost,
-.member-facilities-toolbar__actions .btn {
-  min-height: 34px;
-  padding: 0 18px;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  box-shadow: none;
-}
-
-.member-facilities-toolbar__actions .btn-ghost {
-  border: none;
-  background: transparent;
-  color: #6f7f8c;
-}
-
-.member-facilities-toolbar__actions .btn-ghost:hover {
-  background: #f4f8fb;
-}
-
-.member-facilities-toolbar__actions .btn {
-  min-width: 82px;
-  background: #698295;
-  color: #ffffff;
-}
-
-.member-facilities-toolbar__actions .btn:hover {
-  background: #5a7385;
 }
 
 .member-facilities-feedback {
@@ -347,58 +204,23 @@
 }
 
 @media (max-width: 1080px) {
-  .member-facilities-toolbar {
-    grid-template-columns: 1fr;
-    align-items: center;
-  }
-
-  .member-facilities-toolbar__grid {
-    grid-template-columns: repeat(2, minmax(0, 180px));
-    justify-content: center;
-  }
-
-  .member-facilities-toolbar__actions {
-    justify-self: center;
-  }
-
   .member-facilities-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 720px) {
-  .member-facilities-header__title-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .member-facilities-header h1 {
-    font-size: 2.2rem;
-  }
-
   .member-facilities-header__map-btn {
     width: 100%;
     justify-content: center;
   }
 
-  .member-facilities-toolbar {
-    padding: 16px;
-  }
-
-  .member-facilities-toolbar__grid {
-    width: 100%;
-    grid-template-columns: 1fr;
-  }
-
-  .member-facilities-toolbar__actions,
   .member-facility-card__actions {
     width: 100%;
     flex-direction: column;
     align-items: stretch;
   }
 
-  .member-facilities-toolbar__actions .btn-ghost,
-  .member-facilities-toolbar__actions .btn,
   .member-facility-card__actions .btn-secondary,
   .member-facility-card__actions .btn {
     width: 100%;

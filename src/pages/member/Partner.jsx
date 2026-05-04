@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "../pageStyles.css";
 import "./Partner.css";
+import PageLayout from "../../components/common/PageLayout";
 import { useAuth } from "../../provider/AuthContext";
 import { getCurrentMatchProfile, toggleMatchStatus, upsertMatchProfile } from "../../services/partnerService";
 import { getFacilitySportTypes } from "../../services/bookingService";
@@ -171,6 +172,16 @@ export default function Partner() {
   const previewAvailability = form.availableTime.map((value) => formatAvailabilityLabel(value));
 
   function updateField(key, value) {
+    if (key === "selfDescription" && countMeaningfulCharacters(value) > 150) {
+      setFieldErrors((previous) => ({
+        ...previous,
+        selfDescription: "Short bio must be 150 characters or fewer.",
+      }));
+      setError("");
+      setMessage("");
+      return;
+    }
+
     setFieldErrors((previous) => ({ ...previous, [key]: "" }));
     setError("");
     setMessage("");
@@ -300,15 +311,11 @@ export default function Partner() {
   }
 
   return (
-    <div className="partner-page">
-      <section className="partner-page__heading">
-        <h1>Match Profile</h1>
-        <p>
-          Create your public profile to find sports partners. Your real name and contact details
-          will remain strictly confidential.
-        </p>
-      </section>
-
+    <PageLayout
+      className="partner-page"
+      title="Match Profile"
+      subtitle="Create your public profile to find sports partners. Your real name and contact details will remain strictly confidential."
+    >
       <div className="partner-page__layout">
         <article className="partner-card partner-card--editor">
           <div className="partner-card__toggleRow">
@@ -558,6 +565,6 @@ export default function Partner() {
           </button>
         </aside>
       </div>
-    </div>
+    </PageLayout>
   );
 }

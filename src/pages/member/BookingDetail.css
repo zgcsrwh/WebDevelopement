@@ -3,13 +3,6 @@
   gap: 18px;
 }
 
-.booking-detail-page__header h1 {
-  margin: 0;
-  color: #1f2f39;
-  font-size: 2.95rem;
-  line-height: 1.06;
-}
-
 .booking-detail-card {
   background: #ffffff;
   border: 1px solid #dfe7ec;
@@ -140,6 +133,26 @@
   line-height: 1.7;
 }
 
+.booking-detail-card__feedback {
+  display: grid;
+  gap: 10px;
+  padding: 22px 24px;
+  border: 1px solid #dce6ec;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.booking-detail-card__feedback strong {
+  color: #1f2f39;
+  font-size: 1.08rem;
+}
+
+.booking-detail-card__feedback p {
+  margin: 0;
+  color: #40525d;
+  line-height: 1.7;
+}
+
 .booking-detail-card__notice--neutral {
   background: #f6f8fa;
   border-color: #e3e8ec;
@@ -179,10 +192,6 @@
 }
 
 @media (max-width: 640px) {
-  .booking-detail-page__header h1 {
-    font-size: 2.25rem;
-  }
-
   .booking-detail-card__section {
     padding: 22px 20px;
   }

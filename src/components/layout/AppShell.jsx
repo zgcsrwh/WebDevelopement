@@ -5,6 +5,7 @@ import { useAuth } from "../../provider/AuthContext";
 import { getAvatarForActor, subscribeToAvatarChanges } from "../../utils/avatar";
 import { ROUTE_PATHS, getDefaultRouteForRole, getProfileRouteForRole } from "../../constants/routes";
 import NotificationBell from "./NotificationBell";
+import "../common/Button.css";
 import "./AppShell.css";
 
 const navConfig = {

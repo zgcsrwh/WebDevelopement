@@ -497,7 +497,7 @@ export async function respondToMatchRequest(payload, actor) {
     "respondToMatchRequest",
     {
       match_id: payload.match_id || payload.id,
-      status: Array.isArray(payload.status) ? payload.status : [payload.status].filter(Boolean),
+      status: Array.isArray(payload.status) ? String(payload.status[0] || "").trim() : String(payload.status || "").trim(),
       respond_message: payload.respond_message?.trim() || "",
     },
   );

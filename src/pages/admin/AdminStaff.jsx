@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import "../pageStyles.css";
 import "../workspaceStyles.css";
 import "./AdminStaff.css";
@@ -7,6 +7,9 @@ import { createStaffAccount, disableStaffAccount, getAdminStaff } from "../../se
 import { useAuth } from "../../provider/AuthContext";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
+import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import PageLayout from "../../components/common/PageLayout";
+import { Button } from "../../components/common/Button";
 
 const DEFAULT_PASSWORD = "Staff1234";
 
@@ -82,7 +85,6 @@ export default function AdminStaff() {
   const [pageError, setPageError] = useState("");
   const [pageMessage, setPageMessage] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(getEmptyCreateForm());
   const [createErrors, setCreateErrors] = useState({});
@@ -115,16 +117,18 @@ export default function AdminStaff() {
   }, [sessionProfile]);
 
   const filteredItems = useMemo(() => {
-    const normalizedQuery = appliedSearch.trim().toLowerCase();
+    const normalizedQuery = searchInput.trim().toLowerCase();
     if (!normalizedQuery) {
       return items;
     }
 
     return items.filter((item) => String(item.name || "").toLowerCase().includes(normalizedQuery));
-  }, [appliedSearch, items]);
+  }, [searchInput, items]);
 
-  function applySearch() {
-    setAppliedSearch(searchInput.trim());
+  function clearFilters() {
+    setSearchInput("");
+    setPageError("");
+    setPageMessage("");
   }
 
   function openCreateModal() {
@@ -234,41 +238,35 @@ export default function AdminStaff() {
     }
   }
 
+  const filterActions = (
+      <Button className="admin-staff-page__addButton" type="button" onClick={openCreateModal}>
+        <Plus size={18} aria-hidden="true" />
+        <span>Add New Staff</span>
+      </Button>
+  );
+
   return (
-    <div className="admin-staff-page">
-      <section className="admin-staff-page__hero">
-        <div>
-          <h1>Staff Management</h1>
-          <p>Create new staff accounts and manage existing personnel.</p>
-        </div>
-
-        <div className="admin-staff-page__toolbar">
-          <div className="admin-staff-page__search">
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  applySearch();
-                }
-              }}
-              placeholder="Search staff name..."
-              aria-label="Search staff name"
-            />
-            <button className="btn-secondary admin-staff-page__searchButton" type="button" onClick={applySearch}>
-              <Search size={18} aria-hidden="true" />
-              <span>Search</span>
-            </button>
-          </div>
-
-          <button className="btn admin-staff-page__addButton" type="button" onClick={openCreateModal}>
-            <Plus size={18} aria-hidden="true" />
-            <span>Add New Staff</span>
-          </button>
-        </div>
-      </section>
+    <PageLayout
+      className="admin-staff-page"
+      title="Staff Management"
+      subtitle="Create new staff accounts and manage existing personnel."
+    >
+      <FilterPanel columns={1} onClear={clearFilters} extraActions={filterActions}>
+        <FilterField id="admin-staff-search" label="">
+          <input
+            id="admin-staff-search"
+            type="text"
+            value={searchInput}
+            onChange={(event) => {
+              setSearchInput(event.target.value);
+              setPageError("");
+              setPageMessage("");
+            }}
+            placeholder="Search staff name..."
+            aria-label="Search staff name"
+          />
+        </FilterField>
+      </FilterPanel>
 
       {pageError ? (
         <section className="workspace-surface">
@@ -444,6 +442,6 @@ export default function AdminStaff() {
           </div>
         </div>
       ) : null}
-    </div>
+    </PageLayout>
   );
 }

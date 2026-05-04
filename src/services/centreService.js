@@ -12,7 +12,7 @@ import {
 } from "./firestoreService";
 import { createAppError } from "../utils/errors";
 
-export const BOOKING_ACTIVE_STATUSES = new Set(["pending", "accepted", "in_progress"]);
+export const BOOKING_ACTIVE_STATUSES = new Set(["pending", "accepted"]);
 export const BOOKING_HISTORY_STATUSES = new Set(["rejected", "cancelled", "completed", "no_show", "suggested"]);
 export const FACILITY_VISIBLE_STATUSES = new Set(["normal", "fixing"]);
 export const FACILITY_BOOKABLE_STATUSES = new Set(["normal"]);
@@ -176,8 +176,9 @@ export function buildDateTime(date, hour) {
 }
 
 export function getEffectiveBookingStatus(item = {}, now = new Date()) {
-  const rawStatus = String(item.status || "").toLowerCase();
-  if (!["accepted", "in_progress"].includes(rawStatus) || !item.date || !item.end_time) {
+  const rawStatus = normalizeBookingStatusValue(item.status);
+
+  if (rawStatus !== "accepted" || !item.date || !item.end_time) {
     return rawStatus || "pending";
   }
 
@@ -186,7 +187,7 @@ export function getEffectiveBookingStatus(item = {}, now = new Date()) {
     return rawStatus;
   }
 
-  return rawStatus === "accepted" ? "no_show" : "completed";
+  return "no_show";
 }
 
 function normalizeBookingStatusValue(value = "") {
@@ -214,15 +215,6 @@ export function getMemberBookingDisplayStatus(item = {}, now = new Date()) {
     }
     return now < bookingStartTime ? "upcoming" : "no_show";
   }
-
-  if (rawStatus === "in progress" || rawStatus === "in_progress") {
-    const bookingEndTime = buildDateTime(date, endTime);
-    if (Number.isNaN(bookingEndTime.getTime())) {
-      return "upcoming";
-    }
-    return now < bookingEndTime ? "upcoming" : "completed";
-  }
-
   return rawStatus || "pending";
 }
 
@@ -714,7 +706,7 @@ export async function syncBookingLifecycleStatus() {
 
   for (const request of requests) {
     const status = String(request.status || "").toLowerCase();
-    if (!["accepted", "in_progress"].includes(status) || !request.date || !request.end_time) {
+    if (status !== "accepted" || !request.date || !request.end_time) {
       continue;
     }
 
@@ -748,20 +740,6 @@ export async function syncBookingLifecycleStatus() {
       );
       continue;
     }
-
-    await updateCollectionDoc("request", request.id, {
-      status: "completed",
-      completed_at: new Date().toISOString(),
-      updated_at: serverTimestamp(),
-    });
-
-    await createNotifications(
-      [request.member_id, ...(request.participant_ids || [])],
-      "A booking session has been completed successfully.",
-      "facility_request",
-      "completed",
-      request.id,
-    );
   }
 }
 

@@ -828,7 +828,7 @@ export default function NotificationBell({ variant = "member" }) {
       await respondToMatchRequest(
         {
           match_id: detail.id,
-          status: [nextStatus],
+          status: nextStatus,
           respond_message: matchRespondMessage.trim(),
         },
         sessionProfile,
