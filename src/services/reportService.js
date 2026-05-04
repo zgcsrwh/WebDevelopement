@@ -1,6 +1,5 @@
 import {
   assertRole,
-  createNotifications,
   getCurrentActor,
   getEffectiveRepairStatus,
   getFacilityLookup,
@@ -149,14 +148,6 @@ async function submitRepairTicketDirect(payload, actor) {
     completed_at: "",
   });
 
-  await createNotifications(
-    [resolvedActor.id, facility.staffId],
-    `A repair ticket for ${facility.name} has been submitted.`,
-    "repair_report",
-    "pending",
-    repairId,
-  );
-
   return { success: true, repairt_id: repairId };
 }
 
@@ -222,14 +213,6 @@ async function updateTicketStatusDirect(payload, actor) {
       updated_at: serverTimestamp(),
     });
   });
-
-  await createNotifications(
-    [repair.member_id],
-    "Your repair report has been resolved.",
-    "repair_report",
-    "resolved",
-    repairId,
-  );
 
   return { success: true };
 }

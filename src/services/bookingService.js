@@ -4,7 +4,6 @@ import {
   BOOKING_ACTIVE_STATUSES,
   buildDateTime,
   buildHourRange,
-  createNotifications,
   formatHourRange,
   getCurrentActor,
   getEffectiveBookingStatus,
@@ -715,21 +714,6 @@ async function submitBookingRequestDirect(payload, actor) {
     });
   });
 
-  await createNotifications(
-    [resolvedActor.id, ...participantIds],
-    `Your booking request for ${facility.name} on ${payload.date} ${formatHourRange(payload.start_time, payload.end_time)} has been submitted.`,
-    "facility_request",
-    "pending",
-    requestRef.id,
-  );
-  await createNotifications(
-    [facility.staffId],
-    `A new booking request for ${facility.name} is waiting for approval.`,
-    "facility_request",
-    "pending",
-    requestRef.id,
-  );
-
   return { success: true, request_id: requestRef.id };
 }
 
@@ -882,14 +866,6 @@ async function modifyPendingBookingDirect(payload, actor) {
       updated_at: serverTimestamp(),
     });
   });
-
-  await createNotifications(
-    [existingRequest.member_id, existingRequest.staff_id, ...participantIds],
-    `The booking request for ${nextPayload.date} ${formatHourRange(nextPayload.start_time, nextPayload.end_time)} was updated and sent back for approval.`,
-    "facility_request",
-    "pending",
-    requestId,
-  );
 
   return { success: true };
 }
@@ -1125,14 +1101,6 @@ async function cancelConfirmedBookingDirect(idOrPayload, actor) {
     });
   }
 
-  await createNotifications(
-    [request.member_id, request.staff_id, ...normalizeParticipantIds(request)],
-    `The confirmed booking for ${request.date} ${formatHourRange(request.start_time, request.end_time)} has been cancelled.`,
-    "facility_request",
-    "cancelled",
-    id,
-  );
-
   return { success: true };
 }
 
@@ -1206,20 +1174,6 @@ async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted"
       });
     }
   });
-
-  const messageByStatus = {
-    accepted: "Your booking request has been approved.",
-    rejected: `Your booking request has been rejected. ${responseText}`.trim(),
-    suggested: `A change was suggested for your booking request. ${responseText}`.trim(),
-  };
-
-  await createNotifications(
-    [request.member_id, ...normalizeParticipantIds(request)],
-    messageByStatus[normalizedStatus],
-    "facility_request",
-    normalizedStatus,
-    id,
-  );
 
   return { success: true };
 }

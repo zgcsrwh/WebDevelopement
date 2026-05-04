@@ -1,6 +1,5 @@
 import {
   assertRole,
-  createNotifications,
   getCurrentActor,
   getFriendRecord,
   getMemberLookup,
@@ -249,16 +248,6 @@ async function toggleMatchStatusDirect(isActiveOrPayload, actor) {
       ),
     );
 
-    const affectedMemberIds = pendingRelated.map((item) =>
-      item.sender_id === resolvedActor.id ? item.reciever_id : item.sender_id,
-    );
-    await createNotifications(
-      affectedMemberIds,
-      "A pending partner request was invalidated because the other member closed matching.",
-      "match_request",
-      "invalidated",
-      resolvedActor.id,
-    );
   }
 
   return { success: true, isActive: Boolean(isActive) };
@@ -406,15 +395,6 @@ async function sendMatchRequestDirect(payload, actor) {
     completed_at: "",
   });
 
-  const senderName = ownProfile.nickname || memberLookup.get(resolvedActor.id)?.name || "A member";
-  await createNotifications(
-    [receiverId],
-    `${senderName} sent you a partner matching request.`,
-    "match_request",
-    "pending",
-    requestId,
-  );
-
   return { success: true, match_id: requestId };
 }
 
@@ -479,16 +459,6 @@ async function respondToMatchRequestDirect(payload, actor) {
         ),
     );
   }
-
-  await createNotifications(
-    [request.sender_id],
-    String(nextStatus).toLowerCase() === "accepted"
-      ? "Your partner request has been accepted."
-      : "Your partner request has been rejected.",
-    "match_request",
-    String(nextStatus).toLowerCase(),
-    requestId,
-  );
 
   return { success: true };
 }

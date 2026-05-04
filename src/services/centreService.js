@@ -1,6 +1,5 @@
 import { auth } from "../provider/FirebaseConfig";
 import {
-  addCollectionDoc,
   createWriteBatch,
   getCollectionDocs,
   getDocById,
@@ -665,26 +664,6 @@ export async function claimSlotsForRequest(slotItems, requestId) {
   await batch.commit();
 }
 
-export async function createNotification(recipientId, message, type = "system", statusContext = "", referenceId = "") {
-  if (!recipientId || !message) {
-    return null;
-  }
-
-  return addCollectionDoc("notification", {
-    member_id: recipientId,
-    message,
-    type,
-    status_context: statusContext,
-    reference_id: referenceId,
-    is_read: false,
-  });
-}
-
-export async function createNotifications(recipientIds, message, type = "system", statusContext = "", referenceId = "") {
-  const uniqueRecipients = [...new Set(recipientIds.filter(Boolean))];
-  await Promise.all(uniqueRecipients.map((recipientId) => createNotification(recipientId, message, type, statusContext, referenceId)));
-}
-
 export async function syncFacilityStatus(facilityId) {
   const facility = await getDocById("facility", facilityId);
   if (!facility) {
@@ -731,13 +710,6 @@ export async function syncBookingLifecycleStatus() {
         }
       }
 
-      await createNotifications(
-        [request.member_id, ...(request.participant_ids || [])],
-        "A booking was marked as no-show because it was not checked in before the end time.",
-        "facility_request",
-        "no_show",
-        request.id,
-      );
       continue;
     }
   }

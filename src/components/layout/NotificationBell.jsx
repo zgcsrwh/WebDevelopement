@@ -12,7 +12,6 @@ import { getRepairTicketById } from "../../services/reportService";
 import {
   getMatchRequests,
   respondToMatchRequest,
-  subscribeToMatchRequests,
 } from "../../services/partnerService";
 import { useAuth } from "../../provider/AuthContext";
 import { statusTone, toTitleText } from "../../utils/presentation";
@@ -70,49 +69,6 @@ function getTypeIcon(type = "") {
   }
 
   return <Bell {...props} />;
-}
-
-function buildMatchNotificationKey(referenceId, status = "") {
-  if (!referenceId) {
-    return "";
-  }
-
-  return `${referenceId}:${String(status || "").trim().toLowerCase()}`;
-}
-
-function createSyntheticMatchItem(request, isRead = false) {
-  const status = String(request.status || "").trim().toLowerCase();
-  const direction = request.direction;
-  const counterpartName = request.counterpartName || "This member";
-  let message = "Match request updated.";
-
-  if (status === "pending" && direction === "incoming") {
-    message = `${counterpartName} sent you a new partner request.`;
-  } else if (status === "accepted" && direction === "outgoing") {
-    message = `${counterpartName} accepted your partner request.`;
-  } else if (status === "rejected" && direction === "outgoing") {
-    message = `${counterpartName} rejected your partner request.`;
-  } else if (status === "invalidated") {
-    message =
-      direction === "incoming"
-        ? `A partner request from ${counterpartName} is now invalidated.`
-        : `Your partner request to ${counterpartName} is now invalidated.`;
-  }
-
-  return {
-    id: `matching:${request.id}:${status}`,
-    source: "matching",
-    group: "match",
-    type: "match_request",
-    message,
-    statusContext: status,
-    referenceId: request.id,
-    isRead,
-    createdAt: request.completedAt || request.createdAt,
-    sortValue: request.completedAt || request.createdAt,
-    request,
-    syntheticReadKey: `matching:${request.id}:${status}`,
-  };
 }
 
 function normalizeNotificationItem(item) {
@@ -510,7 +466,6 @@ export default function NotificationBell({ variant = "member" }) {
   const { sessionProfile, sessionRole } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [matchRequests, setMatchRequests] = useState([]);
-  const [syntheticReadKeys, setSyntheticReadKeys] = useState(() => new Set());
   const [panelOpen, setPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [panelError, setPanelError] = useState("");
@@ -527,7 +482,6 @@ export default function NotificationBell({ variant = "member" }) {
 
   useEffect(() => {
     let unsubscribeNotifications = () => {};
-    let unsubscribeMatches = () => {};
     let cancelled = false;
 
     subscribeToNotifications(
@@ -552,34 +506,13 @@ export default function NotificationBell({ variant = "member" }) {
       unsubscribeNotifications = unsubscribe;
     });
 
-    if (sessionRole === "Member" && !isStaffVariant) {
-      subscribeToMatchRequests(
-        sessionProfile,
-        (items) => {
-          if (!cancelled) {
-            setMatchRequests(items);
-          }
-        },
-        () => {
-          if (!cancelled) {
-            setMatchRequests([]);
-          }
-        },
-      ).then((unsubscribe) => {
-        if (cancelled) {
-          unsubscribe();
-          return;
-        }
-        unsubscribeMatches = unsubscribe;
-      });
-    } else {
+    if (sessionRole !== "Member" || isStaffVariant) {
       setMatchRequests([]);
     }
 
     return () => {
       cancelled = true;
       unsubscribeNotifications();
-      unsubscribeMatches();
     };
   }, [sessionProfile, sessionRole, isStaffVariant]);
 
@@ -618,41 +551,9 @@ export default function NotificationBell({ variant = "member" }) {
     [notifications],
   );
 
-  const syntheticMatchItems = useMemo(() => {
-    if (sessionRole !== "Member") {
-      return [];
-    }
-
-    const notificationKeys = new Set(
-      notificationItems
-        .filter((item) => item.group === "match")
-        .map((item) => buildMatchNotificationKey(item.referenceId, item.statusContext))
-        .filter(Boolean),
-    );
-
-    return matchRequests
-      .filter((request) => {
-        const status = String(request.status || "").trim().toLowerCase();
-        if (status === "pending") {
-          return request.direction === "incoming";
-        }
-        if (status === "accepted" || status === "rejected") {
-          return request.direction === "outgoing";
-        }
-        if (status === "invalidated") {
-          return true;
-        }
-        return false;
-      })
-      .filter((request) => !notificationKeys.has(buildMatchNotificationKey(request.id, request.status)))
-      .map((request) =>
-        createSyntheticMatchItem(request, syntheticReadKeys.has(`matching:${request.id}:${request.status}`)),
-      );
-  }, [matchRequests, notificationItems, sessionRole, syntheticReadKeys]);
-
   const allItems = useMemo(
-    () => sortByNewest(isStaffVariant ? notificationItems : [...notificationItems, ...syntheticMatchItems]),
-    [notificationItems, syntheticMatchItems, isStaffVariant],
+    () => sortByNewest(notificationItems),
+    [notificationItems],
   );
 
   const unreadCount = useMemo(
@@ -676,18 +577,6 @@ export default function NotificationBell({ variant = "member" }) {
     return allItems.filter((item) => item.group === activeTab);
   }, [activeTab, allItems, isStaffVariant]);
 
-  function markSyntheticItemRead(item) {
-    if (!item?.syntheticReadKey) {
-      return;
-    }
-
-    setSyntheticReadKeys((current) => {
-      const next = new Set(current);
-      next.add(item.syntheticReadKey);
-      return next;
-    });
-  }
-
   async function markItemRead(item) {
     if (!item || item.isRead) {
       return;
@@ -701,7 +590,6 @@ export default function NotificationBell({ variant = "member" }) {
       return;
     }
 
-    markSyntheticItemRead(item);
   }
 
   async function loadMatchDetail(referenceId) {
@@ -830,7 +718,6 @@ export default function NotificationBell({ variant = "member" }) {
       return;
     }
 
-    const currentItem = activeModal.item;
     const detail = modalDetail;
 
     if (!detail?.id || detail.direction !== "incoming" || detail.status !== "pending") {
@@ -856,9 +743,6 @@ export default function NotificationBell({ variant = "member" }) {
       setPanelMessage(
         nextStatus === "accepted" ? "Partner request accepted." : "Partner request rejected.",
       );
-      if (currentItem.source === "matching") {
-        markSyntheticItemRead(currentItem);
-      }
       closeModal();
     } catch (error) {
       if (String(error?.code || "").toLowerCase().includes("failed-precondition")) {
@@ -876,15 +760,6 @@ export default function NotificationBell({ variant = "member" }) {
     try {
       await markAllNotificationsRead(sessionProfile);
       setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
-      setSyntheticReadKeys((current) => {
-        const next = new Set(current);
-        syntheticMatchItems.forEach((item) => {
-          if (item.syntheticReadKey) {
-            next.add(item.syntheticReadKey);
-          }
-        });
-        return next;
-      });
     } catch (error) {
       setPanelError(error?.message || "Notifications could not be marked as read.");
     }

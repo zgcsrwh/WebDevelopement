@@ -1,4 +1,4 @@
-import { createNotification, getCurrentActor } from "./centreService";
+import { getCurrentActor } from "./centreService";
 import { getCollectionDocs, normalizeTimestamp, subscribeToCollection, updateCollectionDoc, where } from "./firestoreService";
 
 async function resolveActor(actor) {
@@ -95,12 +95,3 @@ export async function markAllNotificationsRead(actor) {
   return { success: true };
 }
 
-export async function createFrontendLog(message, type = "system", actor) {
-  const resolvedActor = await resolveActor(actor);
-  if (!resolvedActor?.id) {
-    return { success: false };
-  }
-
-  const id = await createNotification(resolvedActor.id, message, type, "", "");
-  return { success: true, id };
-}
