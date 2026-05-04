@@ -30,6 +30,9 @@ const { getFunctions, connectFunctionsEmulator, httpsCallable } = require("fireb
 
 const admin = require("firebase-admin");
 
+// ============ time.js helper 导入 ============
+const { getLondonDateOffset, getLondonDateHourFromInstant } = require("../utils/time");
+
 // ============ Firebase Client SDK 初始化 ============
 
 const firebaseConfig = {
@@ -97,6 +100,37 @@ function normalizeErrorCode(code) {
     return code.replace("functions/", "");
   }
   return code;
+}
+
+// ============ 2 小时锁定期 Helper ============
+
+function getSuccessBookingTime() {
+  return {
+    date: getLondonDateOffset(1),
+    start_time: "09",
+    end_time: "11"
+  };
+}
+
+function getWithinLockPeriodBookingTime() {
+  const oneHourLater = new Date(Date.now() + 60 * 60 * 1000);
+  const { date, hour } = getLondonDateHourFromInstant(oneHourLater);
+
+  const hourNum = parseInt(hour);
+  if (hourNum >= 23) {
+    const nowInfo = getLondonDateHourFromInstant(new Date());
+    return {
+      date: nowInfo.date,
+      start_time: "22",
+      end_time: "23"
+    };
+  }
+
+  return {
+    date: date,
+    start_time: hour,
+    end_time: String(hourNum + 1).padStart(2, "0")
+  };
 }
 
 // ============ Scenario 配置 ============
@@ -170,6 +204,16 @@ const scenarios = {
     expectedSuccess: null,
     expectedErrorCode: "invalid-argument",
     verifyDatabase: false
+  },
+  "withdraw-within-2h-lock-period": {
+    payload: { request_id: null },
+    preProcess: "create-pending-booking-within-lock",
+    expectedSuccess: null,
+    expectedErrorCode: "deadline-exceeded",
+    verifyDatabase: false,
+    checkRequestStatusUnchanged: true,
+    checkSlotStatusUnchanged: true,
+    expectedErrorMessageContains: "Pending booking requests can only be withdrawn at least 2 hours before start time."
   }
 };
 
@@ -426,6 +470,43 @@ async function main() {
     console.log(`  ✓ Created request without time_slot: ${requestRef.id}`);
     // 注意：此场景不创建 time_slot
 
+  } else if (currentScenario.preProcess === "create-pending-booking-within-lock") {
+    console.log("Pre-processing: creating a pending booking within 2-hour lock period...");
+
+    const bookingTime = getWithinLockPeriodBookingTime();
+    const bookingDate = bookingTime.date;
+    const startHour = bookingTime.start_time;
+    const endHour = bookingTime.end_time;
+
+    const requestRef = db.collection("request").doc("test-withdraw-within-lock-" + Date.now());
+    await requestRef.set({
+      member_id: aliceUid,
+      facility_id: "facility-001",
+      staff_id: "staff-001",
+      status: "pending",
+      date: bookingDate,
+      start_time: startHour,
+      end_time: endHour,
+      participant_ids: [],
+      completed_at: "",
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    currentScenario.payload.request_id = requestRef.id;
+    console.log(`  ✓ Created request within lock period: ${requestRef.id} (${bookingDate} ${startHour}-${endHour})`);
+
+    // 锁定 time_slot
+    const slotRef = db.collection("time_slot").doc(`facility-001-${bookingDate}-${startHour}`);
+    await slotRef.set({
+      facility_id: "facility-001",
+      date: bookingDate,
+      start_time: parseInt(startHour),
+      end_time: parseInt(endHour),
+      status: "locked",
+      request_id: requestRef.id,
+      created_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+    console.log(`  ✓ Locked time_slot: ${slotRef.id}`);
+
   } else if (currentScenario.preProcess === "create-pending-booking-inactive") {
     console.log("Pre-processing: creating a pending booking with suspended member...");
 
@@ -651,6 +732,18 @@ async function main() {
         console.log("Function Error:");
         console.log(`  Code: ${errorCode}`);
         console.log(`  Message: ${error.message}`);
+
+        // 额外验证 error message 内容（如果 scenario 有要求）
+        if (currentScenario.expectedErrorMessageContains) {
+          if (!error.message.includes(currentScenario.expectedErrorMessageContains)) {
+            console.error("");
+            console.error("ERROR: Error message does not contain expected text!");
+            console.error(`  Expected to contain: "${currentScenario.expectedErrorMessageContains}"`);
+            console.error(`  Got: "${error.message}"`);
+            process.exit(1);
+          }
+          console.log(`  ✓ Error message contains expected text`);
+        }
 
         console.log("");
         console.log("=".repeat(60));
