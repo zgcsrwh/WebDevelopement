@@ -8,6 +8,8 @@ import {
   getStaffRequestPageStatus,
   getStaffRequests,
   processBookingApproval,
+  getTimeSlotsByFacility,
+  getFacilities,
 } from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
 import { getErrorMessage } from "../../utils/errors";
@@ -87,6 +89,8 @@ export default function Requests() {
   });
   const [decision, setDecision] = useState(getInitialDecisionState());
   const [conflictSummary, setConflictSummary] = useState(null);
+  const [availableSlots, setAvailableSlots] = useState(null);
+  const [alternativeFacilities, setAlternativeFacilities] = useState(null);
   const [pageMessage, setPageMessage] = useState("");
   const [pageError, setPageError] = useState("");
   const [decisionError, setDecisionError] = useState("");
@@ -232,6 +236,94 @@ export default function Requests() {
     };
   }, [selectedItem, sessionProfile]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAvailableSlots() {
+      if (!selectedItem || selectedItem.pageStatus !== "pending") {
+        setAvailableSlots(null);
+        return;
+      }
+      try {
+        const slots = await getTimeSlotsByFacility(selectedItem.facilityId || selectedItem.raw?.facility_id, selectedItem.date);
+        if (!cancelled) {
+          const openSlots = slots.filter((slot) => String(slot.status || "").toLowerCase() === "open");
+          setAvailableSlots(openSlots);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAvailableSlots([]);
+        }
+      }
+    }
+
+    loadAvailableSlots();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedItem]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAlternativeFacilities() {
+      if (!selectedItem || selectedItem.pageStatus !== "pending") {
+        setAlternativeFacilities(null);
+        return;
+      }
+      try {
+        const targetFacilityId = selectedItem.facilityId || selectedItem.raw?.facility_id;
+        const startTime = `${selectedItem.startTime}`;
+
+        const allFacilities = await getFacilities(selectedItem.date);
+
+        if (cancelled) return;
+
+        const sportType = selectedItem.sportType;
+        const potentialAlternatives = allFacilities.filter((f) => {
+          return (
+            f.id !== targetFacilityId &&
+            f.sportType === sportType &&
+            f.status === "normal"
+          );
+        });
+
+        const verifiedAlternatives = [];
+        await Promise.all(
+          potentialAlternatives.map(async (fac) => {
+            try {
+              const slots = await getTimeSlotsByFacility(fac.id, selectedItem.date);
+              const hasMatchingSlot = slots.some(
+                (slot) =>
+                  (String(slot.start_time) === String(selectedItem.raw?.start_time || selectedItem.startTime) ||
+                    String(slot.startTime) === startTime) &&
+                  String(slot.status || "").toLowerCase() === "open"
+              );
+              if (hasMatchingSlot) {
+                verifiedAlternatives.push(fac);
+              }
+            } catch (err) {
+              // Skip facility if slots fail to load
+            }
+          })
+        );
+
+        if (cancelled) return;
+
+        setAlternativeFacilities(verifiedAlternatives);
+      } catch (error) {
+        if (!cancelled) {
+          setAlternativeFacilities([]);
+        }
+      }
+    }
+
+    loadAlternativeFacilities();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedItem]);
+
   function clearFilters() {
     setFilters({
       date: "",
@@ -360,7 +452,7 @@ export default function Requests() {
         columns={3}
         onClear={clearFilters}
       >
-          <FilterField id="staff-request-date" label="Date">
+          <FilterField id="staff-request-date" label="Activity Date">
             <input
               id="staff-request-date"
               type="date"
@@ -473,7 +565,7 @@ export default function Requests() {
                         <strong>{selectedItem.attendees}</strong>
                       </div>
                       <div>
-                        <span>Date</span>
+                        <span>Activity Date</span>
                         <strong>{selectedItem.date}</strong>
                       </div>
                       <div>
@@ -494,35 +586,71 @@ export default function Requests() {
                     </div>
 
                     {selectedItem.pageStatus === "pending" ? (
-                      <div className="staff-request-detail__actions">
-                        <button
-                          className="btn staff-request-detail__primaryAction"
-                          type="button"
-                          disabled={processingAction !== ""}
-                          onClick={handleApprove}
-                        >
-                          {processingAction === "accepted" ? "Approving..." : "Approve Booking"}
-                        </button>
-
-                        <div className="staff-request-detail__secondaryActions">
-                          <button
-                            className="btn-secondary"
-                            type="button"
-                            disabled={processingAction !== ""}
-                            onClick={() => openDecision("suggested")}
-                          >
-                            Suggest Alt.
-                          </button>
-                          <button
-                            className="btn-danger"
-                            type="button"
-                            disabled={processingAction !== ""}
-                            onClick={() => openDecision("rejected")}
-                          >
-                            Reject
-                          </button>
+                      <>
+                        <div className="staff-request-detail__section">
+                          <h3>Alternative Time Slots (Same Facility)</h3>
+                          {availableSlots === null ? (
+                            <p>Loading available slots...</p>
+                          ) : availableSlots.length > 0 ? (
+                            <div className="staff-request-detail__tags">
+                              {availableSlots.map((slot) => (
+                                <span key={slot.id || `${slot.date}-${slot.start_time}-${slot.end_time}`}>
+                                  {slot.timeLabel || `${slot.start_time} - ${slot.end_time}`}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p>No other available time slots for this date.</p>
+                          )}
                         </div>
-                      </div>
+
+                        <div className="staff-request-detail__section">
+                          <h3>Alternative Facilities (Same Time & Sport)</h3>
+                          {alternativeFacilities === null ? (
+                            <p>Loading alternative facilities...</p>
+                          ) : alternativeFacilities.length > 0 ? (
+                            <div className="staff-request-detail__tags">
+                              {alternativeFacilities.map((fac) => (
+                                <span key={fac.id}>
+                                  {fac.name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p>No alternative facilities available for this time slot.</p>
+                          )}
+                        </div>
+
+                        <div className="staff-request-detail__actions">
+                          <button
+                            className="btn staff-request-detail__primaryAction"
+                            type="button"
+                            disabled={processingAction !== ""}
+                            onClick={handleApprove}
+                          >
+                            {processingAction === "accepted" ? "Approving..." : "Approve Booking"}
+                          </button>
+
+                          <div className="staff-request-detail__secondaryActions">
+                            <button
+                              className="btn-secondary"
+                              type="button"
+                              disabled={processingAction !== ""}
+                              onClick={() => openDecision("suggested")}
+                            >
+                              Suggest Alt.
+                            </button>
+                            <button
+                              className="btn-danger"
+                              type="button"
+                              disabled={processingAction !== ""}
+                              onClick={() => openDecision("rejected")}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <div className="staff-request-detail__readonly">
                         <CalendarAlert />
