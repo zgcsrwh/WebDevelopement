@@ -1,0 +1,72 @@
+.staff-list-card {
+  padding: 20px 28px;
+  border: 1px solid #dbe4ea;
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(18, 33, 46, 0.05);
+  min-width: 0;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.staff-list-card:hover,
+.staff-list-card.is-active {
+  border-color: #718c9c;
+  box-shadow: 0 16px 32px rgba(18, 33, 46, 0.08);
+}
+
+.staff-list-card__row {
+  display: grid;
+  grid-template-columns: var(--card-grid-columns, repeat(6, 1fr));
+  gap: 16px;
+  align-items: center;
+}
+
+.staff-list-card__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.staff-list-card__label {
+  color: #8fa0ad;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.staff-list-card__value {
+  color: #18232c;
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.staff-list-card__cell .status-pill {
+  width: fit-content;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  min-height: 24px;
+}
+
+@media (max-width: 1080px) {
+  .staff-list-card__row {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 20px 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .staff-list-card__row {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .staff-list-card {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}

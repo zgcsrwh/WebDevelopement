@@ -1,4 +1,4 @@
-import "./StaffProfile.css";
+import "../../components/profile/StaffProfile.css";
 import OperatorProfilePage from "../../components/profile/OperatorProfilePage";
 
 export default function StaffProfile() {

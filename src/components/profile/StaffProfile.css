@@ -8,6 +8,7 @@
   margin: 0 auto;
   border: 1px solid #d6e3ec;
   border-radius: 34px;
+  border-radius: 24px;
   background: #ffffff;
   box-shadow: 0 24px 48px rgba(92, 124, 146, 0.1);
   overflow: hidden;
@@ -17,7 +18,9 @@
   display: flex;
   align-items: center;
   gap: 34px;
-  padding: 40px 44px;
+  padding: 30px 34px;
+  gap: 24px;
+  padding: 24px 32px;
   border-bottom: 1px solid #e7eef4;
 }
 
@@ -27,13 +30,16 @@
 
 .staff-profile__heroAvatarLink {
   position: relative;
-  width: 132px;
-  height: 132px;
+  width: 120px;
+  height: 120px;
+  width: 90px;
+  height: 90px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid #ccd9e1;
   border-radius: 30px;
+  border-radius: 24px;
   background: linear-gradient(180deg, #eef5f8 0%, #dfeaf0 100%);
   box-shadow: 0 14px 28px rgba(34, 54, 66, 0.12);
 }
@@ -45,11 +51,14 @@
 }
 
 .staff-profile__heroAvatarFrame {
-  width: 112px;
-  height: 112px;
+  width: 100px;
+  height: 100px;
+  width: 74px;
+  height: 74px;
   display: grid;
   place-items: center;
   border-radius: 30px;
+  border-radius: 20px;
   background: linear-gradient(135deg, #547180, #2f4b59);
   border: 3px solid rgba(255, 255, 255, 0.94);
 }
@@ -66,7 +75,8 @@
   height: 100%;
   color: #ffffff;
   font-family: var(--font-heading);
-  font-size: 3.4rem;
+  font-size: 3.0rem;
+  font-size: 2.2rem;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -80,6 +90,9 @@
   right: -8px;
   bottom: -6px;
   min-height: 26px;
+  right: -6px;
+  bottom: -4px;
+  min-height: 22px;
   padding: 0 10px;
   display: inline-flex;
   align-items: center;
@@ -89,6 +102,7 @@
   border: 2px solid #ffffff;
   color: #ffffff;
   font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -103,6 +117,7 @@
   color: #182c3c;
   font-family: var(--font-heading);
   font-size: 3rem;
+  font-size: 2.2rem;
   font-weight: 800;
   line-height: 1.06;
 }
@@ -111,14 +126,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
+  min-height: 40px;
   margin-top: 16px;
   padding: 0 20px;
+  min-height: 32px;
+  margin-top: 10px;
+  padding: 0 14px;
   border-radius: 16px;
   background: #eef5f9;
   border: 1px solid #cfe0eb;
   color: #0d6caf;
   font-size: 1.15rem;
+  font-size: 0.95rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -132,6 +151,7 @@
 
 .staff-profile__section {
   padding: 34px 44px;
+  padding: 24px 32px;
   border-bottom: 1px solid #edf3f7;
 }
 
@@ -141,12 +161,14 @@
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 28px;
+  margin-bottom: 20px;
 }
 
 .staff-profile__sectionTitle {
   display: inline-flex;
   align-items: center;
   gap: 14px;
+  gap: 10px;
   color: #516878;
 }
 
@@ -154,12 +176,15 @@
   margin: 0;
   color: #162938;
   font-size: 2.1rem;
+  font-size: 1.6rem;
   font-weight: 800;
 }
 
 .staff-profile__toggleButton {
   width: 50px;
   height: 50px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -179,12 +204,14 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px 32px;
+  gap: 18px 24px;
 }
 
 .staff-profile__field {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  gap: 6px;
 }
 
 .staff-profile__field--full {
@@ -194,6 +221,7 @@
 .staff-profile__field span {
   color: #607787;
   font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 800;
 }
 
@@ -201,11 +229,15 @@
   width: 100%;
   min-height: 62px;
   padding: 0 18px;
+  min-height: 46px;
+  padding: 0 14px;
   border: 1px solid #d5e3ec;
   border-radius: 18px;
+  border-radius: 14px;
   background: #ffffff;
   color: #182f40;
   font-size: 1rem;
+  font-size: 0.95rem;
   box-sizing: border-box;
 }
 
@@ -229,12 +261,14 @@
   justify-content: space-between;
   gap: 24px;
   padding: 28px 44px 36px;
+  padding: 24px 32px 30px;
 }
 
 .staff-profile__actionButtons {
   display: flex;
   align-items: center;
   gap: 16px;
+  gap: 12px;
 }
 
 .staff-profile__button,
@@ -242,11 +276,15 @@
   min-height: 60px;
   padding: 0 28px;
   border-radius: 18px;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: 14px;
   border: 1px solid #6a8394;
   background: #698394;
   color: #ffffff;
   font-family: var(--font-body);
   font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 14px 28px rgba(90, 118, 137, 0.18);
@@ -330,6 +368,7 @@
   background: #ffffff;
   color: #708695;
   font-size: 1.1rem;
+  font-size: 1rem;
   text-align: center;
 }
 
@@ -347,15 +386,18 @@
   width: min(540px, 100%);
   border: 1px solid #d5e3ec;
   border-radius: 28px;
+  border-radius: 20px;
   background: #ffffff;
   box-shadow: 0 28px 56px rgba(45, 68, 84, 0.2);
   padding: 28px;
+  padding: 24px;
 }
 
 .staff-profile__modalHeader h2 {
   margin: 0;
   color: #182d3d;
   font-size: 2rem;
+  font-size: 1.6rem;
   font-weight: 800;
 }
 

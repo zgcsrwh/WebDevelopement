@@ -4,6 +4,7 @@ import "../pageStyles.css";
 import "./CheckIn.css";
 import {
   checkInBooking,
+  getAllFacilityFilterOptions,
   getStaffCheckInPageStatus,
   getStaffCheckIns,
   isBookingCheckInOpen,
@@ -15,16 +16,19 @@ import { displayStatus, statusTone } from "../../utils/presentation";
 import { formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import PageLayout from "../../components/common/PageLayout";
+import StaffListCard from "../../components/staff/StaffListCard";
 
 const ALL_STATUS_VALUE = "all";
-const CHECK_IN_PAGE_STATUSES = new Set(["accepted", "cancelled", "no_show", "completed"]);
+const CHECK_IN_PAGE_STATUSES = new Set(["accepted"]);
+
+const todayKey = new Date().toISOString().slice(0, 10);
 
 function formatDateLabel(value = "") {
   if (!value) {
     return "";
   }
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  //const todayKey = new Date().toISOString().slice(0, 10);
   if (value === todayKey) {
     return "Today";
   }
@@ -84,27 +88,6 @@ function getStatusBanner(item, canCheckIn) {
     };
   }
 
-  if (item.pageStatus === "completed") {
-    return {
-      tone: "completed",
-      title: "Completed",
-      body: "This booking has already been completed.",
-    };
-  }
-
-  if (item.pageStatus === "cancelled") {
-    return {
-      tone: "cancelled",
-      title: "Cancelled",
-      body: "This booking was cancelled and can no longer be checked in.",
-    };
-  }
-
-  return {
-    tone: "no_show",
-    title: "No-show",
-    body: "This booking missed the valid check-in window and can no longer be confirmed.",
-  };
 }
 
 function getHistoryEntries(item, pageStatus) {
@@ -118,44 +101,23 @@ function getHistoryEntries(item, pageStatus) {
     entries.push(`Staff last updated this booking on ${formatStaffDateTime(item.completedAt)}`);
   }
 
-  if (pageStatus === "completed") {
-    entries.push("This booking has already been completed.");
-  }
-
-  if (pageStatus === "cancelled") {
-    entries.push("This booking was cancelled before check-in.");
-  }
-
-  if (pageStatus === "no_show") {
-    entries.push("The valid check-in window expired before the member was confirmed on arrival.");
-  }
-
   return entries;
 }
 
 function getReadonlyMessage(item) {
-  if (item.pageStatus === "completed") {
-    return "This booking has already been completed and is read-only.";
-  }
-
-  if (item.pageStatus === "cancelled") {
-    return "This booking was cancelled and can no longer be checked in.";
-  }
-
-  if (item.pageStatus === "no_show") {
-    return "This booking missed the valid check-in window and can no longer be confirmed.";
-  }
-
   return "This booking cannot be checked in from the current state.";
 }
 
 export default function CheckIn() {
   const { sessionProfile } = useAuth();
   const [items, setItems] = useState([]);
+  const [facilityOptions, setFacilityOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState("");
   const [filters, setFilters] = useState({
     search: "",
+    requestId: "",
+    facility: "",
     date: "",
     status: ALL_STATUS_VALUE,
   });
@@ -207,12 +169,16 @@ export default function CheckIn() {
     async function loadPage() {
       setLoading(true);
       try {
-        const nextItems = sortCheckInItems(await getStaffCheckIns(sessionProfile));
+        const [nextItems, nextFacilities] = await Promise.all([
+          getStaffCheckIns(sessionProfile),
+          getAllFacilityFilterOptions(),
+        ]);
         if (!active) {
           return;
         }
 
         setItems(nextItems);
+        setFacilityOptions(nextFacilities);
         setSelectedId("");
         setPageError("");
       } catch (loadError) {
@@ -271,16 +237,20 @@ export default function CheckIn() {
 
   const visibleItems = useMemo(() => {
     const normalizedSearch = filters.search.trim().toLowerCase();
+    const normalizedRequestId = filters.requestId.trim().toLowerCase();
 
     return sortCheckInItems(
       pageItems.filter((item) => {
         const searchMatch = !normalizedSearch || item.memberName.toLowerCase().includes(normalizedSearch);
-        const dateMatch = !filters.date || item.date === filters.date;
+        const requestIdMatch = !normalizedRequestId || item.id.toLowerCase().includes(normalizedRequestId);
+        const facilityMatch = !filters.facility || item.facilityId === filters.facility || item.facilityName === filters.facility;
+        // Only show bookings for today
+        const dateMatch = item.date === todayKey;
         const statusMatch = filters.status === ALL_STATUS_VALUE || item.pageStatus === filters.status;
-        return searchMatch && dateMatch && statusMatch;
+        return searchMatch && requestIdMatch && facilityMatch && statusMatch;
       }),
     );
-  }, [filters.date, filters.search, filters.status, pageItems]);
+  }, [filters.search, filters.requestId, filters.facility, filters.status, pageItems]);
 
   useEffect(() => {
     if (!visibleItems.length) {
@@ -305,6 +275,8 @@ export default function CheckIn() {
   function clearFilters() {
     setFilters({
       search: "",
+      requestId: "",
+      facility: "",
       date: "",
       status: ALL_STATUS_VALUE,
     });
@@ -376,39 +348,38 @@ export default function CheckIn() {
             />
           </FilterField>
 
-          <FilterField id="staff-checkin-date" label="Date">
+          <FilterField id="staff-checkin-requestId" label="Request ID">
             <input
-              id="staff-checkin-date"
-              type="date"
-              min={staffCreatedDate}
-              max={maxFilterDate}
-              value={filters.date}
+              id="staff-checkin-requestId"
+              type="text"
+              value={filters.requestId}
               onChange={(event) => {
-                setFilters((previous) => ({ ...previous, date: event.target.value }));
+                setFilters((previous) => ({ ...previous, requestId: event.target.value }));
                 setPageError("");
                 setPageMessage("");
               }}
+              placeholder="Search Request ID"
             />
           </FilterField>
 
-          <FilterField id="staff-checkin-status" label="Status">
+          <FilterField id="staff-checkin-facility" label="Facility">
             <select
-              id="staff-checkin-status"
-              value={filters.status}
+              id="staff-checkin-facility"
+              value={filters.facility}
               onChange={(event) => {
-                setFilters((previous) => ({ ...previous, status: event.target.value }));
+                setFilters((previous) => ({ ...previous, facility: event.target.value }));
                 setPageError("");
                 setPageMessage("");
               }}
             >
-              <option value={ALL_STATUS_VALUE}>All Status</option>
-              <option value="accepted">accepted</option>
-              <option value="cancelled">cancelled</option>
-              <option value="no_show">no_show</option>
-              <option value="completed">completed</option>
+              <option value="">All Facilities</option>
+              {facilityOptions.map((facility) => (
+                <option key={facility.id} value={facility.id}>{facility.name}</option>
+              ))}
             </select>
           </FilterField>
       </FilterPanel>
+
 
       <section className="staff-checkin-layout">
         <div className="staff-checkin-list">
@@ -418,40 +389,109 @@ export default function CheckIn() {
             </div>
           ) : visibleItems.length > 0 ? (
             visibleItems.map((item) => (
-              <article
-                key={item.id}
-                className={`staff-checkin-card ${selectedItem?.id === item.id ? "is-active" : ""}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => toggleSelection(item.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    toggleSelection(item.id);
-                  }
-                }}
-              >
-                <div className="staff-checkin-card__header">
-                  <div className="staff-checkin-card__titleBlock">
-                    <h3>{item.facilityName}</h3>
-                    <p className="staff-checkin-card__member">{item.memberName}</p>
-                  </div>
+              <div key={item.id} className="staff-checkin-group">
+                <StaffListCard
+                  isActive={selectedItem?.id === item.id}
+                  onClick={() => toggleSelection(item.id)}
+                  gridTemplateColumns="2fr 1.8fr 1fr 0.7fr 1fr 1fr"
+                  cells={[
+                    { label: "Facility", value: item.facilityName, title: item.facilityName },
+                    { label: "Request ID", value: item.id, title: item.id },
+                    { label: "Member", value: item.memberName, title: item.memberName },
+                    { label: "Date", value: formatDateLabel(item.date) },
+                    { label: "Time", value: `${item.startTime} - ${item.endTime}` },
+                    { label: "Status", value: displayStatus(item.pageStatus), isStatus: true, statusTone: statusTone(item.pageStatus) },
+                  ]}
+                />
 
-                  <div className="staff-checkin-card__meta">
-                    <p className="staff-checkin-card__requestId">Request ID: {item.id}</p>
-                    <span className={`status-pill ${statusTone(item.pageStatus)}`}>
-                      {displayStatus(item.pageStatus)}
-                    </span>
-                  </div>
-                </div>
+                {selectedItem?.id === item.id ? (
+                  <div className="staff-checkin-detail__card">
+                    <div className="staff-checkin-detail__head">
+                      <div>
+                        <h2>{selectedItem.facilityName}</h2>
+                        <p className="staff-checkin-detail__requestId">Request ID: {selectedItem.id}</p>
+                      </div>
+                      <span className={`status-pill ${statusTone(selectedItem.pageStatus)}`}>
+                        {displayStatus(selectedItem.pageStatus)}
+                      </span>
+                    </div>
 
-                <p className="staff-checkin-card__time">
-                  <Clock3 size={18} />
-                  <span>
-                    {formatDateLabel(item.date)}, {item.startTime} - {item.endTime}
-                  </span>
-                </p>
-              </article>
+                    <div className={`staff-checkin-detail__banner is-${selectedItem.pageStatus}`}>
+                      {["accepted", "completed"].includes(selectedItem.pageStatus) ? (
+                        <CheckCircle2 size={24} />
+                      ) : (
+                        <AlertTriangle size={24} />
+                      )}
+                      <div>
+                        <strong>{getStatusBanner(selectedItem, canCheckIn).title}</strong>
+                        <p>{getStatusBanner(selectedItem, canCheckIn).body}</p>
+                      </div>
+                    </div>
+
+                    <div className="staff-checkin-detail__grid">
+                      <div>
+                        <span>Member Name</span>
+                        <strong>{selectedItem.memberName}</strong>
+                      </div>
+                      <div>
+                        <span>Attendees</span>
+                        <strong>{selectedItem.attendees} People</strong>
+                      </div>
+                      <div>
+                        <span>Date</span>
+                        <strong>{formatDateLabel(selectedItem.date)}</strong>
+                      </div>
+                      <div>
+                        <span>Time Slot</span>
+                        <strong>
+                          {selectedItem.startTime} - {selectedItem.endTime}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="staff-checkin-detail__section">
+                      <h3>Participants</h3>
+                      <div className="staff-checkin-detail__tags">
+                        {getParticipants(selectedItem).map((participant) => (
+                          <span key={participant}>{participant}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="staff-checkin-detail__section">
+                      <h3>Order History</h3>
+                      <ul className="staff-checkin-detail__history">
+                        {getHistoryEntries(selectedItem, selectedItem.pageStatus).map((entry) => (
+                          <li key={entry}>{entry}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {selectedItem.pageStatus === "accepted" ? (
+                      <div className="staff-checkin-detail__actions">
+                        <button
+                          className="btn staff-checkin-detail__action"
+                          type="button"
+                          disabled={checkingInId !== "" || !canCheckIn}
+                          onClick={handleConfirmArrival}
+                        >
+                          {checkingInId === selectedItem.id ? "Confirming..." : "Confirm Arrival"}
+                        </button>
+                        {!canCheckIn ? (
+                          <span className="staff-checkin-detail__note">
+                            Check-in is available from 15 minutes before the session starts.
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="staff-checkin-detail__readonly">
+                        <Clock3 size={18} />
+                        <span>{getReadonlyMessage(selectedItem)}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             ))
           ) : (
             <div className="staff-checkin-empty">
@@ -459,100 +499,6 @@ export default function CheckIn() {
             </div>
           )}
         </div>
-
-        <aside className="staff-checkin-detail">
-          {selectedItem ? (
-            <div className="staff-checkin-detail__card">
-              <div className="staff-checkin-detail__head">
-                <div>
-                  <h2>{selectedItem.facilityName}</h2>
-                  <p className="staff-checkin-detail__requestId">Request ID: {selectedItem.id}</p>
-                </div>
-                <span className={`status-pill ${statusTone(selectedItem.pageStatus)}`}>
-                  {displayStatus(selectedItem.pageStatus)}
-                </span>
-              </div>
-
-              <div className={`staff-checkin-detail__banner is-${selectedItem.pageStatus}`}>
-                {["accepted", "completed"].includes(selectedItem.pageStatus) ? (
-                  <CheckCircle2 size={24} />
-                ) : (
-                  <AlertTriangle size={24} />
-                )}
-                <div>
-                  <strong>{getStatusBanner(selectedItem, canCheckIn).title}</strong>
-                  <p>{getStatusBanner(selectedItem, canCheckIn).body}</p>
-                </div>
-              </div>
-
-              <div className="staff-checkin-detail__grid">
-                <div>
-                  <span>Member Name</span>
-                  <strong>{selectedItem.memberName}</strong>
-                </div>
-                <div>
-                  <span>Attendees</span>
-                  <strong>{selectedItem.attendees} People</strong>
-                </div>
-                <div>
-                  <span>Date</span>
-                  <strong>{formatDateLabel(selectedItem.date)}</strong>
-                </div>
-                <div>
-                  <span>Time Slot</span>
-                  <strong>
-                    {selectedItem.startTime} - {selectedItem.endTime}
-                  </strong>
-                </div>
-              </div>
-
-              <div className="staff-checkin-detail__section">
-                <h3>Participants</h3>
-                <div className="staff-checkin-detail__tags">
-                  {getParticipants(selectedItem).map((participant) => (
-                    <span key={participant}>{participant}</span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="staff-checkin-detail__section">
-                <h3>Order History</h3>
-                <ul className="staff-checkin-detail__history">
-                  {getHistoryEntries(selectedItem, selectedItem.pageStatus).map((entry) => (
-                    <li key={entry}>{entry}</li>
-                  ))}
-                </ul>
-              </div>
-
-              {selectedItem.pageStatus === "accepted" ? (
-                <div className="staff-checkin-detail__actions">
-                  <button
-                    className="btn staff-checkin-detail__action"
-                    type="button"
-                    disabled={checkingInId !== "" || !canCheckIn}
-                    onClick={handleConfirmArrival}
-                  >
-                    {checkingInId === selectedItem.id ? "Confirming..." : "Confirm Arrival"}
-                  </button>
-                  {!canCheckIn ? (
-                    <span className="staff-checkin-detail__note">
-                      Check-in is available from 15 minutes before the session starts.
-                    </span>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="staff-checkin-detail__readonly">
-                  <Clock3 size={18} />
-                  <span>{getReadonlyMessage(selectedItem)}</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="staff-checkin-empty">
-              <p>Select a booking card to preview the check-in detail panel, or click the same card again to hide it.</p>
-            </div>
-          )}
-        </aside>
       </section>
     </PageLayout>
   );

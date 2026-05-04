@@ -34,11 +34,11 @@ export function toTitleText(value = "") {
 
 export function displayStatus(value = "") {
   const normalized = String(value).toLowerCase();
-
+  
   const labels = {
-    accepted: "Booked",
+    accepted: "Upcoming",
     rejected: "Rejected",
-    pending: "Pending Approval",
+    pending: "Pending",
     cancelled: "Cancelled",
     completed: "Completed",
     no_show: "No Show",
@@ -54,9 +54,8 @@ export function displayStatus(value = "") {
     deactivated: "Deactivated",
     deactivate: "Deactivated",
     inactive: "Inactive",
-    suggested: "Suggested Alternative",
+    suggested: "Alternative Suggested",
     invalidated: "Invalidated",
   };
-
   return labels[normalized] || toTitleText(normalized || "unknown");
 }

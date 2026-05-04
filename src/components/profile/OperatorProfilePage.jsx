@@ -336,6 +336,34 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
     );
   }
 
+  function formatDateTime(value) {
+  if (!value) {
+    return "Not available";
+  }
+
+  if (typeof value === "object" && value !== null) {
+    const seconds = value.seconds ?? value._seconds;
+    const nanoseconds = value.nanoseconds ?? value._nanoseconds ?? 0;
+    if (typeof seconds === "number") {
+      const milliseconds = seconds * 1000 + Math.floor(nanoseconds / 1000000);
+      return formatDateTime(new Date(milliseconds));
+    }
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const hours = String(parsed.getHours()).padStart(2, "0");
+  const minutes = String(parsed.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+
   return (
     <div className="staff-profile-page">
       <section className={`staff-profile staff-profile--${roleVariant}`}>
@@ -365,7 +393,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
         <section className="staff-profile__section">
           <div className="staff-profile__sectionHeader">
             <div className="staff-profile__sectionTitle">
-              <UserRound size={24} strokeWidth={2} />
+              <UserRound size={20} strokeWidth={2} />
               <h2>Personal Information</h2>
             </div>
           </div>
@@ -374,17 +402,28 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
 
           <div className="staff-profile__grid">
             <label className="staff-profile__field">
-              <span>Full Name (name)</span>
+              <span>Full Name</span>
               <input type="text" value={draftProfile.name} readOnly disabled />
             </label>
 
             <label className="staff-profile__field">
-              <span>Date of Birth (date_of_birth)</span>
+              <span>Date of Birth</span>
               <input type="text" value={formatDateDisplay(draftProfile.dateOfBirth)} readOnly disabled />
             </label>
 
+
+            <label className="staff-profile__field">
+              <span>Email Address</span>
+              <input type="text" value={draftProfile.email} readOnly disabled />
+            </label>
+
+            <label className="staff-profile__field">
+              <span>Join Date</span>
+              <input type="text" value={formatDateTime(draftProfile.createdAt)} readOnly disabled />
+            </label>
+
             <label className="staff-profile__field staff-profile__field--full">
-              <span>Address (address)</span>
+              <span>Address</span>
               <input
                 type="text"
                 value={draftProfile.address}
@@ -398,17 +437,13 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
               {renderFieldError(fieldErrors.address)}
             </label>
 
-            <label className="staff-profile__field staff-profile__field--full">
-              <span>Email Address (Cannot be changed)</span>
-              <input type="text" value={draftProfile.email} readOnly disabled />
-            </label>
           </div>
         </section>
 
         <section className="staff-profile__section">
           <div className="staff-profile__sectionHeader">
             <div className="staff-profile__sectionTitle">
-              <LockKeyhole size={24} strokeWidth={2} />
+              <LockKeyhole size={20} strokeWidth={2} />
               <h2>Security (Change Password)</h2>
             </div>
 

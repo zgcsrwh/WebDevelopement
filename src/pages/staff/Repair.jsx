@@ -6,10 +6,11 @@ import { getAllFacilityFilterOptions } from "../../services/bookingService";
 import { getRepairTickets, updateTicketStatus } from "../../services/reportService";
 import { useAuth } from "../../provider/AuthContext";
 import { getErrorMessage } from "../../utils/errors";
-import { statusTone } from "../../utils/presentation";
+import { displayStatus, statusTone } from "../../utils/presentation";
 import { formatStaffCardTimestamp, formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import PageLayout from "../../components/common/PageLayout";
+import StaffListCard from "../../components/staff/StaffListCard";
 
 function sortRepairItems(items = []) {
   return [...items].sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
@@ -18,11 +19,11 @@ function sortRepairItems(items = []) {
 function getRepairStatusLabel(status = "") {
   const normalized = String(status || "").toLowerCase();
   if (normalized === "pending") {
-    return "pending";
+    return "Pending";
   }
 
   if (normalized === "resolved") {
-    return "resolved";
+    return "Resolved";
   }
 
   return normalized || "unknown";
@@ -39,6 +40,7 @@ export default function Repair() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState("");
   const [filters, setFilters] = useState({
+    ticketId: "",
     facility: "",
     date: "",
     status: "",
@@ -89,18 +91,21 @@ export default function Repair() {
   }, [sessionProfile]);
 
   const visibleItems = useMemo(() => {
+    const normalizedTicketId = filters.ticketId.trim().toLowerCase();
+
     return sortRepairItems(
       items.filter((item) => {
+        const ticketIdMatch = !normalizedTicketId || item.id.toLowerCase().includes(normalizedTicketId);
         const facilityMatch =
           !filters.facility ||
           item.facilityId === filters.facility ||
           item.facility === filters.facility;
         const dateMatch = !filters.date || toDateInputValue(item.createdAt) === filters.date;
         const statusMatch = !filters.status || item.status === filters.status;
-        return facilityMatch && dateMatch && statusMatch;
+        return ticketIdMatch && facilityMatch && dateMatch && statusMatch;
       }),
     );
-  }, [filters.date, filters.facility, filters.status, items]);
+  }, [filters.ticketId, filters.date, filters.facility, filters.status, items]);
 
   useEffect(() => {
     if (selectedId && !visibleItems.some((item) => item.id === selectedId)) {
@@ -115,6 +120,7 @@ export default function Repair() {
 
   function clearFilters() {
     setFilters({
+      ticketId: "",
       facility: "",
       date: "",
       status: "",
@@ -179,9 +185,24 @@ export default function Repair() {
 
       <FilterPanel
         className="staff-repair-filters"
-        columns={3}
+        columns={4}
         onClear={clearFilters}
       >
+          <FilterField id="staff-repair-ticketId" label="Ticket ID">
+            <input
+              id="staff-repair-ticketId"
+              type="text"
+              value={filters.ticketId}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, ticketId: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+                setDetailError("");
+              }}
+              placeholder="Search Ticket ID"
+            />
+          </FilterField>
+
           <FilterField id="staff-repair-facility" label="Facility">
             <select
               id="staff-repair-facility"
@@ -230,10 +251,11 @@ export default function Repair() {
               }}
             >
               <option value="">All Status</option>
-              <option value="pending">pending</option>
-              <option value="resolved">resolved</option>
+              <option value="pending">Pending</option>
+              <option value="resolved">Resolved</option>
             </select>
           </FilterField>
+
       </FilterPanel>
 
       <section className="staff-repair-layout">
@@ -244,32 +266,78 @@ export default function Repair() {
             </div>
           ) : visibleItems.length > 0 ? (
             visibleItems.map((item) => (
-              <article
-                key={item.id}
-                className={`staff-repair-card ${selectedItem?.id === item.id ? "is-active" : ""}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => toggleSelection(item.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    toggleSelection(item.id);
-                  }
-                }}
-              >
-                <div className="staff-repair-card__header">
-                  <h3>{item.facility}</h3>
-                  <div className="staff-repair-card__headerMeta">
-                    <p className="staff-repair-card__ticketId">Ticket ID: {item.id}</p>
-                    <span className={`status-pill ${statusTone(item.status)}`}>{getRepairStatusLabel(item.status)}</span>
-                  </div>
-                </div>
+              <div key={item.id} className="staff-repair-group">
+                <StaffListCard
+                  isActive={selectedItem?.id === item.id}
+                  onClick={() => toggleSelection(item.id)}
+                  gridTemplateColumns="2.4fr 1.8fr 0.8fr 0.8fr 0.8fr 0.8fr"
+                  cells={[
+                    { label: "Facility", value: item.facility, title: item.facility },
+                    { label: "Ticket ID", value: item.id, title: item.id },
+                    { label: "Member", value: item.memberName, title: item.memberName },
+                    { label: "Type", value: displayStatus(item.type), title: item.type },
+                    { label: "Status", value: getRepairStatusLabel(item.status), isStatus: true, statusTone: statusTone(item.status) },
+                    { label: "Submitted", value: formatStaffCardTimestamp(item.createdAt), title: formatStaffCardTimestamp(item.createdAt) },
+                  ]}
+                />
 
-                <p className="staff-repair-card__summary">{item.description}</p>
-                <p className="staff-repair-card__footer">
-                  By: {item.memberName} / {formatStaffCardTimestamp(item.createdAt)}
-                </p>
-              </article>
+                {selectedItem?.id === item.id ? (
+                  <div className="staff-repair-detail__card">
+                    {detailError ? (
+                      <section className="staff-repair-inlineError">
+                        <strong>Cannot continue</strong>
+                        <p>{detailError}</p>
+                      </section>
+                    ) : null}
+
+                    <div className="staff-repair-detail__head">
+                      <div>
+                        <h2>{selectedItem.facility}</h2>
+                        <p className="staff-repair-detail__ticketId">Ticket ID: {selectedItem.id}</p>
+                      </div>
+                      <span className={`status-pill ${statusTone(selectedItem.status)}`}>{getRepairStatusLabel(selectedItem.status)}</span>
+                    </div>
+
+                    <div className="staff-repair-detail__section">
+                      <h3>Issue Description</h3>
+                      <p>{selectedItem.description}</p>
+                    </div>
+
+                    <div className="staff-repair-detail__grid">
+                      <div>
+                        <span>Reported By</span>
+                        <strong>{selectedItem.memberName}</strong>
+                      </div>
+                      <div>
+                        <span>Submitted At</span>
+                        <strong>{formatStaffDateTime(selectedItem.createdAt)}</strong>
+                      </div>
+                      <div>
+                        <span>Resolved At</span>
+                        <strong>{getResolvedAtLabel(selectedItem)}</strong>
+                      </div>
+                    </div>
+
+                    {selectedItem.status === "pending" ? (
+                      <div className="staff-repair-detail__actions">
+                        <button
+                          className="btn staff-repair-detail__action"
+                          type="button"
+                          disabled={resolvingId !== ""}
+                          onClick={handleResolve}
+                        >
+                          {resolvingId === selectedItem.id ? "Updating..." : "Mark as Resolved"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="staff-repair-detail__readonly">
+                        <CheckCircle2 size={18} />
+                        <span>This ticket has been fully resolved.</span>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             ))
           ) : (
             <div className="staff-repair-empty">
@@ -277,69 +345,6 @@ export default function Repair() {
             </div>
           )}
         </div>
-
-        <aside className="staff-repair-detail">
-          {selectedItem ? (
-            <div className="staff-repair-detail__card">
-              {detailError ? (
-                <section className="staff-repair-inlineError">
-                  <strong>Cannot continue</strong>
-                  <p>{detailError}</p>
-                </section>
-              ) : null}
-
-              <div className="staff-repair-detail__head">
-                <div>
-                  <h2>{selectedItem.facility}</h2>
-                  <p className="staff-repair-detail__ticketId">Ticket ID: {selectedItem.id}</p>
-                </div>
-                <span className={`status-pill ${statusTone(selectedItem.status)}`}>{getRepairStatusLabel(selectedItem.status)}</span>
-              </div>
-
-              <div className="staff-repair-detail__section">
-                <h3>Issue Description</h3>
-                <p>{selectedItem.description}</p>
-              </div>
-
-              <div className="staff-repair-detail__grid">
-                <div>
-                  <span>Reported By</span>
-                  <strong>{selectedItem.memberName}</strong>
-                </div>
-                <div>
-                  <span>Submitted At</span>
-                  <strong>{formatStaffDateTime(selectedItem.createdAt)}</strong>
-                </div>
-                <div>
-                  <span>Resolved At</span>
-                  <strong>{getResolvedAtLabel(selectedItem)}</strong>
-                </div>
-              </div>
-
-              {selectedItem.status === "pending" ? (
-                <div className="staff-repair-detail__actions">
-                  <button
-                    className="btn staff-repair-detail__action"
-                    type="button"
-                    disabled={resolvingId !== ""}
-                    onClick={handleResolve}
-                  >
-                    {resolvingId === selectedItem.id ? "Updating..." : "Mark as Resolved"}
-                  </button>
-                </div>
-              ) : (
-                <div className="staff-repair-detail__readonly">
-                  <CheckCircle2 size={18} />
-                  <span>This ticket has been fully resolved.</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="staff-repair-empty">
-              <p>Select a repair ticket to preview its detail panel, or click the same card again to hide it.</p>
-            </div>
-          )}
-        </aside>
       </section>
     </PageLayout>
   );

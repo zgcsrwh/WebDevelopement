@@ -11,11 +11,12 @@ import {
 } from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
 import { getErrorMessage } from "../../utils/errors";
-import { statusTone } from "../../utils/presentation";
+import { displayStatus, statusTone } from "../../utils/presentation";
 import { formatStaffCardTimestamp, formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 import { hasMeaningfulText } from "../../utils/text";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import PageLayout from "../../components/common/PageLayout";
+import StaffListCard from "../../components/staff/StaffListCard";
 
 const STAFF_REQUEST_STATUSES = ["pending", "accepted", "rejected", "alternative suggested", "cancelled"];
 const STAFF_REQUEST_STATUS_SET = new Set(STAFF_REQUEST_STATUSES);
@@ -406,7 +407,7 @@ export default function Requests() {
               <option value="">All Status</option>
               {STATUS_FILTER_OPTIONS.map((status) => (
                 <option key={status.value} value={status.value}>
-                  {status.label}
+                  {displayStatus(status.label)}
                 </option>
               ))}
             </select>
@@ -421,35 +422,116 @@ export default function Requests() {
             </div>
           ) : visibleItems.length > 0 ? (
             visibleItems.map((item) => (
-              <article
-                key={item.id}
-                className={`staff-request-card ${selectedItem?.id === item.id ? "is-active" : ""}`}
-                onClick={() => toggleSelection(item.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    toggleSelection(item.id);
-                  }
-                }}
-              >
-                <div className="staff-request-card__top">
-                  <h3>{item.facilityName}</h3>
-                  <div className="staff-request-card__badges">
-                    <span className={`status-pill ${statusTone(item.pageStatus)}`}>{item.pageStatus}</span>
-                    <span className="staff-request-card__timeChip">
-                      {toDateLabel(item.date)}, {item.startTime} - {item.endTime}
-                    </span>
-                  </div>
-                </div>
+              <div key={item.id} className="staff-request-group">
+                <StaffListCard
+                  isActive={selectedItem?.id === item.id}
+                  onClick={() => toggleSelection(item.id)}
+                  gridTemplateColumns="2.2fr 1.2fr 0.6fr 0.7fr 1fr 1fr"
+                  cells={[
+                    { label: "Facility", value: item.facilityName, title: item.facilityName },
+                    { label: "Member / Attendees", value: `${item.memberName} / ${item.attendees}`, title: `${item.memberName} / ${item.attendees}` },
+                    { label: "Activity Date", value: toDateLabel(item.date) },
+                    { label: "Time", value: `${item.startTime} - ${item.endTime}` },
+                    { label: "Status", value: displayStatus(item.pageStatus), isStatus: true, statusTone: statusTone(item.pageStatus) },
+                    { label: "Submitted Date", value: getCardFooterLabel(item), title: getCardFooterLabel(item) },
+                  ]}
+                />
 
-                <p className="staff-request-card__meta">
-                  {item.memberName} / {item.attendees} Attendees
-                </p>
-                <p className="staff-request-card__summary">{item.activityDescription}</p>
-                <p className="staff-request-card__footer">{getCardFooterLabel(item)}</p>
-              </article>
+                {selectedItem?.id === item.id ? (
+                  <div className="staff-request-detail__card">
+                    <div className="staff-request-detail__head">
+                      <h2>{selectedItem.facilityName}</h2>
+                        <p className="staff-request-detail__requestId">{getDetailTimestampLabel(selectedItem)}</p>
+                    </div>
+
+                    {conflictSummary ? (
+                      <div
+                        className={`staff-request-detail__alert ${
+                          conflictSummary.state === "available" ? "is-available" : "is-conflict"
+                        }`}
+                      >
+                        {conflictSummary.state === "available" ? <CheckCircle2 size={24} /> : <AlertTriangle size={24} />}
+                        <div>
+                          <strong>{conflictSummary.title}</strong>
+                          <p>{conflictSummary.message}</p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="staff-request-detail__section">
+                      <h3>Activity Description</h3>
+                      <p>{selectedItem.activityDescription}</p>
+                    </div>
+
+                    <div className="staff-request-detail__grid">
+                      <div>
+                        <span>Applicant</span>
+                        <strong>{selectedItem.memberName}</strong>
+                      </div>
+                      <div>
+                        <span>Attendees</span>
+                        <strong>{selectedItem.attendees}</strong>
+                      </div>
+                      <div>
+                        <span>Date</span>
+                        <strong>{selectedItem.date}</strong>
+                      </div>
+                      <div>
+                        <span>Time</span>
+                        <strong>
+                          {selectedItem.startTime} - {selectedItem.endTime}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="staff-request-detail__section">
+                      <h3>Participants</h3>
+                      <div className="staff-request-detail__tags">
+                        {getParticipants(selectedItem).map((participant) => (
+                          <span key={participant}>{participant}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {selectedItem.pageStatus === "pending" ? (
+                      <div className="staff-request-detail__actions">
+                        <button
+                          className="btn staff-request-detail__primaryAction"
+                          type="button"
+                          disabled={processingAction !== ""}
+                          onClick={handleApprove}
+                        >
+                          {processingAction === "accepted" ? "Approving..." : "Approve Booking"}
+                        </button>
+
+                        <div className="staff-request-detail__secondaryActions">
+                          <button
+                            className="btn-secondary"
+                            type="button"
+                            disabled={processingAction !== ""}
+                            onClick={() => openDecision("suggested")}
+                          >
+                            Suggest Alt.
+                          </button>
+                          <button
+                            className="btn-danger"
+                            type="button"
+                            disabled={processingAction !== ""}
+                            onClick={() => openDecision("rejected")}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="staff-request-detail__readonly">
+                        <CalendarAlert />
+                        <span>This request cannot be processed because its current status is {selectedItem.pageStatus}.</span>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             ))
           ) : (
             <div className="staff-requests-empty">
@@ -457,107 +539,6 @@ export default function Requests() {
             </div>
           )}
         </div>
-
-        <aside className="staff-request-detail">
-          {selectedItem ? (
-            <div className="staff-request-detail__card">
-              <div className="staff-request-detail__head">
-                <h2>{selectedItem.facilityName}</h2>
-                  <p className="staff-request-detail__requestId">{getDetailTimestampLabel(selectedItem)}</p>
-              </div>
-
-              {conflictSummary ? (
-                <div
-                  className={`staff-request-detail__alert ${
-                    conflictSummary.state === "available" ? "is-available" : "is-conflict"
-                  }`}
-                >
-                  {conflictSummary.state === "available" ? <CheckCircle2 size={24} /> : <AlertTriangle size={24} />}
-                  <div>
-                    <strong>{conflictSummary.title}</strong>
-                    <p>{conflictSummary.message}</p>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="staff-request-detail__section">
-                <h3>Activity Description</h3>
-                <p>{selectedItem.activityDescription}</p>
-              </div>
-
-              <div className="staff-request-detail__grid">
-                <div>
-                  <span>Applicant</span>
-                  <strong>{selectedItem.memberName}</strong>
-                </div>
-                <div>
-                  <span>Attendees</span>
-                  <strong>{selectedItem.attendees}</strong>
-                </div>
-                <div>
-                  <span>Date</span>
-                  <strong>{selectedItem.date}</strong>
-                </div>
-                <div>
-                  <span>Time</span>
-                  <strong>
-                    {selectedItem.startTime} - {selectedItem.endTime}
-                  </strong>
-                </div>
-              </div>
-
-              <div className="staff-request-detail__section">
-                <h3>Participants</h3>
-                <div className="staff-request-detail__tags">
-                  {getParticipants(selectedItem).map((participant) => (
-                    <span key={participant}>{participant}</span>
-                  ))}
-                </div>
-              </div>
-
-              {selectedItem.pageStatus === "pending" ? (
-                <div className="staff-request-detail__actions">
-                  <button
-                    className="btn staff-request-detail__primaryAction"
-                    type="button"
-                    disabled={processingAction !== ""}
-                    onClick={handleApprove}
-                  >
-                    {processingAction === "accepted" ? "Approving..." : "Approve Booking"}
-                  </button>
-
-                  <div className="staff-request-detail__secondaryActions">
-                    <button
-                      className="btn-secondary"
-                      type="button"
-                      disabled={processingAction !== ""}
-                      onClick={() => openDecision("suggested")}
-                    >
-                      Suggest Alt.
-                    </button>
-                    <button
-                      className="btn-danger"
-                      type="button"
-                      disabled={processingAction !== ""}
-                      onClick={() => openDecision("rejected")}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="staff-request-detail__readonly">
-                  <CalendarAlert />
-                  <span>This request cannot be processed because its current status is {selectedItem.pageStatus}.</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="staff-requests-empty">
-              <p>Select a booking request to preview its detail panel, or click the same card again to hide it.</p>
-            </div>
-          )}
-        </aside>
       </section>
 
       {decision.type ? (

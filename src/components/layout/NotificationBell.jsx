@@ -457,7 +457,6 @@ function StaffNotificationModal({ item, onClose }) {
   return (
     <ModalShell
       title="Staff Notification"
-      description="Review this staff update without leaving the current page."
       onClose={onClose}
     >
       <NotificationSummaryCard item={item}>
@@ -466,18 +465,19 @@ function StaffNotificationModal({ item, onClose }) {
           <span>Message</span>
           <p>{item.message || "No additional message was provided."}</p>
         </div>
-        <div className="notification-bell__detailGrid">
-          <div>
-            <span>Received At</span>
-            <strong>{item.createdAt || "Not available"}</strong>
+
+        <div className="notification-bell__applicationBox">
+          <span>Received At</span>
+          <p>{item.createdAt || "Not available"}</p>
           </div>
+
           {item.referenceId ? (
-            <div>
+            <div  className="notification-bell__applicationBox">
               <span>Reference ID</span>
-              <strong>{item.referenceId}</strong>
+              <p>{item.referenceId}</p>
             </div>
           ) : null}
-        </div>
+
       </NotificationSummaryCard>
 
       <div className="notification-bell__modalActions">

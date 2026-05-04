@@ -36,7 +36,7 @@
 
 .staff-checkin-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.88fr);
+  grid-template-columns: 1fr;
   gap: 24px;
   align-items: start;
 }
@@ -46,80 +46,9 @@
   gap: 20px;
 }
 
-.staff-checkin-card {
-  padding: 28px 34px;
-  border: 1px solid #dbe4ea;
-  border-radius: 28px;
-  background: #ffffff;
-  box-shadow: 0 10px 24px rgba(18, 33, 46, 0.05);
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-  cursor: pointer;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.staff-checkin-card:hover,
-.staff-checkin-card.is-active {
-  border-color: #718c9c;
-  box-shadow: 0 16px 32px rgba(18, 33, 46, 0.08);
-}
-
-.staff-checkin-card__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  align-items: flex-start;
-  min-width: 0;
-}
-
-.staff-checkin-card__titleBlock {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-}
-
-.staff-checkin-card__titleBlock h3 {
-  margin: 0;
-  color: #18232c;
-  font-size: 1.25rem;
-  letter-spacing: -0.02em;
-  overflow-wrap: anywhere;
-}
-
-.staff-checkin-card__member {
-  margin: 0;
-  color: #40545f;
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.staff-checkin-card__meta {
+.staff-checkin-group {
   display: grid;
   gap: 12px;
-  justify-items: end;
-  min-width: 0;
-  max-width: min(100%, 320px);
-}
-
-.staff-checkin-card__requestId {
-  margin: 0;
-  color: #7a8e9a;
-  font-size: 0.94rem;
-  font-weight: 700;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.staff-checkin-card__time {
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: #5d7281;
-  font-size: 1rem;
 }
 
 .staff-checkin-detail__card,
@@ -134,8 +63,6 @@
 .staff-checkin-detail__card {
   display: grid;
   gap: 20px;
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
 }
 
 .staff-checkin-empty p {
@@ -301,35 +228,18 @@
   color: #607583;
 }
 
-@media (max-width: 1080px) {
-  .staff-checkin-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .staff-checkin-detail__card {
-    max-height: none;
-  }
-}
-
 @media (max-width: 720px) {
   .staff-checkin-detail__grid {
     grid-template-columns: 1fr;
   }
 
-  .staff-checkin-card,
   .staff-checkin-detail__card,
   .staff-checkin-empty {
     padding-left: 20px;
     padding-right: 20px;
   }
 
-  .staff-checkin-card__header,
   .staff-checkin-detail__head {
     flex-direction: column;
-  }
-
-  .staff-checkin-card__meta {
-    width: 100%;
-    justify-items: start;
   }
 }
