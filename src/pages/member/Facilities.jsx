@@ -6,6 +6,7 @@ import {
   getFacilities,
   getFacilityDateBounds,
   getFacilitySportTypes,
+  getTimeSlotsByFacility,
 } from "../../services/bookingService";
 import { getBookingNewRoute, getFacilityDetailRoute, ROUTE_PATHS } from "../../constants/routes";
 import { getErrorMessage } from "../../utils/errors";
@@ -13,6 +14,7 @@ import { displayStatus, statusTone } from "../../utils/presentation";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import PageLayout from "../../components/common/PageLayout";
 import { Button } from "../../components/common/Button";
+import { getFrontendBookableSlotStatus, normalizeSlotClock } from "../../utils/bookingSlotRules";
 
 const DEFAULT_FILTERS = {
   date: "",
@@ -29,21 +31,6 @@ const AVAILABILITY_OPTIONS = [
 
 function sortAlphabetically(values) {
   return [...values].sort((left, right) => left.localeCompare(right));
-}
-
-function isDisplayableTimeSlot(slot = "") {
-  const match = String(slot).match(/^(\d{2}):00\s*-\s*(\d{2}):00$/);
-  if (!match) {
-    return false;
-  }
-
-  const start = Number(match[1]);
-  const end = Number(match[2]);
-  return start >= 0 && end <= 24 && end - start === 1;
-}
-
-function getDisplayableTimeSlots(slots = []) {
-  return slots.filter(isDisplayableTimeSlot);
 }
 
 function normalizeFacilityType(value = "") {
@@ -75,6 +62,19 @@ function sortTimeSlots(slots = []) {
     const rightStart = Number(String(right).slice(0, 2));
     return leftStart - rightStart;
   });
+}
+
+function getBookableTimeSlotLabels(slots = [], selectedDate = "", now = new Date()) {
+  const labels = slots
+    .filter((slot) => getFrontendBookableSlotStatus(slot, selectedDate, now).bookable)
+    .map((slot) => {
+      const start = normalizeSlotClock(slot.start_time ?? slot.startTime);
+      const end = normalizeSlotClock(slot.end_time ?? slot.endTime);
+      return start && end ? `${start} - ${end}` : "";
+    })
+    .filter(Boolean);
+
+  return sortTimeSlots([...new Set(labels)]);
 }
 
 function getTimeOptions(items = [], selectedType = "All") {
@@ -136,6 +136,15 @@ export default function Facilities() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [clockTick, setClockTick] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClockTick(Date.now());
+    }, 60 * 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -197,10 +206,16 @@ export default function Facilities() {
 
       try {
         const result = await getFacilities(filters.date);
+        const resultWithSlots = await Promise.all(
+          result.map(async (item) => ({
+            ...item,
+            memberTimeSlots: await getTimeSlotsByFacility(item.id, filters.date),
+          })),
+        );
         if (!isActive) {
           return;
         }
-        setItems(result);
+        setItems(resultWithSlots);
       } catch (loadError) {
         if (!isActive) {
           return;
@@ -222,11 +237,13 @@ export default function Facilities() {
   }, [filters.date]);
 
   const displayItems = useMemo(() => {
+    const now = new Date(clockTick);
     return items.map((item) => ({
       ...item,
-      memberVisibleSlots: getDisplayableTimeSlots(item.availableSlots || []),
+      memberVisibleSlots:
+        item.status === "normal" ? getBookableTimeSlotLabels(item.memberTimeSlots || [], filters.date, now) : [],
     }));
-  }, [items]);
+  }, [clockTick, filters.date, items]);
   const timeOptions = useMemo(() => getTimeOptions(displayItems, filters.type), [displayItems, filters.type]);
 
   useEffect(() => {

@@ -8,7 +8,8 @@ import "./FacilitiesMap.css";
 import PageLayout from "../../components/common/PageLayout";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import { ROUTE_PATHS, getBookingNewRoute } from "../../constants/routes";
-import { getFacilities } from "../../services/bookingService";
+import { getFacilities, getTimeSlotsByFacility } from "../../services/bookingService";
+import { getFrontendBookableSlotStatus, getLocalDateKey } from "../../utils/bookingSlotRules";
 
 // Southampton center coordinates
 const SOUTHAMPTON_CENTER = [50.9097, -1.4044];
@@ -187,6 +188,7 @@ export default function FacilitiesMap() {
   const [geocodingStatus, setGeocodingStatus] = useState("");
   const [error, setError] = useState("");
   const [selectedTypes, setSelectedTypes] = useState(new Set());
+  const [clockTick, setClockTick] = useState(Date.now());
 
   // Get unique sport types from facilities
   const sportTypes = useMemo(() => {
@@ -202,6 +204,14 @@ export default function FacilitiesMap() {
   }, [sportTypes, selectedTypes.size]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClockTick(Date.now());
+    }, 60 * 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     let isActive = true;
 
     async function loadFacilitiesAndGeocode() {
@@ -211,16 +221,22 @@ export default function FacilitiesMap() {
 
       try {
         // Load facilities from Firebase
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getLocalDateKey();
         const facilities = await getFacilities(today);
+        const facilitiesWithSlots = await Promise.all(
+          facilities.map(async (facility) => ({
+            ...facility,
+            memberTimeSlots: await getTimeSlotsByFacility(facility.id, today),
+          })),
+        );
         
         if (!isActive) return;
         
-        setAllFacilities(facilities);
+        setAllFacilities(facilitiesWithSlots);
         setGeocodingStatus("Loading map data, please wait...");
         
         // Try to geocode venues
-        const locations = await processAndGroupFacilities(facilities);
+        const locations = await processAndGroupFacilities(facilitiesWithSlots);
         
         if (!isActive) return;
         
@@ -287,8 +303,18 @@ function getIconForSportTypes(sportTypes) {
   return SPORT_ICONS.default;
 }
 
+  function hasBookableSlotsToday(facility) {
+    if (facility.status !== "normal") {
+      return false;
+    }
+
+    const today = getLocalDateKey();
+    const now = new Date(clockTick);
+    return (facility.memberTimeSlots || []).some((slot) => getFrontendBookableSlotStatus(slot, today, now).bookable);
+  }
+
   function handleBookFacility(facility) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getLocalDateKey();
     navigate(getBookingNewRoute({ facilityId: facility.id, date: today }));
   }
 
@@ -376,26 +402,35 @@ function getIconForSportTypes(sportTypes) {
                       <h4 className="facility-popup__list-title">
                         Available facilities ({venue.facilities.length})
                       </h4>
-                      {venue.facilities.map(facility => (
-                        <div key={facility.id} className="facility-popup__facility-item">
-                          <div className="facility-popup__facility-info">
-                            <span className="facility-popup__facility-name">{facility.name}</span>
-                            <span className="facility-popup__facility-meta">
-                              Capacity {facility.capacity}
-                            </span>
-                            <span className="facility-popup__facility-time">
-                              Open time: {facility.startTime}:00 - {facility.endTime}:00
-                            </span>
+                      {venue.facilities.map(facility => {
+                        const canBookFacility = hasBookableSlotsToday(facility);
+
+                        return (
+                          <div key={facility.id} className="facility-popup__facility-item">
+                            <div className="facility-popup__facility-info">
+                              <span className="facility-popup__facility-name">{facility.name}</span>
+                              <span className="facility-popup__facility-meta">
+                                Capacity {facility.capacity}
+                              </span>
+                              <span className="facility-popup__facility-time">
+                                Open time: {facility.startTime}:00 - {facility.endTime}:00
+                              </span>
+                              {!canBookFacility && (
+                                <span className="facility-popup__no-slots">No bookable slots today</span>
+                              )}
+                            </div>
+                            {canBookFacility && (
+                              <button
+                                className="btn facility-popup__book-btn"
+                                type="button"
+                                onClick={() => handleBookFacility(facility)}
+                              >
+                                Book
+                              </button>
+                            )}
                           </div>
-                          <button
-                            className="btn facility-popup__book-btn"
-                            type="button"
-                            onClick={() => handleBookFacility(facility)}
-                          >
-                            Book
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </Popup>
