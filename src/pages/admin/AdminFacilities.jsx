@@ -158,6 +158,20 @@ export default function AdminFacilities() {
     [form.facility_id, items],
   );
   const isEditMode = drawerMode === "edit";
+  const startHourOptions = useMemo(() => {
+    const selectedEndHour = parseHourInputValue(form.end_time);
+    return START_HOUR_OPTIONS.filter((option) => {
+      const optionHour = parseHourInputValue(option);
+      return Number.isNaN(selectedEndHour) || optionHour < selectedEndHour;
+    });
+  }, [form.end_time]);
+  const endHourOptions = useMemo(() => {
+    const selectedStartHour = parseHourInputValue(form.start_time);
+    return END_HOUR_OPTIONS.filter((option) => {
+      const optionHour = parseHourInputValue(option);
+      return Number.isNaN(selectedStartHour) || optionHour > selectedStartHour;
+    });
+  }, [form.start_time]);
 
   function clearFilters() {
     setSearchInput("");
@@ -178,6 +192,38 @@ export default function AdminFacilities() {
 
     setForm((previous) => ({ ...previous, [field]: value }));
     setFormErrors((previous) => ({ ...previous, [field]: "" }));
+    setFormError("");
+  }
+
+  function handleStartTimeChange(value) {
+    const nextStartHour = parseHourInputValue(value);
+    setForm((previous) => {
+      const previousEndHour = parseHourInputValue(previous.end_time);
+      const shouldClearEnd =
+        !Number.isNaN(nextStartHour) && !Number.isNaN(previousEndHour) && previousEndHour <= nextStartHour;
+      return {
+        ...previous,
+        start_time: value,
+        end_time: shouldClearEnd ? "" : previous.end_time,
+      };
+    });
+    setFormErrors((previous) => ({ ...previous, start_time: "", end_time: "" }));
+    setFormError("");
+  }
+
+  function handleEndTimeChange(value) {
+    const nextEndHour = parseHourInputValue(value);
+    setForm((previous) => {
+      const previousStartHour = parseHourInputValue(previous.start_time);
+      const shouldClearStart =
+        !Number.isNaN(nextEndHour) && !Number.isNaN(previousStartHour) && previousStartHour >= nextEndHour;
+      return {
+        ...previous,
+        start_time: shouldClearStart ? "" : previous.start_time,
+        end_time: value,
+      };
+    });
+    setFormErrors((previous) => ({ ...previous, start_time: "", end_time: "" }));
     setFormError("");
   }
 
@@ -624,10 +670,13 @@ export default function AdminFacilities() {
                     <label htmlFor="facility-start">Time Start (HH:00)</label>
                     <select
                       id="facility-start"
-                      value={form.start_time}
-                      onChange={(event) => setForm((prev) => ({ ...prev, start_time: event.target.value }))}
+                      value={startHourOptions.includes(form.start_time) ? form.start_time : ""}
+                      onChange={(event) => handleStartTimeChange(event.target.value)}
                     >
-                      {START_HOUR_OPTIONS.map((option) => (
+                      <option value="" disabled>
+                        Select start time
+                      </option>
+                      {startHourOptions.map((option) => (
                         <option key={option} value={option}>
                           {option}
                         </option>
@@ -640,10 +689,13 @@ export default function AdminFacilities() {
                     <label htmlFor="facility-end">Time End (HH:00)</label>
                     <select
                       id="facility-end"
-                      value={form.end_time}
-                      onChange={(event) => setForm((prev) => ({ ...prev, end_time: event.target.value }))}
+                      value={endHourOptions.includes(form.end_time) ? form.end_time : ""}
+                      onChange={(event) => handleEndTimeChange(event.target.value)}
                     >
-                      {END_HOUR_OPTIONS.map((option) => (
+                      <option value="" disabled>
+                        Select end time
+                      </option>
+                      {endHourOptions.map((option) => (
                         <option key={option} value={option}>
                           {option}
                         </option>
