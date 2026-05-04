@@ -44,3 +44,7 @@ exports.upsertFacility = upsertFacility;
 // 导入 maintainTimeSlotWindow (scheduled function)
 const { maintainTimeSlotWindow } = require("./maintainTimeSlotWindow");
 exports.maintainTimeSlotWindow = maintainTimeSlotWindow;
+
+// 导入 expirePendingBookingRequests (scheduled function)
+const { expirePendingBookingRequests } = require("./expirePendingBookingRequests");
+exports.expirePendingBookingRequests = expirePendingBookingRequests;
