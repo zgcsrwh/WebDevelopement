@@ -38,14 +38,15 @@ import {
 } from "./firestoreService";
 import { createAppError } from "../utils/errors";
 import { displayStatus } from "../utils/presentation";
+import { getLocalDateKey, getMaxLocalBookingDate } from "../utils/bookingSlotRules";
 import { callSubmitAction } from "./callableService";
 
 function getTodayDate() {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalDateKey();
 }
 
 function getMaxBookingDate() {
-  return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return getMaxLocalBookingDate(7);
 }
 
 function buildHourSlotRange(startHour, endHour) {
@@ -681,18 +682,23 @@ async function submitBookingRequestDirect(payload, actor) {
 }
 
 export async function submitBookingRequest(payload, actor) {
-  return callSubmitAction(
-    "submitBookingRequest",
-    {
-      facility_id: payload.facility_id,
-      date: toStoredDateString(payload.date).slice(0, 10),
-      start_time: payload.start_time,
-      end_time: payload.end_time,
-      attendent: Number(payload.attendent || 0),
-      activity_description: payload.activity_description,
-      user_id_list: [...new Set([...(payload.user_id_list || []), ...(payload.participant_ids || [])].filter(Boolean))],
-    },
-  );
+  const participantIds = [
+    ...new Set([...(payload.user_id_list || []), ...(payload.participant_ids || [])].filter(Boolean)),
+  ];
+  const callablePayload = {
+    facility_id: payload.facility_id,
+    date: toStoredDateString(payload.date).slice(0, 10),
+    start_time: payload.start_time,
+    end_time: payload.end_time,
+    attendent: Number(payload.attendent || 0),
+    activity_description: payload.activity_description,
+  };
+
+  if (participantIds.length) {
+    callablePayload.user_id_list = participantIds;
+  }
+
+  return callSubmitAction("submitBookingRequest", callablePayload);
 }
 
 async function modifyPendingBookingDirect(payload, actor) {

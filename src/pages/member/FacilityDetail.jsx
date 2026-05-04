@@ -7,6 +7,7 @@ import { getFacilityById, getFacilityDateBounds, getTimeSlotsByFacility } from "
 import { ROUTE_PATHS, getBookingNewRoute } from "../../constants/routes";
 import { getErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
+import { getFrontendBookableSlotStatus, getLocalDateKey } from "../../utils/bookingSlotRules";
 
 function buildFacilityHeading(name = "", sportType = "") {
   const normalizedName = String(name || "").trim();
@@ -74,6 +75,7 @@ export default function FacilityDetail() {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [clockTick, setClockTick] = useState(Date.now());
 
   useEffect(() => {
     let isActive = true;
@@ -90,7 +92,7 @@ export default function FacilityDetail() {
         if (!isActive) {
           return;
         }
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getLocalDateKey();
         setDateBounds({
           minDate: today,
           maxDate: today,
@@ -102,6 +104,14 @@ export default function FacilityDetail() {
     return () => {
       isActive = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClockTick(Date.now());
+    }, 60 * 1000);
+
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -156,9 +166,13 @@ export default function FacilityDetail() {
     };
   }, [id, selectedDate]);
 
-  const openSlots = useMemo(() => {
-    return slots.filter((slot) => String(slot.status || "").toLowerCase() === "open");
-  }, [slots]);
+  const bookableSlots = useMemo(() => {
+    if (facility?.status !== "normal") {
+      return [];
+    }
+    const now = new Date(clockTick);
+    return slots.filter((slot) => getFrontendBookableSlotStatus(slot, selectedDate, now).bookable);
+  }, [clockTick, facility?.status, selectedDate, slots]);
 
   if (loading) {
     return (
@@ -184,7 +198,7 @@ export default function FacilityDetail() {
 
   const facilityHeading = buildFacilityHeading(facility.name, facility.sportType);
   const guidelineItems = buildGuidelineItems(facility.usageGuidelines);
-  const canBook = facility.status === "normal" && openSlots.length > 0;
+  const canBook = facility.status === "normal" && bookableSlots.length > 0;
 
   return (
     <PageLayout
@@ -261,15 +275,18 @@ export default function FacilityDetail() {
           <div className="facility-detail-card__slotSection">
             <div className="facility-detail-card__slotGrid">
               {slots.map((slot) => {
-                const isOpen = String(slot.status || "").toLowerCase() === "open";
+                const availability =
+                  facility.status === "normal"
+                    ? getFrontendBookableSlotStatus(slot, selectedDate, new Date(clockTick))
+                    : { bookable: false, reason: "Facility unavailable" };
 
                 return (
                   <div
                     key={slot.id || `${slot.date}-${slot.start_time}-${slot.end_time}`}
-                    className={`facility-detail-card__slot ${isOpen ? "is-open" : "is-locked"}`}
+                    className={`facility-detail-card__slot ${availability.bookable ? "is-open" : "is-locked"}`}
                     >
                       <span>{slot.timeLabel}</span>
-                      {!isOpen && <small>({displayStatus(slot.status || "unavailable")})</small>}
+                      {!availability.bookable && <small>({availability.reason || displayStatus(slot.status || "unavailable")})</small>}
                     </div>
                   );
                 })}

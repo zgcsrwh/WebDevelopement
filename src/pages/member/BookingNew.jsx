@@ -7,6 +7,7 @@ import { useAuth } from "../../provider/AuthContext";
 import {
   getFacilityById,
   getFacilityDateBounds,
+  getTimeSlotsByFacility,
   submitBookingRequest,
 } from "../../services/bookingService";
 import { isFacilityBookable } from "../../services/centreService";
@@ -15,16 +16,13 @@ import { ROUTE_PATHS, getFacilityDetailRoute } from "../../constants/routes";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
+import {
+  getFrontendBookableSlotStatus,
+  getLocalDateKey,
+  normalizeSlotClock,
+} from "../../utils/bookingSlotRules";
 
 const ACTIVITY_DESCRIPTION_MAX_LENGTH = 100;
-
-function parseSlot(slot = "") {
-  const parts = String(slot).split(" - ");
-  return {
-    start: parts[0] || "",
-    end: parts[1] || "",
-  };
-}
 
 function clampDateToBounds(date, bounds) {
   if (!date) {
@@ -55,7 +53,35 @@ function summarizeSelectedFriends(items = []) {
 function mapBookingSubmitError(error) {
   const code = getErrorCode(error);
   if (code === "invalid-argument") {
-    return "The selected friends exceed the total attendee count.";
+    const message = getErrorMessage(error, "");
+    const normalizedMessage = message.toLowerCase();
+
+    if (
+      normalizedMessage.includes("friend") ||
+      normalizedMessage.includes("attendee") ||
+      normalizedMessage.includes("attendent") ||
+      normalizedMessage.includes("user_id_list")
+    ) {
+      return "The attendee total must include yourself and every selected partner.";
+    }
+
+    if (normalizedMessage.includes("2 hours") || normalizedMessage.includes("advance")) {
+      return "Bookings must be made at least 2 hours before the selected start time.";
+    }
+
+    if (normalizedMessage.includes("date")) {
+      return "Please choose a booking date between today and the next 7 days.";
+    }
+
+    if (normalizedMessage.includes("facility is open")) {
+      return message;
+    }
+
+    if (normalizedMessage.includes("activity_description") || normalizedMessage.includes("description")) {
+      return "Please enter a valid activity description before submitting.";
+    }
+
+    return message || "Please complete the booking request using a valid date, time, attendee count, and description.";
   }
   if (code === "resource-exhausted") {
     return "The selected time slot is no longer available. Please choose another 1-hour slot.";
@@ -98,6 +124,7 @@ export default function BookingNew() {
     defaultDate: "",
   });
   const [facility, setFacility] = useState(null);
+  const [facilitySlots, setFacilitySlots] = useState([]);
   const [friends, setFriends] = useState([]);
   const [matchProfile, setMatchProfile] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -111,6 +138,7 @@ export default function BookingNew() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [descriptionError, setDescriptionError] = useState("");
+  const [clockTick, setClockTick] = useState(Date.now());
 
   useEffect(() => {
     let cancelled = false;
@@ -132,7 +160,7 @@ export default function BookingNew() {
           return;
         }
 
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getLocalDateKey();
         const fallbackBounds = {
           minDate: today,
           maxDate: today,
@@ -152,8 +180,17 @@ export default function BookingNew() {
   }, [requestedDate]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClockTick(Date.now());
+    }, 60 * 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     if (!requestedFacilityId || !form.date) {
       setFacility(null);
+      setFacilitySlots([]);
       return undefined;
     }
 
@@ -161,20 +198,25 @@ export default function BookingNew() {
 
     async function loadFacility() {
       try {
-        const nextFacility = await getFacilityById(requestedFacilityId, form.date);
+        const [nextFacility, nextSlots] = await Promise.all([
+          getFacilityById(requestedFacilityId, form.date),
+          getTimeSlotsByFacility(requestedFacilityId, form.date),
+        ]);
         if (cancelled) {
           return;
         }
 
         setFacility(nextFacility);
+        setFacilitySlots(nextSlots || []);
         setForm((previous) => {
           const capacity = Math.max(Number(nextFacility?.capacity || 0), 1);
           const attendeeCount = Number(previous.attendees) || 0;
           const safeAttendees =
             previous.attendees === "" ? "" : String(Math.min(Math.max(attendeeCount, 1), capacity));
           const maxInvites = Math.max((Number(safeAttendees) || 0) - 1, 0);
-          const stillValidStart = (nextFacility?.availableSlots || [])
-            .map((slot) => parseSlot(slot).start)
+          const stillValidStart = (nextSlots || [])
+            .filter((slot) => getFrontendBookableSlotStatus(slot, form.date).bookable)
+            .map((slot) => normalizeSlotClock(slot.start_time ?? slot.startTime))
             .includes(previous.startTime);
 
           return {
@@ -187,6 +229,7 @@ export default function BookingNew() {
       } catch (loadError) {
         if (!cancelled) {
           setFacility(null);
+          setFacilitySlots([]);
           setError(getErrorMessage(loadError, "Unable to load available facilities."));
         }
       }
@@ -248,10 +291,16 @@ export default function BookingNew() {
       return [];
     }
 
-    return (facility.availableSlots || [])
-      .map((slot) => parseSlot(slot))
-      .filter((slot) => slot.start && slot.end);
-  }, [facility]);
+    const now = new Date(clockTick);
+    return (facilitySlots || [])
+      .map((slot) => ({
+        raw: slot,
+        start: normalizeSlotClock(slot.start_time ?? slot.startTime),
+        end: normalizeSlotClock(slot.end_time ?? slot.endTime),
+        availability: getFrontendBookableSlotStatus(slot, form.date, now),
+      }))
+      .filter((slot) => slot.start && slot.end && slot.availability.bookable);
+  }, [clockTick, facility, facilitySlots, form.date]);
 
   const startOptions = useMemo(() => slotOptions.map((slot) => slot.start), [slotOptions]);
   const normalizedStartTime = startOptions.includes(form.startTime) ? form.startTime : "";
@@ -345,6 +394,11 @@ export default function BookingNew() {
     }
     if (!normalizedStartTime || !normalizedEndTime) {
       setError("Please choose an available 1-hour time slot before submitting.");
+      return;
+    }
+    const selectedSlot = slotOptions.find((slot) => slot.start === normalizedStartTime);
+    if (!selectedSlot || !getFrontendBookableSlotStatus(selectedSlot.raw, form.date, new Date(clockTick)).bookable) {
+      setError("This time slot is no longer available. Please choose another slot at least 2 hours from now.");
       return;
     }
     if (!facility) {
@@ -497,7 +551,7 @@ export default function BookingNew() {
               />
             </div>
 
-            <div className="booking-new__field">
+            <div className="booking-new__field booking-new__field--time">
               <label htmlFor="booking-start-time">
                 Start Time <span className="booking-new__requiredMark">*</span>
               </label>
@@ -506,20 +560,22 @@ export default function BookingNew() {
                 value={normalizedStartTime}
                 disabled={!facility || !isFacilityBookable(facility.status) || !startOptions.length}
                 onChange={(event) => setFormValue("startTime", event.target.value)}
-                >
-                  <option value="">Select start time</option>
-                  {startOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-                {facility && isFacilityBookable(facility.status) && !startOptions.length ? (
-                  <p className="booking-new__fieldHelp">No open time slots are available for this date.</p>
-                ) : null}
-              </div>
+              >
+                <option value="">Select start time</option>
+                {startOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              {facility && isFacilityBookable(facility.status) && !startOptions.length ? (
+                <p className="booking-new__fieldHelp">
+                  No bookable time slots are available for this date. Please choose an open slot more than 2 hours from now.
+                </p>
+              ) : null}
+            </div>
 
-            <div className="booking-new__field">
+            <div className="booking-new__field booking-new__field--time">
               <label htmlFor="booking-end-time">
                 End Time <span className="booking-new__requiredMark">*</span>
               </label>

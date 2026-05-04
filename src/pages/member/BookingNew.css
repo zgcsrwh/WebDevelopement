@@ -114,6 +114,11 @@
   min-width: 0;
 }
 
+.booking-new__field--time {
+  align-self: start;
+  grid-template-rows: auto 54px auto;
+}
+
 .booking-new__field--full {
   grid-column: 1 / -1;
 }
@@ -176,6 +181,12 @@
   background-position: calc(100% - 18px) 50%;
   background-size: 14px 14px;
   background-repeat: no-repeat;
+}
+
+.booking-new__field--time input,
+.booking-new__field--time select {
+  height: 54px;
+  min-height: 54px;
 }
 
 .booking-new__fieldFoot {
