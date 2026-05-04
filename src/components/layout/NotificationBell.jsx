@@ -128,7 +128,7 @@ function normalizeNotificationItem(item) {
     referenceId: item.referenceId,
     isRead: item.isRead,
     createdAt: item.createdAt,
-    sortValue: item.createdAt,
+    sortValue: item.sortValue || item.createdAt,
     raw: item,
   };
 }
@@ -1036,7 +1036,7 @@ export default function NotificationBell({ variant = "member" }) {
                       ) : null}
                     </div>
                     <strong>{item.message}</strong>
-                    <span>{item.createdAt || "Just now"}</span>
+                    {item.createdAt ? <span>{item.createdAt}</span> : null}
                   </div>
 
                   <div className="notification-bell__state">

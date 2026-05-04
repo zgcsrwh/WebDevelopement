@@ -5,7 +5,26 @@ async function resolveActor(actor) {
   return actor || getCurrentActor();
 }
 
+function getNotificationSortValue(value) {
+  if (!value) {
+    return 0;
+  }
+
+  if (value?.seconds) {
+    return value.seconds * 1000;
+  }
+
+  if (value?.toDate) {
+    return value.toDate().getTime();
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 function mapNotification(item) {
+  const createdAt = normalizeTimestamp(item.created_at);
+
   return {
     id: item.id,
     type: item.type || "system",
@@ -14,8 +33,23 @@ function mapNotification(item) {
     message: item.message || item.information || "System notification",
     referenceId: item.reference_id || "",
     isRead: Boolean(item.isRead ?? item.is_read ?? false),
-    createdAt: normalizeTimestamp(item.created_at),
+    createdAt,
+    sortValue: getNotificationSortValue(item.created_at),
   };
+}
+
+function getDisplayableNotifications(docs = []) {
+  return docs
+    .map(mapNotification)
+    .filter((item) => item.createdAt && item.sortValue > 0)
+    .sort((left, right) => {
+      const timeDifference = right.sortValue - left.sortValue;
+      if (timeDifference !== 0) {
+        return timeDifference;
+      }
+
+      return String(right.id || "").localeCompare(String(left.id || ""));
+    });
 }
 
 export async function getNotifications(actor) {
@@ -25,9 +59,7 @@ export async function getNotifications(actor) {
   }
 
   const docs = await getCollectionDocs("notification", [where("member_id", "==", resolvedActor.id)]);
-  return docs
-    .map(mapNotification)
-    .sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
+  return getDisplayableNotifications(docs);
 }
 
 export async function subscribeToNotifications(actor, onNext, onError) {
@@ -41,11 +73,7 @@ export async function subscribeToNotifications(actor, onNext, onError) {
     "notification",
     [where("member_id", "==", resolvedActor.id)],
     (docs) => {
-      onNext(
-        docs
-          .map(mapNotification)
-          .sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || ""))),
-      );
+      onNext(getDisplayableNotifications(docs));
     },
     onError,
   );
