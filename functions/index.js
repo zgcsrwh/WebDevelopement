@@ -68,3 +68,7 @@ exports.getUserContext = getUserContext;
 // 导入 checkAccountDeletable
 const { checkAccountDeletable } = require("./checkAccountDeletable");
 exports.checkAccountDeletable = checkAccountDeletable;
+
+// 导入 deleteMyAccount
+const { deleteMyAccount } = require("./deleteMyAccount");
+exports.deleteMyAccount = deleteMyAccount;
