@@ -64,3 +64,7 @@ exports.updateTicketStatus = updateTicketStatus;
 // 导入 getUserContext
 const { getUserContext } = require("./getUserContext");
 exports.getUserContext = getUserContext;
+
+// 导入 checkAccountDeletable
+const { checkAccountDeletable } = require("./checkAccountDeletable");
+exports.checkAccountDeletable = checkAccountDeletable;
