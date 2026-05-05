@@ -56,3 +56,7 @@ exports.deleteFacility = deleteFacility;
 // 导入 submitRepairTicket
 const { submitRepairTicket } = require("./submitRepairTicket");
 exports.submitRepairTicket = submitRepairTicket;
+
+// 导入 updateTicketStatus
+const { updateTicketStatus } = require("./updateTicketStatus");
+exports.updateTicketStatus = updateTicketStatus;
