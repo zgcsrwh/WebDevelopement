@@ -52,3 +52,7 @@ exports.expirePendingBookingRequests = expirePendingBookingRequests;
 // 导入 deleteFacility
 const { deleteFacility } = require("./deleteFacility");
 exports.deleteFacility = deleteFacility;
+
+// 导入 submitRepairTicket
+const { submitRepairTicket } = require("./submitRepairTicket");
+exports.submitRepairTicket = submitRepairTicket;
