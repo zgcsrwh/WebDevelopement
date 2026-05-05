@@ -9,7 +9,7 @@
  *
  * 业务规则：
  * - only create missing slots, never overwrite existing slots
- * - 只有 status === "normal" 的 facility 才生成新 slot
+ * - 只为 status === "normal" 或 "fixing" 的 facility 生成新 slot
  * - 应用 due scheduled_change
  * - 旧 doc id 兼容
  * - batch 写入
@@ -222,7 +222,7 @@ async function processFacility({ facilityDoc, targetDates, stats }) {
   const facilityId = facilityDoc.id;
 
   // ========== 5.1 facility.status 过滤 ==========
-  if (facilityData.status !== "normal") {
+  if (!["normal", "fixing"].includes(facilityData.status)) {
     stats.skippedNonNormalFacilities++;
     return;
   }
