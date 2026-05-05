@@ -32,6 +32,11 @@ export function toTitleText(value = "") {
     .join(" ");
 }
 
+export function displayFilterOption(value = "") {
+  const source = Array.isArray(value) ? value.find(Boolean) : value;
+  return toTitleText(String(source || ""));
+}
+
 export function displayStatus(value = "") {
   const normalized = String(value).toLowerCase();
   
@@ -45,11 +50,11 @@ export function displayStatus(value = "") {
     resolved: "Resolved",
     suspended: "Suspended",
     terminated: "Terminated",
-    normal: "normal",
+    normal: "Normal",
     closed: "Closed",
-    fixing: "fixing",
-    outdate: "outdate",
-    deleted: "deleted",
+    fixing: "Fixing",
+    outdate: "Outdate",
+    deleted: "Deleted",
     active: "Active",
     unassigned: "Unassigned",
     deactivated: "Deactivated",

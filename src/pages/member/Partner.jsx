@@ -23,6 +23,9 @@ const DAY_OPTIONS = [
 ];
 
 const PERIOD_OPTIONS = ["morning", "afternoon", "evening"];
+const PARTNER_PAGE_TITLE = "Match Profile";
+const PARTNER_PAGE_SUBTITLE =
+  "Create your public profile to find sports partners. Your real name and contact details will remain strictly confidential.";
 
 function createEmptyForm() {
   return {
@@ -56,7 +59,7 @@ function createAvailabilityDraft() {
 function formatAvailabilityLabel(value = "") {
   const [day = "", ...periodParts] = String(value).split("_");
   const period = periodParts.join("_");
-  return `${toTitleText(day)} • ${toTitleText(period)}`;
+  return `${toTitleText(day)} - ${toTitleText(period)}`;
 }
 
 function validatePartnerForm(form) {
@@ -129,6 +132,7 @@ export default function Partner() {
   const [availabilityDraft, setAvailabilityDraft] = useState(createAvailabilityDraft);
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -136,6 +140,7 @@ export default function Partner() {
     let cancelled = false;
 
     setLoading(true);
+    setLoadError("");
 
     Promise.all([getCurrentMatchProfile(sessionProfile), getFacilitySportTypes()])
       .then(([profile, sportTypes]) => {
@@ -163,9 +168,12 @@ export default function Partner() {
         setOriginalMatchProfile(nextForm);
         setForm(nextForm);
       })
-      .catch(() => {
+      .catch((profileLoadError) => {
         if (!cancelled) {
           setSportTypeOptions([]);
+          setLoadError(
+            getErrorMessage(profileLoadError, "Unable to load your match profile right now."),
+          );
         }
       })
       .finally(() => {
@@ -351,11 +359,39 @@ export default function Partner() {
     navigate(ROUTE_PATHS.PARTNER_DISCOVER);
   }
 
+  if (loading) {
+    return (
+      <PageLayout
+        className="partner-page"
+        title={PARTNER_PAGE_TITLE}
+        subtitle={PARTNER_PAGE_SUBTITLE}
+      >
+        <article className="partner-card partner-card--loading">
+          <p>Loading match profile...</p>
+        </article>
+      </PageLayout>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <PageLayout
+        className="partner-page"
+        title={PARTNER_PAGE_TITLE}
+        subtitle={PARTNER_PAGE_SUBTITLE}
+      >
+        <article className="partner-card partner-card--loading">
+          <div className="errorMessage partner-card__message">{loadError}</div>
+        </article>
+      </PageLayout>
+    );
+  }
+
   return (
     <PageLayout
       className="partner-page"
-      title="Match Profile"
-      subtitle="Create your public profile to find sports partners. Your real name and contact details will remain strictly confidential."
+      title={PARTNER_PAGE_TITLE}
+      subtitle={PARTNER_PAGE_SUBTITLE}
     >
       <div className="partner-page__layout">
         <article className="partner-card partner-card--editor">

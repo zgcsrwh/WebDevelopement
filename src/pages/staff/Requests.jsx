@@ -374,7 +374,7 @@ export default function Requests() {
         sessionProfile,
       );
       await refresh(selectedItem.id);
-      setPageMessage(`Request ${selectedItem.id} was updated to accepted.`);
+      setPageMessage(`Request ${selectedItem.id} was updated to Upcoming.`);
     } catch (approvalError) {
       setPageError(getErrorMessage(approvalError, "Unable to process this booking request."));
     } finally {

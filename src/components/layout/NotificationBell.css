@@ -427,16 +427,12 @@
   line-height: 1.6;
 }
 
-.notification-bell__modalCard {
+.notification-bell__modalDetail {
   display: grid;
   gap: 12px;
-  padding: 18px;
-  border: 1px solid #e1e8ed;
-  border-radius: 20px;
-  background: #f8fbfc;
 }
 
-.notification-bell__modalCard strong {
+.notification-bell__modalDetail strong {
   color: #18232c;
   font-size: 1.02rem;
 }

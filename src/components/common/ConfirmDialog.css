@@ -1,0 +1,57 @@
+.confirm-dialog__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 7000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 31, 40, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.confirm-dialog {
+  width: min(460px, calc(100vw - 48px));
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+  border: 1px solid #dbe3e8;
+  border-radius: 26px;
+  background: #ffffff;
+  box-shadow: 0 26px 52px rgba(15, 23, 42, 0.14);
+}
+
+.confirm-dialog__copy {
+  display: grid;
+  gap: 8px;
+}
+
+.confirm-dialog__copy h2 {
+  margin: 0;
+  color: #172b3a;
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+.confirm-dialog__copy p,
+.confirm-dialog__content p {
+  margin: 0;
+  color: #6b7f8d;
+  line-height: 1.6;
+}
+
+.confirm-dialog__content {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #e0e8ee;
+  border-radius: 16px;
+  background: #f8fbfc;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}

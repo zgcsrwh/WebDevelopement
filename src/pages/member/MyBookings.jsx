@@ -12,10 +12,12 @@ import {
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS, getBookingDetailRoute } from "../../constants/routes";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
-import { statusTone } from "../../utils/presentation";
+import { displayStatus, statusTone } from "../../utils/presentation";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import PageLayout from "../../components/common/PageLayout";
 import { ButtonLink } from "../../components/common/Button";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import Toast from "../../components/common/Toast";
 
 const ALL_STATUS_VALUE = "all";
 const BOOKING_STATUS_OPTIONS = [
@@ -59,6 +61,10 @@ function normalizeBookingStatus(value = "") {
 
   if (normalized === "complete") {
     return "completed";
+  }
+
+  if (normalized === "accepted") {
+    return "upcoming";
   }
 
   return normalized;
@@ -181,7 +187,7 @@ export default function MyBookings() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [toast, setToast] = useState(null);
   const [filters, setFilters] = useState({ status: ALL_STATUS_VALUE, date: "" });
   const [pendingAction, setPendingAction] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -248,7 +254,7 @@ export default function MyBookings() {
       const nextItems = await getBookings(sessionProfile);
       setItems(sortBookingsNewestFirst(nextItems));
       if (successMessage) {
-        setMessage(successMessage);
+        setToast({ tone: "success", title: "Updated", message: successMessage });
       }
       setError("");
     } catch (loadError) {
@@ -261,12 +267,12 @@ export default function MyBookings() {
   function handleClearFilters() {
     const nextFilters = { status: ALL_STATUS_VALUE, date: "" };
     setFilters(nextFilters);
-    setMessage("");
+    setToast(null);
   }
 
   function handleRequestAction(type, booking) {
     setError("");
-    setMessage("");
+    setToast(null);
     setPendingAction({ type, booking });
   }
 
@@ -296,7 +302,11 @@ export default function MyBookings() {
         await refreshBookings("The booking was cancelled successfully.");
       }
     } catch (actionError) {
-      setError(mapBookingActionError(type, actionError));
+      setToast({
+        tone: "error",
+        title: "Action failed",
+        message: mapBookingActionError(type, actionError),
+      });
     } finally {
       setActionLoading(false);
       setPendingAction(null);
@@ -314,17 +324,12 @@ export default function MyBookings() {
         </ButtonLink>
       }
     >
+      <Toast toast={toast} onClose={() => setToast(null)} />
+
       {error ? (
         <div className="member-alert member-alert--error">
           <strong>Action failed</strong>
           <p>{error}</p>
-        </div>
-      ) : null}
-
-      {message ? (
-        <div className="member-alert member-alert--success">
-          <strong>Updated</strong>
-          <p>{message}</p>
         </div>
       ) : null}
 
@@ -339,13 +344,13 @@ export default function MyBookings() {
               value={filters.status}
               onChange={(event) => {
                 setFilters((prev) => ({ ...prev, status: event.target.value }));
-                setMessage("");
+                setToast(null);
               }}
             >
               <option value={ALL_STATUS_VALUE}>All Status</option>
               {BOOKING_STATUS_OPTIONS.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {displayStatus(status)}
                 </option>
               ))}
             </select>
@@ -359,7 +364,7 @@ export default function MyBookings() {
               value={filters.date}
               onChange={(event) => {
                 setFilters((prev) => ({ ...prev, date: event.target.value }));
-                setMessage("");
+                setToast(null);
               }}
             />
           </FilterField>
@@ -383,14 +388,15 @@ export default function MyBookings() {
                     <div className="my-bookings__itemHeading">
                       <h3>{formatTitle(booking)}</h3>
                       <p>{formatDateTimeLine(booking)}</p>
+                      <p className="my-bookings__createdAt">
+                        Created At: {booking.createdAt || "Not available"}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="my-bookings__itemControls">
-                  <span className={`status-pill ${statusTone(status)}`}>
-                    {status}
-                  </span>
+                  <span className={`status-pill ${statusTone(status)}`}>{displayStatus(status)}</span>
 
                   <div className="my-bookings__itemActions">
                     <Link className="btn-secondary my-bookings__actionButton" to={getBookingDetailRoute(booking.id)}>
@@ -428,32 +434,29 @@ export default function MyBookings() {
         )}
       </section>
 
-      {pendingAction ? (
-        <div className="member-modal-overlay" role="presentation">
-          <div className="member-modal" role="dialog" aria-modal="true" aria-labelledby="booking-action-title">
-            <div>
-              <p className="member-card__eyebrow">
-                {pendingAction.type === "withdraw" ? "Withdraw Request" : "Cancel Booking"}
-              </p>
-              <h2 id="booking-action-title">
-                {pendingAction.type === "withdraw"
-                  ? "Do you want to withdraw this pending request?"
-                  : "Do you want to cancel this upcoming booking?"}
-              </h2>
-            </div>
-            <p>{formatTitle(pendingAction.booking)}</p>
-            <p>{formatDateTimeLine(pendingAction.booking)}</p>
-            <div className="member-modal__actions">
-              <button className="btn-secondary" type="button" onClick={() => setPendingAction(null)} disabled={actionLoading}>
-                Keep Booking
-              </button>
-              <button className="btn-danger" type="button" onClick={handleConfirmAction} disabled={actionLoading}>
-                {actionLoading ? "Submitting..." : pendingAction.type === "withdraw" ? "Withdraw Request" : "Cancel Booking"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        open={Boolean(pendingAction)}
+        title={
+          pendingAction?.type === "withdraw"
+            ? "Do you want to withdraw this pending request?"
+            : "Do you want to cancel this upcoming booking?"
+        }
+        description={
+          pendingAction?.booking
+            ? `${formatTitle(pendingAction.booking)} - ${formatDateTimeLine(pendingAction.booking)}`
+            : ""
+        }
+        confirmLabel={pendingAction?.type === "withdraw" ? "Withdraw Request" : "Cancel Booking"}
+        cancelLabel="Keep Booking"
+        tone="danger"
+        pending={actionLoading}
+        onCancel={() => {
+          if (!actionLoading) {
+            setPendingAction(null);
+          }
+        }}
+        onConfirm={handleConfirmAction}
+      />
     </PageLayout>
   );
 }

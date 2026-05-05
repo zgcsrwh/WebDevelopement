@@ -24,17 +24,23 @@ function getNotificationSortValue(value) {
 
 function mapNotification(item) {
   const createdAt = normalizeTimestamp(item.created_at);
+  const isRead = Boolean(item.isRead ?? item.is_read ?? false);
 
   return {
     id: item.id,
     type: item.type || "system",
-    statusContext: item.status_context || "",
-    memberId: item.member_id || "",
+    statusContext: item.status_context || item.status || "",
+    memberId: item.member_id || item.recipient_id || "",
     message: item.message || item.information || "System notification",
-    referenceId: item.reference_id || "",
-    isRead: Boolean(item.isRead ?? item.is_read ?? false),
+    referenceId: item.reference_id || item.related_id || "",
+    isRead,
     createdAt,
     sortValue: getNotificationSortValue(item.created_at),
+    rawDocument: {
+      ...item,
+      id: item.id,
+      is_read: isRead,
+    },
   };
 }
 
@@ -52,13 +58,27 @@ function getDisplayableNotifications(docs = []) {
     });
 }
 
+function mergeNotificationDocs(...groups) {
+  const merged = new Map();
+  groups.flat().forEach((item) => {
+    if (item?.id) {
+      merged.set(item.id, item);
+    }
+  });
+  return [...merged.values()];
+}
+
 export async function getNotifications(actor) {
   const resolvedActor = await resolveActor(actor);
   if (!resolvedActor?.id) {
     return [];
   }
 
-  const docs = await getCollectionDocs("notification", [where("member_id", "==", resolvedActor.id)]);
+  const [memberDocs, recipientDocs] = await Promise.all([
+    getCollectionDocs("notification", [where("member_id", "==", resolvedActor.id)]),
+    getCollectionDocs("notification", [where("recipient_id", "==", resolvedActor.id)]),
+  ]);
+  const docs = mergeNotificationDocs(memberDocs, recipientDocs);
   return getDisplayableNotifications(docs);
 }
 
@@ -69,14 +89,39 @@ export async function subscribeToNotifications(actor, onNext, onError) {
     return () => {};
   }
 
-  return subscribeToCollection(
+  let latestMemberDocs = [];
+  let latestRecipientDocs = [];
+  let unsubscribeMember = () => {};
+  let unsubscribeRecipient = () => {};
+
+  function emit() {
+    onNext(getDisplayableNotifications(mergeNotificationDocs(latestMemberDocs, latestRecipientDocs)));
+  }
+
+  unsubscribeMember = await subscribeToCollection(
     "notification",
     [where("member_id", "==", resolvedActor.id)],
     (docs) => {
-      onNext(getDisplayableNotifications(docs));
+      latestMemberDocs = docs;
+      emit();
     },
     onError,
   );
+
+  unsubscribeRecipient = await subscribeToCollection(
+    "notification",
+    [where("recipient_id", "==", resolvedActor.id)],
+    (docs) => {
+      latestRecipientDocs = docs;
+      emit();
+    },
+    onError,
+  );
+
+  return () => {
+    unsubscribeMember();
+    unsubscribeRecipient();
+  };
 }
 
 export async function getUnreadNotificationCount(actor) {

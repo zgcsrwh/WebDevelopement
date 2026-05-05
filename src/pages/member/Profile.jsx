@@ -16,6 +16,8 @@ import { getAvatarForActor } from "../../utils/avatar";
 import { getErrorMessage } from "../../utils/errors";
 import { displayStatus, toTitleText } from "../../utils/presentation";
 import { hasMeaningfulText } from "../../utils/text";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import Toast from "../../components/common/Toast";
 
 function formatDateInput(value) {
   if (!value) {
@@ -174,13 +176,14 @@ export default function Profile() {
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [profileAlert, setProfileAlert] = useState(null);
+  const [toast, setToast] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [friends, setFriends] = useState([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
-  const [friendAlert, setFriendAlert] = useState(null);
   const [selectedFriend, setSelectedFriend] = useState(null);
+  const [friendDeleteConfirmOpen, setFriendDeleteConfirmOpen] = useState(false);
   const [friendModalError, setFriendModalError] = useState("");
   const [removingFriend, setRemovingFriend] = useState(false);
 
@@ -235,13 +238,11 @@ export default function Profile() {
       const nextFriends = await getFriendProfiles(sessionProfile);
       setFriends(sortFriends(nextFriends));
     } catch (loadError) {
-      setFriendAlert(
-        buildAlert(
-          "Unable to load friends",
-          getErrorMessage(loadError, "Unable to load your partners."),
-          "error",
-        ),
-      );
+      setToast({
+        tone: "error",
+        title: "Unable to load friends",
+        message: getErrorMessage(loadError, "Unable to load your partners."),
+      });
     } finally {
       setFriendsLoading(false);
     }
@@ -460,11 +461,20 @@ export default function Profile() {
       await removeFriend(selectedFriend.memberId || selectedFriend.id, sessionProfile);
       await loadFriends();
       setSelectedFriend(null);
-      setFriendAlert(buildAlert("Friend removed", "Friend removed successfully."));
+      setFriendDeleteConfirmOpen(false);
+      setToast({
+        tone: "success",
+        title: "Friend removed",
+        message: "Friend removed successfully.",
+      });
     } catch (removeError) {
-      setFriendModalError(
-        getErrorMessage(removeError, "Unable to remove this friend right now."),
-      );
+      const message = getErrorMessage(removeError, "Unable to remove this friend right now.");
+      setFriendModalError(message);
+      setToast({
+        tone: "error",
+        title: "Remove failed",
+        message,
+      });
     } finally {
       setRemovingFriend(false);
     }
@@ -487,6 +497,8 @@ export default function Profile() {
 
   return (
     <div className="profile-page">
+      <Toast toast={toast} onClose={() => setToast(null)} />
+
       <aside className="profile-sidebar">
         <Link className="profile-sidebar__brand" to={ROUTE_PATHS.FACILITIES}>
           <span>Sports Center</span>
@@ -514,8 +526,6 @@ export default function Profile() {
             <small className="profile-sidebar__friendsCount">{friendCountLabel}</small>
           </div>
 
-          {renderAlert(friendAlert, "profile-sidebar__alert")}
-
           <div className="profile-sidebar__friendList">
             {friendsLoading ? (
               <p className="profile-sidebar__empty">Loading friends...</p>
@@ -529,8 +539,8 @@ export default function Profile() {
                   type="button"
                   onClick={() => {
                     setSelectedFriend(friend);
+                    setFriendDeleteConfirmOpen(false);
                     setFriendModalError("");
-                    setFriendAlert(null);
                   }}
                 >
                   <img
@@ -549,9 +559,6 @@ export default function Profile() {
         </section>
 
         <div className="profile-sidebar__footer">
-          <span className="profile-sidebar__navItem profile-sidebar__navItem--active">
-            Profile
-          </span>
           <button className="profile-sidebar__logout" type="button" onClick={handleSignOut}>
             Log Out
           </button>
@@ -725,6 +732,7 @@ export default function Profile() {
               type="button"
               onClick={() => {
                 setSelectedFriend(null);
+                setFriendDeleteConfirmOpen(false);
                 setFriendModalError("");
               }}
             >
@@ -733,8 +741,7 @@ export default function Profile() {
 
             {friendModalError ? renderAlert(buildAlert("Delete failed", friendModalError, "error")) : null}
 
-            <section className="partner-detail partner-detail--modal">
-              <article className="partner-detail__card">
+              <section className="profile-partnerModal" aria-labelledby="friend-detail-title">
                 <div className="partner-detail__header">
                   <div className="partner-detail__identity">
                     <img
@@ -798,14 +805,13 @@ export default function Profile() {
                   <button
                     className="profile-button profile-button--danger"
                     type="button"
-                    onClick={handleDeleteFriend}
+                    onClick={() => setFriendDeleteConfirmOpen(true)}
                     disabled={removingFriend}
                   >
                     {removingFriend ? "Deleting..." : "Delete Friend"}
                   </button>
                 </div>
-              </article>
-            </section>
+              </section>
           </div>
         </div>
       ) : null}
@@ -934,6 +940,22 @@ export default function Profile() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={friendDeleteConfirmOpen && Boolean(selectedFriend)}
+        title="Remove friend?"
+        description={`Remove ${selectedFriend?.nickname || selectedFriend?.name || "this friend"} from your partners?`}
+        confirmLabel="Remove Friend"
+        cancelLabel="Cancel"
+        tone="danger"
+        pending={removingFriend}
+        onCancel={() => {
+          if (!removingFriend) {
+            setFriendDeleteConfirmOpen(false);
+          }
+        }}
+        onConfirm={handleDeleteFriend}
+      />
     </div>
   );
 }

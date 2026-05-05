@@ -63,6 +63,11 @@
   line-height: 1.5;
 }
 
+.my-bookings__createdAt {
+  color: #8a9aa6 !important;
+  font-size: 0.82rem !important;
+}
+
 .my-bookings__itemControls {
   display: grid;
   justify-items: end;

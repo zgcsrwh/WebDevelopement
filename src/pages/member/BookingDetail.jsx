@@ -8,6 +8,7 @@ import { getBookingById } from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getErrorMessage } from "../../utils/errors";
+import { displayStatus } from "../../utils/presentation";
 
 const BOOKING_DETAIL_VISIBLE_STATUSES = new Set([
   "pending",
@@ -55,6 +56,10 @@ function normalizeStatus(value = "") {
 
   if (normalized === "complete") {
     return "completed";
+  }
+
+  if (normalized === "accepted") {
+    return "upcoming";
   }
 
   return normalized;
@@ -268,7 +273,7 @@ export default function BookingDetail() {
           <div>
             <h2>Booking Information</h2>
           </div>
-          <span className={getStatusPillClass(normalizedStatus)}>{normalizedStatus || "unknown"}</span>
+          <span className={getStatusPillClass(normalizedStatus)}>{displayStatus(normalizedStatus || "unknown")}</span>
         </section>
 
         <section className="booking-detail-card__section booking-detail-card__section--grid">

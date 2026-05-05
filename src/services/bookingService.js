@@ -253,6 +253,10 @@ function normalizeMemberBookingPageStatus(value = "") {
     return "completed";
   }
 
+  if (normalizedStatus === "accepted") {
+    return "upcoming";
+  }
+
   return normalizedStatus;
 }
 

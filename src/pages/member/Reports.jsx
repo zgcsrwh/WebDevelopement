@@ -5,7 +5,7 @@ import "./Reports.css";
 import { getReportFacilities, getRepairTickets, submitRepairTicket } from "../../services/reportService";
 import { useAuth } from "../../provider/AuthContext";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
-import { statusTone, toTitleText } from "../../utils/presentation";
+import { displayFilterOption, statusTone, toTitleText } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
 import PageLayout from "../../components/common/PageLayout";
 
@@ -243,7 +243,7 @@ export default function Reports() {
                 <option value="">Select the faulty part...</option>
                 {FAULT_PART_OPTIONS.map((option) => (
                   <option key={option} value={option}>
-                    {option}
+                    {displayFilterOption(option)}
                   </option>
                 ))}
               </select>

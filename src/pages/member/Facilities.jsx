@@ -24,9 +24,9 @@ const DEFAULT_FILTERS = {
 };
 
 const AVAILABILITY_OPTIONS = [
-  { value: "All", label: "All statuses" },
-  { value: "normal", label: "normal" },
-  { value: "fixing", label: "fixing" },
+  { value: "All", label: "All Statuses" },
+  { value: "normal", label: "Normal" },
+  { value: "fixing", label: "Fixing" },
 ];
 
 function sortAlphabetically(values) {
@@ -39,21 +39,6 @@ function normalizeFacilityType(value = "") {
 
 function formatFacilityType(value = "") {
   return String(value || "").trim();
-}
-
-function buildHourSlotRange(startHour, endHour) {
-  const safeStart = Number(startHour);
-  const safeEnd = Number(endHour);
-
-  if (!Number.isFinite(safeStart) || !Number.isFinite(safeEnd) || safeEnd <= safeStart) {
-    return [];
-  }
-
-  return Array.from({ length: safeEnd - safeStart }, (_, index) => {
-    const start = String(safeStart + index).padStart(2, "0");
-    const end = String(safeStart + index + 1).padStart(2, "0");
-    return `${start}:00 - ${end}:00`;
-  });
 }
 
 function sortTimeSlots(slots = []) {
@@ -84,24 +69,9 @@ function getTimeOptions(items = [], selectedType = "All") {
       ? items
       : items.filter((item) => normalizeFacilityType(item.sportType) === normalizedSelectedType);
 
-  if (!scopedItems.length) {
-    return ["All"];
-  }
-
-  if (normalizedSelectedType === "all") {
-    const startHours = scopedItems.map((item) => Number(item.startTime)).filter(Number.isFinite);
-    const endHours = scopedItems.map((item) => Number(item.endTime)).filter(Number.isFinite);
-
-    if (!startHours.length || !endHours.length) {
-      return ["All"];
-    }
-
-    return ["All", ...buildHourSlotRange(Math.min(...startHours), Math.max(...endHours))];
-  }
-
   const timeSlots = new Set();
   scopedItems.forEach((item) => {
-    buildHourSlotRange(item.startTime, item.endTime).forEach((slot) => timeSlots.add(slot));
+    (item.memberVisibleSlots || []).forEach((slot) => timeSlots.add(slot));
   });
 
   return ["All", ...sortTimeSlots([...timeSlots])];
@@ -346,13 +316,18 @@ export default function Facilities() {
             <select
               id="facilities-time"
               value={filters.time}
+              disabled={timeOptions.length <= 1}
               onChange={(event) => updateFilter("time", event.target.value)}
             >
-              {timeOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option === "All" ? "All Times" : option}
-                </option>
-              ))}
+              {timeOptions.length > 1 ? (
+                timeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === "All" ? "All Times" : option}
+                  </option>
+                ))
+              ) : (
+                <option value="All">No available times</option>
+              )}
             </select>
           </FilterField>
 

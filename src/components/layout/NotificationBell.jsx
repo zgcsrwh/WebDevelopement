@@ -26,13 +26,26 @@ const NOTIFICATION_TABS = [
 ];
 
 function sortByNewest(items = []) {
-  return [...items].sort((left, right) =>
-    String(right.sortValue || right.createdAt || "").localeCompare(String(left.sortValue || left.createdAt || "")),
-  );
+  return [...items].sort((left, right) => {
+    const leftSort = Number(left.sortValue || 0);
+    const rightSort = Number(right.sortValue || 0);
+    if (leftSort !== rightSort) {
+      return rightSort - leftSort;
+    }
+
+    return String(right.createdAt || "").localeCompare(String(left.createdAt || ""));
+  });
+}
+
+function getNormalizedTypeKey(type = "") {
+  return String(type || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 }
 
 function getNotificationGroup(type = "") {
-  const value = String(type || "").trim().toLowerCase();
+  const value = getNormalizedTypeKey(type);
   if (value === "facility_request") return "booking";
   if (value === "repair_report") return "repair";
   if (["match_request", "friend", "match", "matching", "partner_request"].includes(value)) return "match";
@@ -40,7 +53,7 @@ function getNotificationGroup(type = "") {
 }
 
 function getTypeLabel(type = "") {
-  const value = String(type || "").trim().toLowerCase();
+  const value = getNormalizedTypeKey(type);
   if (value === "facility_request") return "Booking";
   if (value === "repair_report") return "Repair";
   if (["match_request", "friend", "match", "matching", "partner_request"].includes(value)) return "Match";
@@ -54,7 +67,7 @@ function getStatusLabel(status = "") {
 
 function getTypeIcon(type = "") {
   const props = { size: 18, strokeWidth: 2.2 };
-  const value = String(type || "").trim().toLowerCase();
+  const value = getNormalizedTypeKey(type);
 
   if (value === "facility_request") {
     return <CalendarDays {...props} />;
@@ -82,6 +95,7 @@ function normalizeNotificationItem(item) {
     message: item.message,
     statusContext: item.statusContext,
     referenceId: item.referenceId,
+    memberId: item.memberId,
     isRead: item.isRead,
     createdAt: item.createdAt,
     sortValue: item.sortValue || item.createdAt,
@@ -145,7 +159,7 @@ function LoadingState({ label }) {
 
 function NotificationSummaryCard({ item, children }) {
   return (
-    <div className="notification-bell__modalCard">
+    <div className="notification-bell__modalDetail">
       <div className="notification-bell__modalMeta">
         <span className={`notification-bell__typeBadge notification-bell__typeBadge--${item.group}`}>
           {getTypeLabel(item.type)}
@@ -426,6 +440,44 @@ function MatchInfoModal({ item, detail, loading, error, onClose }) {
   );
 }
 
+function NotificationSummaryModal({ item, onClose }) {
+  return (
+    <ModalShell
+      title="Notification Details"
+      description="Review this notification without leaving the current page."
+      onClose={onClose}
+    >
+      <NotificationSummaryCard item={item}>
+        <strong>{item.message || "Notification"}</strong>
+        <div className="notification-bell__detailGrid">
+          <div>
+            <span>Category</span>
+            <strong>{getTypeLabel(item.type)}</strong>
+          </div>
+          <div>
+            <span>Status</span>
+            <strong>{item.statusContext ? getStatusLabel(item.statusContext) : "Not available"}</strong>
+          </div>
+          <div>
+            <span>Received At</span>
+            <strong>{item.createdAt || "Not available"}</strong>
+          </div>
+        </div>
+        <div className="notification-bell__applicationBox">
+          <span>Message</span>
+          <p>{item.message || "No notification message was provided."}</p>
+        </div>
+      </NotificationSummaryCard>
+
+      <div className="notification-bell__modalActions">
+        <button className="btn-secondary" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
 function StaffNotificationModal({ item, onClose }) {
   return (
     <ModalShell
@@ -585,7 +637,18 @@ export default function NotificationBell({ variant = "member" }) {
     if (item.source === "notification") {
       await markNotificationRead(item.id);
       setNotifications((current) =>
-        current.map((entry) => (entry.id === item.id ? { ...entry, isRead: true } : entry)),
+        current.map((entry) =>
+          entry.id === item.id
+            ? {
+                ...entry,
+                isRead: true,
+                rawDocument: {
+                  ...(entry.rawDocument || {}),
+                  is_read: true,
+                },
+              }
+            : entry,
+        ),
       );
       return;
     }
@@ -629,15 +692,25 @@ export default function NotificationBell({ variant = "member" }) {
     setMatchDecisionPending(false);
   }
 
-  async function openBookingDetails(item) {
-    openModal("booking", item);
+  function openNotificationSummaryDetails(item) {
+    setPanelOpen(false);
+    setActiveModal({ kind: "notification-summary", item });
+    setModalDetail(null);
+    setModalError("");
+    setModalLoading(false);
+    setMatchRespondMessage("");
+    setMatchDecisionPending(false);
     void markItemRead(item);
+  }
 
+  async function openBookingDetails(item) {
     if (!item.referenceId) {
-      setModalError("Detailed booking data is unavailable for this notification.");
-      setModalLoading(false);
+      openNotificationSummaryDetails(item);
       return;
     }
+
+    openModal("booking", item);
+    void markItemRead(item);
 
     try {
       const detail = await getBookingById(item.referenceId, sessionProfile);
@@ -650,14 +723,13 @@ export default function NotificationBell({ variant = "member" }) {
   }
 
   async function openRepairDetails(item) {
-    openModal("repair", item);
-    void markItemRead(item);
-
     if (!item.referenceId) {
-      setModalError("Detailed repair data is unavailable for this notification.");
-      setModalLoading(false);
+      openNotificationSummaryDetails(item);
       return;
     }
+
+    openModal("repair", item);
+    void markItemRead(item);
 
     try {
       const detail = await getRepairTicketById(item.referenceId, sessionProfile);
@@ -670,6 +742,11 @@ export default function NotificationBell({ variant = "member" }) {
   }
 
   async function openMatchReview(item) {
+    if (!item.referenceId) {
+      openNotificationSummaryDetails(item);
+      return;
+    }
+
     openModal("match-review", item);
     void markItemRead(item);
 
@@ -689,11 +766,16 @@ export default function NotificationBell({ variant = "member" }) {
   }
 
   async function openMatchInfo(item) {
+    if (!item.referenceId) {
+      openNotificationSummaryDetails(item);
+      return;
+    }
+
     openModal("match-info", item);
     void markItemRead(item);
 
     try {
-      const detail = item.referenceId ? await loadMatchDetail(item.referenceId) : null;
+      const detail = await loadMatchDetail(item.referenceId);
       setModalDetail(detail);
     } catch (error) {
       setModalError(error?.message || "The full match details could not be loaded.");
@@ -759,7 +841,16 @@ export default function NotificationBell({ variant = "member" }) {
     setPanelMessage("");
     try {
       await markAllNotificationsRead(sessionProfile);
-      setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+      setNotifications((current) =>
+        current.map((item) => ({
+          ...item,
+          isRead: true,
+          rawDocument: {
+            ...(item.rawDocument || {}),
+            is_read: true,
+          },
+        })),
+      );
     } catch (error) {
       setPanelError(error?.message || "Notifications could not be marked as read.");
     }
@@ -812,6 +903,10 @@ export default function NotificationBell({ variant = "member" }) {
 
     if (activeModal.kind === "staff-info") {
       return <StaffNotificationModal item={activeModal.item} onClose={closeModal} />;
+    }
+
+    if (activeModal.kind === "notification-summary") {
+      return <NotificationSummaryModal item={activeModal.item} onClose={closeModal} />;
     }
 
     return (
@@ -952,8 +1047,12 @@ export default function NotificationBell({ variant = "member" }) {
                     {!isStaffVariant &&
                     item.group === "match" &&
                     String(item.statusContext || "").trim().toLowerCase() === "pending" ? (
-                      <button className="btn" type="button" onClick={() => openMatchReview(item)}>
-                        Review Request
+                      <button
+                        className={item.referenceId ? "btn" : "btn-secondary"}
+                        type="button"
+                        onClick={() => openMatchReview(item)}
+                      >
+                        {item.referenceId ? "Review Request" : "View Details"}
                       </button>
                     ) : null}
 
@@ -962,6 +1061,12 @@ export default function NotificationBell({ variant = "member" }) {
                     String(item.statusContext || "").trim().toLowerCase() !== "pending" ? (
                       <button className="btn-secondary" type="button" onClick={() => openMatchInfo(item)}>
                         Open Details
+                      </button>
+                    ) : null}
+
+                    {!isStaffVariant && item.group === "all" ? (
+                      <button className="btn-secondary" type="button" onClick={() => openNotificationSummaryDetails(item)}>
+                        View Details
                       </button>
                     ) : null}
                   </div>
