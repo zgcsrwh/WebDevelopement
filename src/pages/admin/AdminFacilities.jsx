@@ -115,11 +115,10 @@ export default function AdminFacilities() {
 
       setItems(facilityItems);
       setStaffMembers(
-        staffItems.filter(
-          (item) =>
-            String(item.role || "").toLowerCase() === "staff" &&
-            String(item.status || "").toLowerCase() === "active",
-        ),
+        staffItems.filter((item) => {
+          const status = String(item.status || "").toLowerCase();
+          return String(item.role || "").toLowerCase() === "staff" && ["active", "unassigned"].includes(status);
+        }),
       );
       setPageError("");
     } catch (loadError) {

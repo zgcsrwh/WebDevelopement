@@ -5,7 +5,7 @@ export function statusTone(status = "") {
     return "status-active";
   }
 
-  if (["pending approval", "pending", "suggested alternative", "alternative suggested", "suggested", "suspended", "fixing", "maintenance"].includes(value)) {
+  if (["pending approval", "pending", "suggested alternative", "alternative suggested", "suggested", "suspended", "fixing", "maintenance", "unassigned"].includes(value)) {
     return "status-pending";
   }
 
@@ -51,6 +51,7 @@ export function displayStatus(value = "") {
     outdate: "outdate",
     deleted: "deleted",
     active: "Active",
+    unassigned: "Unassigned",
     deactivated: "Deactivated",
     deactivate: "Deactivated",
     inactive: "Inactive",

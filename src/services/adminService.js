@@ -29,6 +29,7 @@ import { displayStatus, formatRole } from "../utils/presentation";
 import { callSubmitAction } from "./callableService";
 
 const SECONDARY_AUTH_APP = "staff-account-creator";
+const ASSIGNABLE_STAFF_STATUSES = new Set(["active", "unassigned"]);
 
 async function resolveActor(actor) {
   return actor || getCurrentActor();
@@ -99,7 +100,7 @@ function formatScheduledChange(change) {
   return `New hours ${String(startTime).padStart(2, "0")}:00 - ${String(endTime).padStart(2, "0")}:00 will take effect on ${formatEffectiveDateLabel(change.effectiveOn)}.`;
 }
 
-async function assertActiveStaffAccount(staffId) {
+async function assertAssignableStaffAccount(staffId) {
   if (!staffId) {
     return null;
   }
@@ -113,8 +114,8 @@ async function assertActiveStaffAccount(staffId) {
     throw createAppError("failed-precondition", "Only staff accounts can be assigned to facilities.");
   }
 
-  if (String(staffDoc.status || "").toLowerCase() !== "active") {
-    throw createAppError("failed-precondition", "Please assign an active staff member.");
+  if (!ASSIGNABLE_STAFF_STATUSES.has(String(staffDoc.status || "").toLowerCase())) {
+    throw createAppError("failed-precondition", "Please assign an active or unassigned staff member.");
   }
 
   return staffDoc;
@@ -442,7 +443,7 @@ async function upsertFacilityDirect(form, actor) {
   if (!nextStaffId) {
     throw createAppError("failed-precondition", "Please assign one active staff member to this facility.");
   }
-  await assertActiveStaffAccount(nextStaffId);
+  await assertAssignableStaffAccount(nextStaffId);
 
   const basePayload = {
     name: String(form.name || "").trim(),
@@ -577,41 +578,6 @@ export async function upsertFacility(form, actor) {
   );
 }
 
-async function deleteFacilityDirect(facilityIdOrPayload, actor) {
-  const resolvedActor = await resolveActor(actor);
-  assertRole(resolvedActor, ["Admin"]);
-  const facilityId =
-    typeof facilityIdOrPayload === "object" && facilityIdOrPayload !== null
-      ? facilityIdOrPayload.facility_id || facilityIdOrPayload.id
-      : facilityIdOrPayload;
-
-  const existingDoc = await getDocById("facility", facilityId);
-  if (!existingDoc) {
-    throw createAppError("not-found");
-  }
-
-  const rawFacility = normalizeFacilityDoc(existingDoc);
-  const virtualFacility = getVirtualFacilityDoc(existingDoc);
-  if (getPersistedFacilityStatus(virtualFacility) === "deleted") {
-    throw createAppError("failed-precondition", "This facility has already been deleted.");
-  }
-
-  if (rawFacility.scheduledChange?.type === "delete") {
-    throw createAppError("failed-precondition", "This facility is already scheduled for deletion.");
-  }
-
-  const scheduledChange = buildScheduledChange("delete");
-  await updateCollectionDoc("facility", facilityId, {
-    scheduled_change: scheduledChange,
-    updated_at: serverTimestamp(),
-  });
-
-  return {
-    success: true,
-    effective_on: scheduledChange.effective_on,
-  };
-}
-
 export async function deleteFacility(facilityIdOrPayload, actor) {
   const payload =
     typeof facilityIdOrPayload === "object" && facilityIdOrPayload !== null
@@ -648,7 +614,7 @@ async function manageFacilityStaffDirect(payload, actor) {
   }
 
   const nextStaffId = String(assignedStaff[0] || "").trim();
-  await assertActiveStaffAccount(nextStaffId);
+  await assertAssignableStaffAccount(nextStaffId);
 
   await updateCollectionDoc("facility", facilityId, {
     staff_id: nextStaffId,

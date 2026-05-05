@@ -223,8 +223,12 @@ export function getEffectiveFacilityStatus(facility = {}, repairs = []) {
   return getPersistedFacilityStatus(normalizedFacility);
 }
 
-export function isActiveAccount(status = "") {
-  return String(status || "").toLowerCase() === "active";
+export function isActiveAccount(status = "", role = "") {
+  const normalizedStatus = String(status || "").toLowerCase();
+  if (normalizedStatus === "active") {
+    return true;
+  }
+  return String(role || "").toLowerCase() === "staff" && normalizedStatus === "unassigned";
 }
 
 export function isFacilityVisible(status = "") {
@@ -724,7 +728,7 @@ export function assertRole(actor, allowedRoles) {
     throw createAppError("permission-denied");
   }
 
-  if (!isActiveAccount(actor.status)) {
+  if (!isActiveAccount(actor.status, actor.role)) {
     throw createAppError("permission-denied", "This account is currently inactive.");
   }
 }
