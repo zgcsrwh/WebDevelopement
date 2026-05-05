@@ -9,7 +9,7 @@
  *
  * 业务规则：
  * - only create missing slots, never overwrite existing slots
- * - 只有 status === "normal" 的 facility 才生成新 slot
+ * - 只为 status === "normal" 或 "fixing" 的 facility 生成新 slot
  * - 应用 due scheduled_change
  * - 旧 doc id 兼容
  * - batch 写入
@@ -62,6 +62,9 @@ function generateSlotId(facilityId, date, hour) {
  * 只删除 date < getLondonDateOffset(0) 且 status === "open" 的 slot
  * 不删除 locked / unavailable 等其他状态
  *
+ * 注意：为了避免 Firestore composite index，查询只用单字段
+ * 在代码中过滤 status === "open"
+ *
  * @param {object} stats - 统计对象
  * @returns {Promise<void>}
  */
@@ -69,11 +72,11 @@ async function cleanupExpiredOpenSlots(stats) {
   const today = getLondonDateOffset(0);
   const DELETE_BATCH_SIZE = 450;
 
-  // 查询：date < today 且 status === "open"
+  // 查询：只查询 date < today（单字段查询，避免 composite index）
+  // status === "open" 的过滤在代码中判断
   const expiredSlotsSnap = await db
     .collection("time_slot")
     .where("date", "<", today)
-    .where("status", "==", "open")
     .get();
 
   if (expiredSlotsSnap.empty) {
@@ -81,12 +84,19 @@ async function cleanupExpiredOpenSlots(stats) {
     return;
   }
 
-  // 分批删除
+  // 分批删除：只删除 status === "open" 的 slot
   let batch = db.batch();
   let batchCount = 0;
   let deletedCount = 0;
 
   for (const slotDoc of expiredSlotsSnap.docs) {
+    const slotData = slotDoc.data();
+
+    // 只删除 status === "open" 的 slot
+    if (slotData.status !== "open") {
+      continue;
+    }
+
     batch.delete(slotDoc.ref);
     batchCount++;
     deletedCount++;
@@ -212,7 +222,7 @@ async function processFacility({ facilityDoc, targetDates, stats }) {
   const facilityId = facilityDoc.id;
 
   // ========== 5.1 facility.status 过滤 ==========
-  if (facilityData.status !== "normal") {
+  if (!["normal", "fixing"].includes(facilityData.status)) {
     stats.skippedNonNormalFacilities++;
     return;
   }

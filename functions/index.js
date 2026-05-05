@@ -48,3 +48,27 @@ exports.maintainTimeSlotWindow = maintainTimeSlotWindow;
 // 导入 expirePendingBookingRequests (scheduled function)
 const { expirePendingBookingRequests } = require("./expirePendingBookingRequests");
 exports.expirePendingBookingRequests = expirePendingBookingRequests;
+
+// 导入 deleteFacility
+const { deleteFacility } = require("./deleteFacility");
+exports.deleteFacility = deleteFacility;
+
+// 导入 submitRepairTicket
+const { submitRepairTicket } = require("./submitRepairTicket");
+exports.submitRepairTicket = submitRepairTicket;
+
+// 导入 updateTicketStatus
+const { updateTicketStatus } = require("./updateTicketStatus");
+exports.updateTicketStatus = updateTicketStatus;
+
+// 导入 getUserContext
+const { getUserContext } = require("./getUserContext");
+exports.getUserContext = getUserContext;
+
+// 导入 checkAccountDeletable
+const { checkAccountDeletable } = require("./checkAccountDeletable");
+exports.checkAccountDeletable = checkAccountDeletable;
+
+// 导入 deleteMyAccount
+const { deleteMyAccount } = require("./deleteMyAccount");
+exports.deleteMyAccount = deleteMyAccount;

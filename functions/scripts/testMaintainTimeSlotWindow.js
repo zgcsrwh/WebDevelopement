@@ -547,7 +547,7 @@ async function testSkipNonNormalFacility() {
         facilityId: facilityId
       });
 
-      if (status === "normal") {
+      if (status === "normal" || status === "fixing") {
         assertStats(result, {
           scannedFacilities: 1,
           skippedNonNormalFacilities: 0,
@@ -563,6 +563,146 @@ async function testSkipNonNormalFacility() {
     }
 
     console.log("PASS: skip-non-normal-facility");
+  } finally {
+    await cleanupTestData(facilityIds);
+  }
+}
+
+/**
+ * fixing-facility-generates-slots
+ * 验证 status === "fixing" 的 facility 也能生成 time_slot
+ */
+async function testFixingFacilityGeneratesSlots() {
+  const facilityId = "mtw-facility-fixing";
+  const facilityIds = [facilityId];
+
+  console.log("\n=== Test: fixing-facility-generates-slots ===");
+
+  try {
+    // Setup facility with fixing status
+    await db.collection("facility").doc(facilityId).set({
+      name: "Test Fixing Facility",
+      sport_type: "tennis",
+      description: "Test",
+      usage_guidelines: "Test",
+      capacity: 4,
+      location: "Test",
+      start_time: 9,
+      end_time: 11,
+      staff_id: "staff_test",
+      status: "fixing",
+      scheduled_change: null,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    console.log("Created facility with status: fixing");
+
+    // Execute
+    const result = await processTimeSlotWindow({
+      mode: "daily",
+      facilityId: facilityId
+    });
+    console.log("Result:", JSON.stringify(result, null, 2));
+
+    // Verify: should create slots for fixing facility (daily mode = today+7)
+    const targetDate = getLondonDateOffset(7);
+    assertStats(result, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      createdSlots: 2
+    });
+
+    // Verify slots created for targetDate
+    const slot9 = await db.collection("time_slot").doc(`${facilityId}-${targetDate}-09`).get();
+    const slot10 = await db.collection("time_slot").doc(`${facilityId}-${targetDate}-10`).get();
+
+    if (!slot9.exists) {
+      throw new Error("Slot 09 should be created");
+    }
+    if (!slot10.exists) {
+      throw new Error("Slot 10 should be created");
+    }
+    if (slot9.data().status !== "open") {
+      throw new Error("Slot status should be open");
+    }
+
+    console.log("PASS: fixing-facility-generates-slots");
+  } finally {
+    await cleanupTestData(facilityIds);
+  }
+}
+
+/**
+ * fixing-existing-locked-slot-not-overwritten
+ * 验证 fixing facility 的 existing locked slot 不会被覆盖
+ */
+async function testFixingExistingLockedSlotNotOverwritten() {
+  const facilityId = "mtw-facility-locked";
+  const facilityIds = [facilityId];
+  const targetDate = getLondonDateOffset(7);
+  const slotId = `${facilityId}-${targetDate}-09`;
+  const otherMemberId = "other-member-id";
+
+  console.log("\n=== Test: fixing-existing-locked-slot-not-overwritten ===");
+
+  try {
+    // Setup facility with fixing status
+    await db.collection("facility").doc(facilityId).set({
+      name: "Test Fixing Facility",
+      sport_type: "tennis",
+      description: "Test",
+      usage_guidelines: "Test",
+      capacity: 4,
+      location: "Test",
+      start_time: 9,
+      end_time: 11,
+      staff_id: "staff_test",
+      status: "fixing",
+      scheduled_change: null,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    // Setup existing locked time_slot
+    await db.collection("time_slot").doc(slotId).set({
+      facility_id: facilityId,
+      date: targetDate,
+      start_time: "09",
+      end_time: "10",
+      status: "locked",
+      request_id: otherMemberId,
+      created_at: FieldValue.serverTimestamp(),
+      updated_at: FieldValue.serverTimestamp(),
+    });
+
+    console.log("Created facility with status: fixing and existing locked slot");
+
+    // Execute
+    const result = await processTimeSlotWindow({
+      mode: "daily",
+      facilityId: facilityId
+    });
+    console.log("Result:", JSON.stringify(result, null, 2));
+
+    // Verify: other slots should be created, locked slot should NOT be overwritten
+    assertStats(result, {
+      scannedFacilities: 1,
+      skippedNonNormalFacilities: 0,
+      createdSlots: 1,
+      skippedExistingSlots: 1
+    });
+
+    // Verify locked slot NOT overwritten
+    const slotDoc = await db.collection("time_slot").doc(slotId).get();
+    if (slotDoc.data().request_id !== otherMemberId) {
+      throw new Error("Locked slot request_id should not be overwritten");
+    }
+    if (slotDoc.data().status !== "locked") {
+      throw new Error("Locked slot status should not be changed");
+    }
+
+    console.log("PASS: fixing-existing-locked-slot-not-overwritten");
   } finally {
     await cleanupTestData(facilityIds);
   }
@@ -1320,6 +1460,8 @@ async function main() {
     console.log("  apply-scheduled-change-before-generation");
     console.log("  future-scheduled-change-not-applied");
     console.log("  skip-non-normal-facility");
+    console.log("  fixing-facility-generates-slots");
+    console.log("  fixing-existing-locked-slot-not-overwritten");
     console.log("  legacy-doc-id-compatibility");
     console.log("\nFailure / edge paths:");
     console.log("  unknown-mode");
@@ -1361,6 +1503,12 @@ async function main() {
         break;
       case "skip-non-normal-facility":
         await testSkipNonNormalFacility();
+        break;
+      case "fixing-facility-generates-slots":
+        await testFixingFacilityGeneratesSlots();
+        break;
+      case "fixing-existing-locked-slot-not-overwritten":
+        await testFixingExistingLockedSlotNotOverwritten();
         break;
       case "legacy-doc-id-compatibility":
         await testLegacyDocIdCompatibility();
