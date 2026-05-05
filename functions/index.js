@@ -60,3 +60,7 @@ exports.submitRepairTicket = submitRepairTicket;
 // 导入 updateTicketStatus
 const { updateTicketStatus } = require("./updateTicketStatus");
 exports.updateTicketStatus = updateTicketStatus;
+
+// 导入 getUserContext
+const { getUserContext } = require("./getUserContext");
+exports.getUserContext = getUserContext;
