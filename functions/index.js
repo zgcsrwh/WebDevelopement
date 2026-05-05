@@ -48,3 +48,7 @@ exports.maintainTimeSlotWindow = maintainTimeSlotWindow;
 // 导入 expirePendingBookingRequests (scheduled function)
 const { expirePendingBookingRequests } = require("./expirePendingBookingRequests");
 exports.expirePendingBookingRequests = expirePendingBookingRequests;
+
+// 导入 deleteFacility
+const { deleteFacility } = require("./deleteFacility");
+exports.deleteFacility = deleteFacility;
