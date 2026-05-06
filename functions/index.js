@@ -80,3 +80,7 @@ exports.createStaffAccount = createStaffAccount;
 // 导入 disableStaffAccount
 const { disableStaffAccount } = require("./disableStaffAccount");
 exports.disableStaffAccount = disableStaffAccount;
+
+// 导入 toggleMatchStatus
+const { toggleMatchStatus } = require("./toggleMatchStatus");
+exports.toggleMatchStatus = toggleMatchStatus;
