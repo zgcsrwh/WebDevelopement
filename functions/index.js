@@ -76,3 +76,7 @@ exports.deleteMyAccount = deleteMyAccount;
 // 导入 createStaffAccount
 const { createStaffAccount } = require("./createStaffAccount");
 exports.createStaffAccount = createStaffAccount;
+
+// 导入 disableStaffAccount
+const { disableStaffAccount } = require("./disableStaffAccount");
+exports.disableStaffAccount = disableStaffAccount;
