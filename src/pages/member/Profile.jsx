@@ -467,13 +467,17 @@ export default function Profile() {
               ))
             )}
           </div>
-        </section>
+          </section>
 
-        <div className="profile-sidebar__footer">
-          <button className="profile-sidebar__logout" type="button" onClick={handleSignOut}>
-            Log Out
-          </button>
-        </div>
+          <div className="profile-sidebar__footer">
+            <div className="profile-sidebar__support" aria-label="Customer support phone">
+              <span>Customer Support</span>
+              <strong>+44 20 1234 5678</strong>
+            </div>
+            <button className="profile-sidebar__logout" type="button" onClick={handleSignOut}>
+              Log Out
+            </button>
+          </div>
       </aside>
 
       <main className="profile-main">

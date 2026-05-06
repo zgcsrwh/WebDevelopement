@@ -101,6 +101,33 @@
   min-width: 0;
 }
 
+.member-shell__support {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: #f4f8fa;
+  border: 1px solid #dce8ef;
+  color: #657785;
+  white-space: nowrap;
+}
+
+.member-shell__support span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.member-shell__support strong {
+  color: #223642;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
 .member-shell__iconButton,
 .member-shell__profileLink {
   position: relative;
@@ -305,6 +332,11 @@
     padding-bottom: 12px;
   }
 
+  .member-shell__support {
+    min-height: 42px;
+    padding: 0 12px;
+  }
+
   .member-shell__main {
     padding: 32px 18px 28px;
   }
@@ -319,5 +351,6 @@
   .member-shell__actions {
     width: 100%;
     justify-content: flex-end;
+    flex-wrap: wrap;
   }
 }

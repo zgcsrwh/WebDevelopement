@@ -130,6 +130,13 @@ function AppShell({ children }) {
           </nav>
 
           <div className="member-shell__actions">
+            {sessionRole === "Member" ? (
+              <div className="member-shell__support" aria-label="Customer support phone">
+                <span>Support</span>
+                <strong>+44 20 1234 5678</strong>
+              </div>
+            ) : null}
+
             {!isAdmin ? <NotificationBell variant={isStaff ? "staff" : "member"} /> : null}
 
             <Link
