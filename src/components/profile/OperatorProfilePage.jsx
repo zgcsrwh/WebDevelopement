@@ -270,7 +270,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
     await persistChanges();
   }
 
-  if (loading) {
+  if (!sessionProfile || loading) {
     return (
       <div className="staff-profile-page">
         <div className="staff-profile__empty">Loading profile...</div>

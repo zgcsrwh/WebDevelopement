@@ -98,6 +98,7 @@ export default function Profile() {
     createdAt: "",
   });
   const [originalProfile, setOriginalProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [form, setForm] = useState({
     name: "",
     dateOfBirth: "",
@@ -130,8 +131,13 @@ export default function Profile() {
 
     async function loadProfile() {
       if (!sessionProfile) {
+        if (!cancelled) {
+          setProfileLoading(true);
+        }
         return;
       }
+
+      setProfileLoading(true);
 
       let record = null;
       if (sessionProfile.id) {
@@ -154,6 +160,7 @@ export default function Profile() {
         dateOfBirth: nextView.dateOfBirth,
         address: nextView.address,
       });
+      setProfileLoading(false);
     }
 
     loadProfile();
@@ -396,7 +403,7 @@ export default function Profile() {
     navigate(ROUTE_PATHS.LOGIN, { replace: true });
   }
 
-  if (!sessionProfile) {
+  if (!sessionProfile || profileLoading) {
     return (
       <div className="profile-page">
         <main className="profile-main">
