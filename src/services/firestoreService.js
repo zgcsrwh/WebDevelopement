@@ -81,14 +81,40 @@ function matchesWhereConstraint(item, constraint) {
   }
 }
 
+function formatLocalTimestamp(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+function normalizeTimestampString(value) {
+  const normalized = String(value || "").trim();
+  const match = normalized.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
+
+  if (!match) {
+    return normalized;
+  }
+
+  if (!match[2] || !match[3]) {
+    return match[1];
+  }
+
+  // Stored timestamp strings are treated as database display values. Do not
+  // shift ISO strings by the browser timezone when showing them back to users.
+  return `${match[1]} ${match[2]}:${match[3]}`;
+}
+
 export function normalizeTimestamp(value) {
   if (!value) return "";
-  if (typeof value === "string") return value;
+  if (typeof value === "string") return normalizeTimestampString(value);
   if (value?.seconds) {
-    return new Date(value.seconds * 1000).toISOString().slice(0, 16).replace("T", " ");
+    return formatLocalTimestamp(new Date(value.seconds * 1000));
   }
   if (value?.toDate) {
-    return value.toDate().toISOString().slice(0, 16).replace("T", " ");
+    return formatLocalTimestamp(value.toDate());
   }
   return String(value);
 }

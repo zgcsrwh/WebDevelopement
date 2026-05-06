@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import { Lock, LockOpen, LockKeyhole, LogOut, UserRound } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { LogOut, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getErrorMessage } from "../../utils/errors";
 import { hasMeaningfulText } from "../../utils/text";
 import { getDocById, updateCollectionDoc } from "../../services/firestoreService";
-import { updateOwnPassword } from "../../services/profileService";
+import ConfirmDialog from "../common/ConfirmDialog";
+import PasswordChangePanel from "./PasswordChangePanel";
 
 function formatDateInput(value) {
   if (!value) {
@@ -47,10 +48,6 @@ function normalizeProfile(record = {}, fallback = {}) {
   };
 }
 
-function isStrongPassword(value) {
-  return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(String(value || ""));
-}
-
 function buildAlert(title, body, tone = "success") {
   return { title, body, tone };
 }
@@ -79,10 +76,10 @@ function renderFieldError(error) {
 export default function OperatorProfilePage({ roleVariant = "staff", roleLabel = "Staff" }) {
   const navigate = useNavigate();
   const { logout, sessionProfile } = useAuth();
+  const passwordPanelRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [pageAlert, setPageAlert] = useState(null);
-  const [saveError, setSaveError] = useState("");
   const [originalProfile, setOriginalProfile] = useState(null);
   const [draftProfile, setDraftProfile] = useState({
     name: "",
@@ -91,11 +88,6 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
     email: "",
     role: roleVariant,
     createdAt: "",
-  });
-  const [passwordExpanded, setPasswordExpanded] = useState(false);
-  const [passwordForm, setPasswordForm] = useState({
-    nextPassword: "",
-    confirmPassword: "",
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -150,53 +142,19 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
     };
   }, [sessionProfile]);
 
-  const passwordDirty = useMemo(
-    () => hasMeaningfulText(passwordForm.nextPassword) || hasMeaningfulText(passwordForm.confirmPassword),
-    [passwordForm.confirmPassword, passwordForm.nextPassword],
-  );
-
   const profileInitial =
     String(originalProfile?.name || sessionProfile?.name || roleLabel).trim().charAt(0).toUpperCase() ||
     roleLabel.charAt(0).toUpperCase();
 
   const roleBadge = String(roleLabel || originalProfile?.role || draftProfile.role || roleVariant).toUpperCase();
 
-  function resetPasswordState({ collapse = true } = {}) {
-    setPasswordForm({ nextPassword: "", confirmPassword: "" });
-    setFieldErrors((previous) => ({
-      ...previous,
-      nextPassword: "",
-      confirmPassword: "",
-      address: previous.address || "",
-    }));
-    if (collapse) {
-      setPasswordExpanded(false);
-    }
-  }
-
-  function handleTogglePasswordSection() {
-    if (passwordExpanded) {
-      resetPasswordState({ collapse: true });
-      setPageAlert(null);
-      return;
-    }
-
-    setPasswordExpanded(true);
-    setFieldErrors((previous) => ({
-      ...previous,
-      nextPassword: "",
-      confirmPassword: "",
-    }));
-  }
-
   function handleCancel() {
     if (originalProfile) {
       setDraftProfile(originalProfile);
     }
-    resetPasswordState({ collapse: true });
+    passwordPanelRef.current?.reset({ collapse: true });
     setFieldErrors({});
     setPageAlert(null);
-    setSaveError("");
     setConfirmModalOpen(false);
   }
 
@@ -212,35 +170,29 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
       nextErrors.address = "Please enter an address.";
     }
 
-    if (passwordDirty) {
-      if (!hasMeaningfulText(passwordForm.nextPassword)) {
-        nextErrors.nextPassword = "Please enter a new password.";
-      } else if (!isStrongPassword(passwordForm.nextPassword)) {
-        nextErrors.nextPassword =
-          "Password must be at least 8 characters long and include both letters and numbers.";
-      }
-
-      if (!hasMeaningfulText(passwordForm.confirmPassword)) {
-        nextErrors.confirmPassword = "Please confirm the new password.";
-      } else if (passwordForm.nextPassword !== passwordForm.confirmPassword) {
-        nextErrors.confirmPassword = "The two passwords must match.";
-      }
-    }
+    const passwordResult = passwordPanelRef.current?.validate({ requirePassword: false }) ?? {
+      dirty: false,
+      errors: {},
+      valid: true,
+    };
 
     setFieldErrors(nextErrors);
-    return nextErrors;
+    return {
+      passwordDirty: passwordResult.dirty,
+      valid: Object.keys(nextErrors).length === 0 && passwordResult.valid,
+    };
   }
 
   async function persistChanges() {
     const trimmedAddress = String(draftProfile.address || "").trim();
     const shouldUpdateAddress = trimmedAddress !== String(originalProfile?.address || "").trim();
-    const shouldUpdatePassword = passwordDirty;
+    const shouldUpdatePassword = Boolean(passwordPanelRef.current?.hasPasswordChange());
 
     if (!shouldUpdateAddress && !shouldUpdatePassword) {
       if (originalProfile) {
         setDraftProfile(originalProfile);
       }
-      resetPasswordState({ collapse: true });
+      passwordPanelRef.current?.reset({ collapse: true });
       setConfirmModalOpen(false);
       setPageAlert(buildAlert("Profile already up to date", "Your profile details are already saved."));
       return;
@@ -248,15 +200,14 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
 
     setSaving(true);
     setPageAlert(null);
-    setSaveError("");
 
     try {
       if (shouldUpdatePassword) {
         try {
-          await updateOwnPassword(passwordForm.nextPassword);
+          await passwordPanelRef.current?.savePassword();
         } catch (error) {
           const message = getErrorMessage(error, "Unable to update the password right now.");
-          setSaveError(message);
+          setConfirmModalOpen(false);
           setPageAlert(buildAlert("Password update failed", message, "error"));
           return;
         }
@@ -278,7 +229,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
                 "error",
               ),
             );
-            resetPasswordState({ collapse: true });
+            passwordPanelRef.current?.reset({ collapse: true });
             setConfirmModalOpen(false);
             return;
           }
@@ -295,7 +246,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
 
       setOriginalProfile(nextProfile);
       setDraftProfile(nextProfile);
-      resetPasswordState({ collapse: true });
+      passwordPanelRef.current?.reset({ collapse: true });
       setConfirmModalOpen(false);
       setPageAlert(
         buildAlert(
@@ -314,14 +265,13 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
 
   async function handleSaveClick() {
     setPageAlert(null);
-    setSaveError("");
 
-    const nextErrors = validateBeforeSave();
-    if (Object.keys(nextErrors).length > 0) {
+    const validation = validateBeforeSave();
+    if (!validation.valid) {
       return;
     }
 
-    if (passwordDirty) {
+    if (validation.passwordDirty) {
       setConfirmModalOpen(true);
       return;
     }
@@ -445,59 +395,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
           </div>
         </section>
 
-        <section className="staff-profile__section">
-          <div className="staff-profile__sectionHeader">
-            <div className="staff-profile__sectionTitle">
-              <LockKeyhole size={20} strokeWidth={2} />
-              <h2>Security (Change Password)</h2>
-            </div>
-
-            <button
-              className="staff-profile__toggleButton"
-              type="button"
-              aria-label={passwordExpanded ? "Hide password fields" : "Show password fields"}
-              onClick={handleTogglePasswordSection}
-            >
-              {passwordExpanded ? <LockOpen size={22} strokeWidth={2.1} /> : <Lock size={22} strokeWidth={2.1} />}
-            </button>
-          </div>
-
-          {passwordExpanded ? (
-            <div className="staff-profile__grid">
-              <label className="staff-profile__field">
-                <span>New Password</span>
-                <input
-                  type="password"
-                  value={passwordForm.nextPassword}
-                  onChange={(event) =>
-                    setPasswordForm((previous) => ({
-                      ...previous,
-                      nextPassword: event.target.value,
-                    }))
-                  }
-                  placeholder="Enter a new password"
-                />
-                {renderFieldError(fieldErrors.nextPassword)}
-              </label>
-
-              <label className="staff-profile__field">
-                <span>Confirm New Password</span>
-                <input
-                  type="password"
-                  value={passwordForm.confirmPassword}
-                  onChange={(event) =>
-                    setPasswordForm((previous) => ({
-                      ...previous,
-                      confirmPassword: event.target.value,
-                    }))
-                  }
-                  placeholder="Re-enter the new password"
-                />
-                {renderFieldError(fieldErrors.confirmPassword)}
-              </label>
-            </div>
-          ) : null}
-        </section>
+        <PasswordChangePanel ref={passwordPanelRef} disabled={saving} />
 
         <footer className="staff-profile__actions">
           <button className="staff-profile__logoutButton" type="button" onClick={handleLogout}>
@@ -516,40 +414,20 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
         </footer>
       </section>
 
-      {confirmModalOpen ? (
-        <div className="staff-profile__modalOverlay" role="presentation">
-          <div className="staff-profile__modal" role="dialog" aria-modal="true" aria-labelledby="staff-password-confirm-title">
-            <div className="staff-profile__modalHeader">
-              <h2 id="staff-password-confirm-title">Confirm Password Update</h2>
-              <p>
-                Changing the password will immediately update this {roleLabel.toLowerCase()} account. Do you want to
-                continue?
-              </p>
-            </div>
-
-            {saveError ? renderAlert(buildAlert("Save failed", saveError, "error")) : null}
-
-            <div className="staff-profile__modalActions">
-              <button
-                className="staff-profile__button staff-profile__button--ghost"
-                type="button"
-                onClick={() => {
-                  if (!saving) {
-                    setConfirmModalOpen(false);
-                    setSaveError("");
-                  }
-                }}
-                disabled={saving}
-              >
-                Cancel
-              </button>
-              <button className="staff-profile__button" type="button" onClick={handleConfirmPasswordSave} disabled={saving}>
-                {saving ? "Saving..." : "Confirm Save"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        open={confirmModalOpen}
+        title="Confirm Password Update"
+        description={`Changing the password will immediately update this ${roleLabel.toLowerCase()} account. Do you want to continue?`}
+        confirmLabel="Confirm Save"
+        cancelLabel="Cancel"
+        pending={saving}
+        onCancel={() => {
+          if (!saving) {
+            setConfirmModalOpen(false);
+          }
+        }}
+        onConfirm={handleConfirmPasswordSave}
+      />
     </div>
   );
 }

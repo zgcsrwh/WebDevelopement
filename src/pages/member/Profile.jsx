@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import "../pageStyles.css";
 import "./PartnerDetail.css";
@@ -6,7 +6,6 @@ import "./Profile.css";
 import {
   checkAccountDeletable,
   deleteMyAccount,
-  updateOwnPassword,
   updateUserProfile,
 } from "../../services/profileService";
 import { getFriendProfiles, removeFriend } from "../../services/partnerService";
@@ -18,6 +17,7 @@ import { displayStatus, toTitleText } from "../../utils/presentation";
 import { hasMeaningfulText } from "../../utils/text";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Toast from "../../components/common/Toast";
+import PasswordChangePanel from "../../components/profile/PasswordChangePanel";
 
 function formatDateInput(value) {
   if (!value) {
@@ -77,10 +77,6 @@ function formatDateTime(value) {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
-function isStrongPassword(value) {
-  return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(String(value || ""));
-}
-
 function formatAvailabilityParts(value = "") {
   const [day = "", time = ""] = String(value)
     .split("_")
@@ -120,45 +116,10 @@ function renderFieldError(error) {
   return <p className="profile-fieldError">{error}</p>;
 }
 
-function PasswordToggleButton({ visible, onToggle }) {
-  return (
-    <button
-      aria-label={visible ? "Hide password" : "Show password"}
-      className="profile-passwordToggle"
-      type="button"
-      onClick={onToggle}
-    >
-      {visible ? (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M3 3l18 18M10.6 10.6A2 2 0 0012 14a2 2 0 001.4-.6M9.9 5.1A10.9 10.9 0 0112 5c5.4 0 9 7 9 7a17.6 17.6 0 01-3 3.7M6.6 6.6C4 8.4 3 12 3 12a17.8 17.8 0 003.8 4.3M14.1 18.9A10.9 10.9 0 0112 19c-5.4 0-9-7-9-7a17.6 17.6 0 012.3-3.2"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-          />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7S18.5 19 12 19 1.5 12 1.5 12z"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-          />
-          <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        </svg>
-      )}
-    </button>
-  );
-}
-
 export default function Profile() {
   const navigate = useNavigate();
   const { logout, sessionProfile, sessionRole } = useAuth();
+  const passwordPanelRef = useRef(null);
 
   const [profileView, setProfileView] = useState({
     name: "",
@@ -187,16 +148,8 @@ export default function Profile() {
   const [friendModalError, setFriendModalError] = useState("");
   const [removingFriend, setRemovingFriend] = useState(false);
 
-  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-  const [passwordForm, setPasswordForm] = useState({
-    nextPassword: "",
-    confirmPassword: "",
-  });
-  const [showNextPassword, setShowNextPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [passwordFieldErrors, setPasswordFieldErrors] = useState({});
-  const [passwordAlert, setPasswordAlert] = useState(null);
-  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [passwordConfirmOpen, setPasswordConfirmOpen] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const [dangerAlert, setDangerAlert] = useState(null);
   const [blockingReasons, setBlockingReasons] = useState([]);
@@ -343,66 +296,41 @@ export default function Profile() {
     }
   }
 
-  function openPasswordModal() {
-    setPasswordModalOpen(true);
-    setPasswordForm({ nextPassword: "", confirmPassword: "" });
-    setPasswordFieldErrors({});
-    setPasswordAlert(null);
-    setShowNextPassword(false);
-    setShowConfirmPassword(false);
-  }
-
-  function closePasswordModal() {
-    setPasswordModalOpen(false);
-    setPasswordForm({ nextPassword: "", confirmPassword: "" });
-    setPasswordFieldErrors({});
-    setPasswordAlert(null);
-    setShowNextPassword(false);
-    setShowConfirmPassword(false);
-    setUpdatingPassword(false);
-  }
-
-  async function handlePasswordUpdate(event) {
-    event.preventDefault();
-
-    const errors = {};
-    if (!hasMeaningfulText(passwordForm.nextPassword)) {
-      errors.nextPassword = "Please enter a new password.";
-    } else if (!isStrongPassword(passwordForm.nextPassword)) {
-      errors.nextPassword =
-        "Password must be at least 8 characters long and include both letters and numbers.";
-    }
-
-    if (!hasMeaningfulText(passwordForm.confirmPassword)) {
-      errors.confirmPassword = "Please confirm the new password.";
-    } else if (passwordForm.nextPassword !== passwordForm.confirmPassword) {
-      errors.confirmPassword = "The two passwords must match.";
-    }
-
-    setPasswordFieldErrors(errors);
-    setPasswordAlert(null);
-
-    if (Object.keys(errors).length > 0) {
+  function handlePasswordSaveIntent() {
+    if (!passwordPanelRef.current?.isExpanded()) {
+      passwordPanelRef.current?.open();
       return;
     }
 
-    setUpdatingPassword(true);
+    const result = passwordPanelRef.current?.validate({ requirePassword: true });
+    if (!result?.valid) {
+      return;
+    }
+
+    setPasswordConfirmOpen(true);
+  }
+
+  async function handleConfirmPasswordSave() {
+    setSavingPassword(true);
+
     try {
-      await updateOwnPassword(passwordForm.nextPassword);
-      setPasswordAlert(buildAlert("Password updated", "Password updated."));
-      setPasswordForm({ nextPassword: "", confirmPassword: "" });
-      setShowNextPassword(false);
-      setShowConfirmPassword(false);
-    } catch (passwordError) {
-      setPasswordAlert(
-        buildAlert(
-          "Update failed",
-          getErrorMessage(passwordError, "Unable to update the password."),
-          "error",
-        ),
-      );
+      await passwordPanelRef.current?.savePassword();
+      passwordPanelRef.current?.reset({ collapse: true });
+      setPasswordConfirmOpen(false);
+      setToast({
+        tone: "success",
+        title: "Password updated",
+        message: "Password updated successfully.",
+      });
+    } catch (error) {
+      setPasswordConfirmOpen(false);
+      setToast({
+        tone: "error",
+        title: "Update failed",
+        message: getErrorMessage(error, "Unable to update the password."),
+      });
     } finally {
-      setUpdatingPassword(false);
+      setSavingPassword(false);
     }
   }
 
@@ -637,14 +565,7 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="profile-card__actions profile-card__actions--spread">
-            <button
-              className="profile-button profile-button--secondary"
-              type="button"
-              onClick={openPasswordModal}
-            >
-              Change Password
-            </button>
+          <div className="profile-card__actions">
             <button
               className="profile-button profile-button--secondary"
               type="button"
@@ -652,6 +573,34 @@ export default function Profile() {
               disabled={savingProfile}
             >
               {savingProfile ? "Saving..." : isEditing ? "Save" : "Edit Profile"}
+            </button>
+          </div>
+        </section>
+
+        <section className="profile-card profile-card--password">
+          <PasswordChangePanel
+            ref={passwordPanelRef}
+            disabled={savingPassword}
+            idPrefix="member-password"
+            sectionClassName="profile-password-panel"
+          />
+
+          <div className="profile-card__actions profile-password-actions">
+            <button
+              className="profile-button profile-button--secondary"
+              type="button"
+              onClick={() => passwordPanelRef.current?.reset({ collapse: true })}
+              disabled={savingPassword}
+            >
+              Cancel
+            </button>
+            <button
+              className="profile-button"
+              type="button"
+              onClick={handlePasswordSaveIntent}
+              disabled={savingPassword}
+            >
+              {savingPassword ? "Updating..." : "Save Password"}
             </button>
           </div>
         </section>
@@ -816,130 +765,41 @@ export default function Profile() {
         </div>
       ) : null}
 
-      {passwordModalOpen ? (
-        <div className="profile-modalOverlay" role="presentation">
-          <div className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
-            <button aria-label="Close" className="profile-modal__close" type="button" onClick={closePasswordModal}>
-              ×
-            </button>
-
-            <div className="profile-modal__header">
-              <h2 id="password-modal-title">Change Password</h2>
-              <p>Password must be at least 8 characters long and include both letters and numbers.</p>
-            </div>
-
-            {renderAlert(passwordAlert)}
-
-            <form className="profile-modal__form" onSubmit={handlePasswordUpdate}>
-              <div className="profile-field">
-                <label htmlFor="next-password">New Password</label>
-                <div className="profile-passwordField">
-                  <input
-                    id="next-password"
-                    type={showNextPassword ? "text" : "password"}
-                    value={passwordForm.nextPassword}
-                    onChange={(event) =>
-                      setPasswordForm((previous) => ({
-                        ...previous,
-                        nextPassword: event.target.value,
-                      }))
-                    }
-                  />
-                  <PasswordToggleButton
-                    visible={showNextPassword}
-                    onToggle={() => setShowNextPassword((previous) => !previous)}
-                  />
-                </div>
-                {renderFieldError(passwordFieldErrors.nextPassword)}
-              </div>
-
-              <div className="profile-field">
-                <label htmlFor="confirm-password">Confirm Password</label>
-                <div className="profile-passwordField">
-                  <input
-                    id="confirm-password"
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={passwordForm.confirmPassword}
-                    onChange={(event) =>
-                      setPasswordForm((previous) => ({
-                        ...previous,
-                        confirmPassword: event.target.value,
-                      }))
-                    }
-                  />
-                  <PasswordToggleButton
-                    visible={showConfirmPassword}
-                    onToggle={() => setShowConfirmPassword((previous) => !previous)}
-                  />
-                </div>
-                {renderFieldError(passwordFieldErrors.confirmPassword)}
-              </div>
-
-              <div className="profile-modal__actions">
-                <button
-                  className="profile-button profile-button--secondary"
-                  type="button"
-                  onClick={closePasswordModal}
-                >
-                  Cancel
-                </button>
-                <button className="profile-button" type="submit" disabled={updatingPassword}>
-                  {updatingPassword ? "Updating..." : "Confirm Update"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
       {deleteModalOpen ? (
-        <div className="profile-modalOverlay" role="presentation">
-          <div className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
-            <button
-              aria-label="Close"
-              className="profile-modal__close"
-              type="button"
-              onClick={() => {
-                if (!deletingAccount) {
-                  setDeleteModalOpen(false);
-                  setDeleteModalError("");
-                }
-              }}
-            >
-              ×
-            </button>
-
-            <div className="profile-modal__header">
-              <h2 id="delete-account-title">Delete Account</h2>
-              <p>This action permanently removes your account and signs you out.</p>
-            </div>
-
-            {deleteModalError ? renderAlert(buildAlert("Delete failed", deleteModalError, "error")) : null}
-
-            <div className="profile-modal__actions">
-              <button
-                className="profile-button profile-button--secondary"
-                type="button"
-                onClick={() => {
-                  setDeleteModalOpen(false);
-                  setDeleteModalError("");
-                }}
-                disabled={deletingAccount}
-              >
-                Cancel
-              </button>
-              <button
-                className="profile-button profile-button--danger"
-                type="button"
-                onClick={handleConfirmDeleteAccount}
-                disabled={deletingAccount}
-              >
-                {deletingAccount ? "Deleting..." : "Confirm Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          open={deleteModalOpen}
+          title="Delete Account"
+          description="This action permanently removes your account and signs you out."
+          tone="danger"
+          confirmLabel="Confirm Delete"
+          cancelLabel="Cancel"
+          pending={deletingAccount}
+          onCancel={() => {
+            if (!deletingAccount) {
+              setDeleteModalOpen(false);
+              setDeleteModalError("");
+            }
+          }}
+          onConfirm={handleConfirmDeleteAccount}
+        >
+          {deleteModalError ? renderAlert(buildAlert("Delete failed", deleteModalError, "error")) : null}
+        </ConfirmDialog>
       ) : null}
+
+      <ConfirmDialog
+        open={passwordConfirmOpen}
+        title="Confirm password update?"
+        description="Your new password will take effect immediately. Do you want to continue?"
+        confirmLabel="Confirm Update"
+        cancelLabel="Cancel"
+        pending={savingPassword}
+        onCancel={() => {
+          if (!savingPassword) {
+            setPasswordConfirmOpen(false);
+          }
+        }}
+        onConfirm={handleConfirmPasswordSave}
+      />
 
       <ConfirmDialog
         open={friendDeleteConfirmOpen && Boolean(selectedFriend)}

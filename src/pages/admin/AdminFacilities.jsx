@@ -10,6 +10,7 @@ import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
 import { countMeaningfulCharacters } from "../../utils/text";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 import PageLayout from "../../components/common/PageLayout";
 import { Button } from "../../components/common/Button";
 
@@ -803,28 +804,20 @@ export default function AdminFacilities() {
         </>
       ) : null}
 
-      {deleteTarget ? (
-        <div className="workspace-modal-overlay">
-          <div className="admin-facilities-page__confirmCard">
-            <h2>Delete Facility</h2>
-            <p className="admin-facilities-page__confirmText">
-              Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
-            </p>
-            <p className="admin-facilities-page__confirmNote">
-              Future bookings will be handled by the backend once the scheduled removal takes effect.
-            </p>
-            {deleteError ? <p className="errorMessage">{deleteError}</p> : null}
-            <div className="admin-facilities-page__confirmActions">
-              <button className="btn-secondary" type="button" disabled={deleting} onClick={closeDeleteModal}>
-                Cancel
-              </button>
-              <button className="btn-danger" type="button" disabled={deleting} onClick={handleDeleteConfirm}>
-                {deleting ? "Confirming..." : "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete Facility"
+        description={deleteTarget ? `Are you sure you want to delete ${deleteTarget.name}?` : ""}
+        tone="danger"
+        pending={deleting}
+        cancelLabel="Cancel"
+        confirmLabel="Confirm"
+        onCancel={closeDeleteModal}
+        onConfirm={handleDeleteConfirm}
+      >
+        <p>Future bookings will be handled by the backend once the scheduled removal takes effect.</p>
+        {deleteError ? <p className="errorMessage">{deleteError}</p> : null}
+      </ConfirmDialog>
     </PageLayout>
   );
 }

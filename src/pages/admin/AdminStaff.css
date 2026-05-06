@@ -109,8 +109,7 @@
   color: #6d7d88;
 }
 
-.admin-staff-page__modalCard,
-.admin-staff-page__confirmCard {
+.admin-staff-page__modalCard {
   width: min(840px, 100%);
   background: #ffffff;
   border-radius: 26px;
@@ -124,25 +123,6 @@
   max-height: min(86vh, 860px);
   display: flex;
   flex-direction: column;
-}
-
-.admin-staff-page__confirmCard {
-  width: min(560px, 100%);
-  padding: 28px 28px 24px;
-  display: grid;
-  gap: 18px;
-}
-
-.admin-staff-page__confirmCard h2 {
-  margin: 0;
-  color: #172231;
-  font-size: 2rem;
-}
-
-.admin-staff-page__confirmText {
-  margin: 0;
-  color: #617381;
-  line-height: 1.6;
 }
 
 .admin-staff-page__modalHead,
@@ -226,11 +206,6 @@
   gap: 16px;
 }
 
-.admin-staff-page__modalFooter--confirm {
-  padding: 0;
-  border-top: none;
-}
-
 .admin-staff-page__modalFooter .btn,
 .admin-staff-page__modalFooter .btn-secondary,
 .admin-staff-page__modalFooter .btn-danger {
@@ -248,8 +223,7 @@
   .admin-staff-page__table td,
   .admin-staff-page__modalHead,
   .admin-staff-page__modalBody,
-  .admin-staff-page__modalFooter,
-  .admin-staff-page__confirmCard {
+  .admin-staff-page__modalFooter {
     padding-left: 20px;
     padding-right: 20px;
   }

@@ -271,39 +271,6 @@
   box-sizing: border-box;
 }
 
-.profile-passwordField {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.profile-passwordField input {
-  padding-right: 56px;
-}
-
-.profile-passwordToggle {
-  position: absolute;
-  right: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 0;
-  background: transparent;
-  color: #6f8594;
-  cursor: pointer;
-}
-
-.profile-passwordToggle svg {
-  width: 20px;
-  height: 20px;
-}
-
-.profile-passwordToggle:hover {
-  color: #294358;
-}
-
 .profile-staticValue {
   display: flex;
   align-items: center;
@@ -454,6 +421,18 @@
   background: rgba(28, 45, 58, 0.36);
 }
 
+.profile-card--password {
+  overflow: visible;
+}
+
+.profile-password-panel {
+  padding: 16px 20px 0;
+}
+
+.profile-password-actions {
+  padding-top: 16px;
+}
+
 .profile-modal {
   position: relative;
   width: min(560px, 100%);
@@ -496,20 +475,6 @@
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
-}
-
-.profile-modal__form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-top: 20px;
-}
-
-.profile-modal__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 22px;
 }
 
 .profile-partnerModal {
@@ -570,8 +535,7 @@
     grid-template-columns: 1fr;
   }
 
-  .profile-card__actions--spread,
-  .profile-modal__actions {
+  .profile-card__actions--spread {
     flex-direction: column;
     align-items: stretch;
   }

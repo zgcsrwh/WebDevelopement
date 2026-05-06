@@ -309,43 +309,6 @@
   border-radius: 18px;
 }
 
-.admin-facilities-page__confirmCard {
-  width: min(560px, calc(100vw - 32px));
-  background: #ffffff;
-  border-radius: 26px;
-  border: 1px solid #dfe6eb;
-  box-shadow: 0 28px 64px rgba(18, 32, 40, 0.2);
-  padding: 28px 28px 24px;
-  display: grid;
-  gap: 18px;
-}
-
-.admin-facilities-page__confirmCard h2 {
-  margin: 0;
-  color: #172231;
-  font-size: 2rem;
-}
-
-.admin-facilities-page__confirmText,
-.admin-facilities-page__confirmNote {
-  margin: 0;
-  color: #617381;
-  line-height: 1.6;
-}
-
-.admin-facilities-page__confirmActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 16px;
-}
-
-.admin-facilities-page__confirmActions .btn-secondary,
-.admin-facilities-page__confirmActions .btn-danger {
-  min-width: 160px;
-  min-height: 60px;
-  border-radius: 18px;
-}
-
 .admin-facilities-page .status-pill {
   text-transform: uppercase;
 }
@@ -355,8 +318,7 @@
   .admin-facilities-page__table td,
   .admin-facilities-page__drawerHead,
   .admin-facilities-page__drawerBody,
-  .admin-facilities-page__drawerFooter,
-  .admin-facilities-page__confirmCard {
+  .admin-facilities-page__drawerFooter {
     padding-left: 20px;
     padding-right: 20px;
   }
@@ -379,15 +341,12 @@
     width: min(100vw, 100%);
   }
 
-  .admin-facilities-page__drawerFooter,
-  .admin-facilities-page__confirmActions {
+  .admin-facilities-page__drawerFooter {
     flex-direction: column-reverse;
   }
 
   .admin-facilities-page__drawerFooter .btn,
-  .admin-facilities-page__drawerFooter .btn-secondary,
-  .admin-facilities-page__confirmActions .btn-secondary,
-  .admin-facilities-page__confirmActions .btn-danger {
+  .admin-facilities-page__drawerFooter .btn-secondary {
     width: 100%;
   }
 }

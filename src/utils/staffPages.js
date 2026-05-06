@@ -12,6 +12,18 @@ function parseStoredDateTime(value = "") {
     return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
   }
 
+  if (typeof value === "string") {
+    const timestampMatch = value
+      .trim()
+      .match(/^(\d{4}-\d{2}-\d{2})[T\s](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+
+    if (timestampMatch) {
+      const [, datePart, hourPart, minutePart] = timestampMatch;
+      const parsedDate = new Date(`${datePart}T${hourPart}:${minutePart}:00`);
+      return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+    }
+  }
+
   const normalizedValue =
     typeof value === "string" && !value.includes("T") && value.includes(" ")
       ? value.replace(" ", "T")

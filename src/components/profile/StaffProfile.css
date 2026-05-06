@@ -180,26 +180,6 @@
   font-weight: 800;
 }
 
-.staff-profile__toggleButton {
-  width: 50px;
-  height: 50px;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #d2e0e8;
-  border-radius: 16px;
-  background: #ffffff;
-  color: #577181;
-  cursor: pointer;
-  box-shadow: 0 10px 20px rgba(68, 96, 114, 0.08);
-}
-
-.staff-profile__toggleButton:hover {
-  background: #f6fbff;
-}
-
 .staff-profile__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -372,49 +352,6 @@
   text-align: center;
 }
 
-.staff-profile__modalOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(25, 38, 48, 0.34);
-}
-
-.staff-profile__modal {
-  width: min(540px, 100%);
-  border: 1px solid #d5e3ec;
-  border-radius: 28px;
-  border-radius: 20px;
-  background: #ffffff;
-  box-shadow: 0 28px 56px rgba(45, 68, 84, 0.2);
-  padding: 28px;
-  padding: 24px;
-}
-
-.staff-profile__modalHeader h2 {
-  margin: 0;
-  color: #182d3d;
-  font-size: 2rem;
-  font-size: 1.6rem;
-  font-weight: 800;
-}
-
-.staff-profile__modalHeader p {
-  margin: 10px 0 0;
-  color: #708695;
-  font-size: 1rem;
-  line-height: 1.6;
-}
-
-.staff-profile__modalActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 14px;
-  margin-top: 24px;
-}
-
 @media (max-width: 900px) {
   .staff-profile__hero,
   .staff-profile__section,
@@ -446,8 +383,7 @@
     font-size: 1.65rem;
   }
 
-  .staff-profile__actions,
-  .staff-profile__modalActions {
+  .staff-profile__actions {
     flex-direction: column;
     align-items: stretch;
   }

@@ -8,6 +8,7 @@ import { useAuth } from "../../provider/AuthContext";
 import { getErrorCode, getErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
 import PageLayout from "../../components/common/PageLayout";
 import { Button } from "../../components/common/Button";
 
@@ -423,25 +424,23 @@ export default function AdminStaff() {
         </div>
       ) : null}
 
-      {deactivateTarget ? (
-        <div className="workspace-modal-overlay">
-          <div className="admin-staff-page__confirmCard">
-            <h2>Deactivate Staff Account</h2>
-            <p className="admin-staff-page__confirmText">
-              Are you sure you want to deactivate <strong>{deactivateTarget.name}</strong>?
-            </p>
-            {deactivateError ? <p className="errorMessage">{deactivateError}</p> : null}
-            <div className="admin-staff-page__modalFooter admin-staff-page__modalFooter--confirm">
-              <button className="btn-secondary" type="button" disabled={deactivateSubmitting} onClick={closeDeactivateModal}>
-                Cancel
-              </button>
-              <button className="btn-danger" type="button" disabled={deactivateSubmitting} onClick={handleDeactivateConfirm}>
-                {deactivateSubmitting ? "Confirming..." : "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        open={Boolean(deactivateTarget)}
+        title="Deactivate Staff Account"
+        description={
+          deactivateTarget
+            ? `Are you sure you want to deactivate ${deactivateTarget.name}?`
+            : ""
+        }
+        tone="danger"
+        pending={deactivateSubmitting}
+        cancelLabel="Cancel"
+        confirmLabel="Confirm"
+        onCancel={closeDeactivateModal}
+        onConfirm={handleDeactivateConfirm}
+      >
+        {deactivateError ? <p className="errorMessage">{deactivateError}</p> : null}
+      </ConfirmDialog>
     </PageLayout>
   );
 }
