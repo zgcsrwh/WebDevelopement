@@ -26,6 +26,18 @@ async function resolveActor(actor) {
   return actor || getCurrentActor();
 }
 
+function getAssignedFacilityStaffId(facility = {}) {
+  return facility?.staffId || facility?.staff_id || facility?.raw?.staff_id || "";
+}
+
+function canStaffAccessRepair(item = {}, facility = {}, staffId = "") {
+  if (!staffId) {
+    return false;
+  }
+
+  return item.staff_id === staffId || getAssignedFacilityStaffId(facility) === staffId;
+}
+
 function mapRepairTicket(item, memberLookup, facilityLookup, staffLookup) {
   const facility = facilityLookup.get(item.facility_id);
   const member = memberLookup.get(item.member_id);
@@ -39,7 +51,7 @@ function mapRepairTicket(item, memberLookup, facilityLookup, staffLookup) {
     facility: facility?.name || item.facility_id || "Facility",
     facilityLabel: facility ? `${facility.name} (${facility.sportType})` : item.facility_id,
     memberId: item.member_id || "",
-    memberName: member?.name || "Member",
+    memberName: member?.name || "Member no longer available",
     staffId: item.staff_id || "",
     staffName: staff?.name || "Staff",
     type: Array.isArray(item.type) ? item.type : [item.type].filter(Boolean),
@@ -69,7 +81,7 @@ export async function getRepairTickets(actor) {
     }
 
     if (resolvedActor.role === "Staff") {
-      return item.staff_id === resolvedActor.id;
+      return canStaffAccessRepair(item, facilityLookup.get(item.facility_id), resolvedActor.id);
     }
 
     return true;
@@ -97,7 +109,7 @@ export async function getRepairTicketById(id, actor) {
     throw createAppError("permission-denied");
   }
 
-  if (resolvedActor.role === "Staff" && item.staff_id !== resolvedActor.id) {
+  if (resolvedActor.role === "Staff" && !canStaffAccessRepair(item, facilityLookup.get(item.facility_id), resolvedActor.id)) {
     throw createAppError("permission-denied");
   }
 
@@ -172,7 +184,10 @@ async function updateTicketStatusDirect(payload, actor) {
     throw createAppError("not-found");
   }
 
-  if (resolvedActor.role === "Staff" && repair.staff_id !== resolvedActor.id) {
+  const repairFacility = await getDocById("facility", repair.facility_id);
+  const repairFacilityDoc = repairFacility ? getVirtualFacilityDoc(repairFacility) : null;
+
+  if (resolvedActor.role === "Staff" && !canStaffAccessRepair(repair, repairFacilityDoc, resolvedActor.id)) {
     throw createAppError("permission-denied");
   }
 
@@ -181,7 +196,6 @@ async function updateTicketStatusDirect(payload, actor) {
     throw createAppError("invalid-argument", "Repairs can only be moved to resolved in this workflow.");
   }
 
-  const repairFacility = await getDocById("facility", repair.facility_id);
   const repairEffectiveStatus = getEffectiveRepairStatus(repair, repairFacility);
   if (repairEffectiveStatus !== "pending") {
     throw createAppError("failed-precondition");
@@ -203,7 +217,8 @@ async function updateTicketStatusDirect(payload, actor) {
       throw createAppError("failed-precondition");
     }
 
-    if (resolvedActor.role === "Staff" && currentRepair.staff_id !== resolvedActor.id) {
+    const currentFacilityDoc = currentFacility ? getVirtualFacilityDoc(currentFacility) : null;
+    if (resolvedActor.role === "Staff" && !canStaffAccessRepair(currentRepair, currentFacilityDoc, resolvedActor.id)) {
       throw createAppError("permission-denied");
     }
 

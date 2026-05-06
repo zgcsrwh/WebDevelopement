@@ -217,6 +217,20 @@ function normalizeParticipantIds(item = {}) {
   return [...new Set([...(item.participant_ids || []), ...(item.user_id_list || [])].filter(Boolean))];
 }
 
+const MISSING_MEMBER_LABEL = "Member no longer available";
+
+function isActiveMember(member) {
+  return Boolean(member) && String(member.status || "").toLowerCase() === "active";
+}
+
+function getMemberDisplayName(member, fallback = MISSING_MEMBER_LABEL) {
+  if (!isActiveMember(member)) {
+    return fallback;
+  }
+
+  return member.profile?.nickname || member.name || fallback;
+}
+
 function normalizeBookingStatusValue(value = "") {
   const rawStatus = String(value || "").trim().toLowerCase();
 
@@ -351,7 +365,7 @@ function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "
   const staff = staffLookup.get(item.staff_id);
   const participantIds = normalizeParticipantIds(item);
   const participantNames = participantIds
-    .map((participantId) => memberLookup.get(participantId)?.name || participantId)
+    .map((participantId) => getMemberDisplayName(memberLookup.get(participantId)))
     .filter(Boolean);
   const effectiveStatus = normalizeBookingStatusValue(getEffectiveBookingStatus(item));
 
@@ -362,7 +376,7 @@ function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "
     facilityLabel: facility ? `${facility.name} (${facility.sportType})` : item.facility_id,
     sportType: facility?.sportType || "",
     memberId: item.member_id || "",
-    memberName: member?.name || "Member",
+    memberName: getMemberDisplayName(member),
     staffId: item.staff_id || "",
     staffName: staff?.name || "Staff",
     status: effectiveStatus,

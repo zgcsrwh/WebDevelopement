@@ -53,6 +53,17 @@ function normalizeSessionContext(context = {}) {
   return normalizeUserContextPayload(context, context.role || "Member");
 }
 
+function canUseAccountStatus(role = "", status = "") {
+  const normalizedRole = String(role || "").toLowerCase();
+  const normalizedStatus = String(status || "").toLowerCase();
+
+  if (normalizedRole === "staff") {
+    return normalizedStatus === "active" || normalizedStatus === "unassigned";
+  }
+
+  return normalizedStatus === "active";
+}
+
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
@@ -179,7 +190,7 @@ export function AuthProvider({ children }) {
         await signOut(auth);
         throw new Error("Please verify your email before signing in.");
       }
-      if (String(context.status || "").toLowerCase() !== "active") {
+      if (!canUseAccountStatus(context.role, context.status)) {
         await signOut(auth);
         throw new Error("This account has been suspended or deactivated by an administrator.");
       }
@@ -210,7 +221,7 @@ export function AuthProvider({ children }) {
           credential.user.displayName || "Google User",
         ),
       );
-      if (String(context.status || "").toLowerCase() !== "active") {
+      if (!canUseAccountStatus(context.role, context.status)) {
         await signOut(auth);
         throw new Error("This account has been suspended or deactivated by an administrator.");
       }
@@ -267,7 +278,7 @@ export function AuthProvider({ children }) {
           resetSession();
           await signOut(auth);
           setCurrentUser(null);
-        } else if (String(context.status || "").toLowerCase() !== "active") {
+        } else if (!canUseAccountStatus(context.role, context.status)) {
           clearRegistrationPending();
           resetSession();
           await signOut(auth);

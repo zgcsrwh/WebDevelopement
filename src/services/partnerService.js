@@ -32,6 +32,20 @@ async function getOwnProfile(actorId) {
   return profiles[0] || null;
 }
 
+const MISSING_MEMBER_LABEL = "Member no longer available";
+
+function isActiveMember(member) {
+  return Boolean(member) && String(member.status || "").toLowerCase() === "active";
+}
+
+function getMemberDisplayName(member) {
+  if (!isActiveMember(member)) {
+    return MISSING_MEMBER_LABEL;
+  }
+
+  return member.profile?.nickname || member.name || MISSING_MEMBER_LABEL;
+}
+
 function mapProfile(item, memberLookup, currentActorId = "") {
   const normalized = normalizeProfileDoc(item);
   const member = memberLookup.get(normalized.memberId);
@@ -53,7 +67,7 @@ function mapProfile(item, memberLookup, currentActorId = "") {
     isActive: normalized.openMatch,
     level: item.level || "Intermediate",
     updatedAt: normalizeTimestamp(normalized.lastUpdated),
-    memberStatus: member?.status || "active",
+    memberStatus: member?.status || "missing",
     isCurrentUser: normalized.memberId === currentActorId,
     raw: item,
   };
@@ -69,9 +83,9 @@ function mapMatchRequest(item, memberLookup, actorId = "") {
   return {
     id: item.id,
     fromId: item.sender_id,
-    from: sender?.profile?.nickname || sender?.name || item.sender_id,
+    from: getMemberDisplayName(sender),
     toId: item.reciever_id,
-    to: receiver?.profile?.nickname || receiver?.name || item.reciever_id,
+    to: getMemberDisplayName(receiver),
     message: item.apply_description || "",
     response: item.respond_message || "",
     status: item.status || "pending",
@@ -80,8 +94,7 @@ function mapMatchRequest(item, memberLookup, actorId = "") {
     completedAt: normalizeTimestamp(item.completed_at),
     direction: isIncoming ? "incoming" : "outgoing",
     counterpartId: isIncoming ? item.sender_id : item.reciever_id,
-    counterpartName:
-      counterpartProfile?.nickname || counterpart?.name || (isIncoming ? item.sender_id : item.reciever_id),
+    counterpartName: getMemberDisplayName(counterpart),
     counterpartBio: counterpartProfile?.bio || "",
     counterpartInterestsRaw: counterpartProfile?.interests || [],
     counterpartInterests: (counterpartProfile?.interests || []).map((entry) => toTitleText(entry)),
@@ -138,7 +151,7 @@ export async function getFriendProfiles(actor) {
   const friendIds = friendRecord?.friends_ids || [];
   return friendIds
     .map((friendId) => memberLookup.get(friendId))
-    .filter(Boolean)
+    .filter(isActiveMember)
     .map((member) => ({
       id: member.id,
       memberId: member.id,
