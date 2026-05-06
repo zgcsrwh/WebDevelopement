@@ -13,7 +13,7 @@ import {
 import { isFacilityBookable } from "../../services/centreService";
 import { getCurrentMatchProfile, getFriendProfiles } from "../../services/partnerService";
 import { ROUTE_PATHS, getFacilityDetailRoute } from "../../constants/routes";
-import { getErrorCode, getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
 import {
@@ -53,35 +53,7 @@ function summarizeSelectedFriends(items = []) {
 function mapBookingSubmitError(error) {
   const code = getErrorCode(error);
   if (code === "invalid-argument") {
-    const message = getErrorMessage(error, "");
-    const normalizedMessage = message.toLowerCase();
-
-    if (
-      normalizedMessage.includes("friend") ||
-      normalizedMessage.includes("attendee") ||
-      normalizedMessage.includes("attendent") ||
-      normalizedMessage.includes("user_id_list")
-    ) {
-      return "The attendee total must include yourself and every selected partner.";
-    }
-
-    if (normalizedMessage.includes("2 hours") || normalizedMessage.includes("advance")) {
-      return "Bookings must be made at least 2 hours before the selected start time.";
-    }
-
-    if (normalizedMessage.includes("date")) {
-      return "Please choose a booking date between today and the next 7 days.";
-    }
-
-    if (normalizedMessage.includes("facility is open")) {
-      return message;
-    }
-
-    if (normalizedMessage.includes("activity_description") || normalizedMessage.includes("description")) {
-      return "Please enter a valid activity description before submitting.";
-    }
-
-    return message || "Please complete the booking request using a valid date, time, attendee count, and description.";
+    return "Please complete the booking request using a valid date, open time slot, attendee count, and activity description.";
   }
   if (code === "resource-exhausted") {
     return "The selected time slot is no longer available. Please choose another 1-hour slot.";
@@ -89,7 +61,7 @@ function mapBookingSubmitError(error) {
   if (code === "failed-precondition") {
     return "You already have a booking in this time period.";
   }
-  return getErrorMessage(error, "Unable to submit the booking request.");
+  return getActionErrorMessage(error, "booking.submit", "Unable to submit the booking request.");
 }
 
 function parseGuidelines(value = "") {
@@ -230,7 +202,7 @@ export default function BookingNew() {
         if (!cancelled) {
           setFacility(null);
           setFacilitySlots([]);
-          setError(getErrorMessage(loadError, "Unable to load available facilities."));
+          setError(getActionErrorMessage(loadError, "facility.load", "Unable to load available facilities."));
         }
       }
     }

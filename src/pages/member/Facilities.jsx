@@ -9,7 +9,7 @@ import {
   getTimeSlotsByFacility,
 } from "../../services/bookingService";
 import { getBookingNewRoute, getFacilityDetailRoute, ROUTE_PATHS } from "../../constants/routes";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import PageLayout from "../../components/common/PageLayout";
@@ -191,7 +191,7 @@ export default function Facilities() {
           return;
         }
         setItems([]);
-        setError(getErrorMessage(loadError, "Unable to load facilities right now."));
+        setError(getActionErrorMessage(loadError, "facility.load", "Unable to load facilities right now."));
       } finally {
         if (isActive) {
           setLoading(false);

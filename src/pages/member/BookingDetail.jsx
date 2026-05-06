@@ -7,7 +7,7 @@ import PageLayout from "../../components/common/PageLayout";
 import { getBookingById } from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus } from "../../utils/presentation";
 
 const BOOKING_DETAIL_VISIBLE_STATUSES = new Set([
@@ -175,7 +175,7 @@ export default function BookingDetail() {
       })
       .catch((loadError) => {
         if (!cancelled) {
-          setError(getErrorMessage(loadError, "Unable to load this booking."));
+          setError(getActionErrorMessage(loadError, "booking.load", "Unable to load this booking."));
           setBooking(null);
         }
       })

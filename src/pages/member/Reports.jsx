@@ -4,7 +4,7 @@ import "./memberWorkspace.css";
 import "./Reports.css";
 import { getReportFacilities, getRepairTickets, submitRepairTicket } from "../../services/reportService";
 import { useAuth } from "../../provider/AuthContext";
-import { getErrorCode, getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
 import { displayFilterOption, statusTone, toTitleText } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
 import PageLayout from "../../components/common/PageLayout";
@@ -43,7 +43,7 @@ function mapReportSubmitError(error) {
     return "Please fill in a valid issue description and review the form before submitting.";
   }
 
-  return getErrorMessage(error, "Unable to submit the repair ticket right now.");
+  return getActionErrorMessage(error, "repair.submit", "Unable to submit the repair ticket right now.");
 }
 
 function formatFaultyPart(type) {
@@ -83,7 +83,7 @@ export default function Reports() {
         setFacilities(facilityItems);
       } catch (loadError) {
         if (!cancelled) {
-          setError(getErrorMessage(loadError, "Unable to load report data right now."));
+            setError(getActionErrorMessage(loadError, "repair.load", "Unable to load report data right now."));
         }
       }
     }

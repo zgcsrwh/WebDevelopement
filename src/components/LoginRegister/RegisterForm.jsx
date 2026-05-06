@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Calendar, CheckCircle, Eye, EyeOff, Lock, Mail, MapPin, User } from "lucide-react";
 import styles from "./LoginRegister.module.css";
 import { useAuth } from "../../provider/AuthContext";
-import { getErrorCode, getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -22,13 +22,13 @@ function resolveVerificationError(err, fallbackMessage) {
   if (message.includes("invalid-email")) {
     return "Invalid email format.";
   }
-  return fallbackMessage || message || "Unable to complete email verification right now.";
+  return getActionErrorMessage(err, "auth.register", fallbackMessage || "Unable to complete email verification right now.");
 }
 
 function mapSignupError(err) {
   const code = getErrorCode(err);
   const message = err?.message || "";
-  const normalizedMessage = getErrorMessage(err, "Registration failed. Please try again.");
+  const actionMessage = getActionErrorMessage(err, "auth.register", "Registration failed. Please try again.");
 
   if (message.includes("already exists for this email")) {
     return "An account already exists for this email. Please log in.";
@@ -39,16 +39,16 @@ function mapSignupError(err) {
   if (code === "already-exists") {
     return "This email is already registered. Please log in.";
   }
-  if (code === "internal" || code === "unavailable" || normalizedMessage.toLowerCase() === "internal") {
+  if (code === "internal" || code === "unavailable") {
     return "Registration failed. Please try again.";
   }
-  return normalizedMessage;
+  return actionMessage;
 }
 
 function mapVerificationError(err) {
   const code = getErrorCode(err);
   const message = err?.message || "";
-  const normalizedMessage = getErrorMessage(err, "Unable to send verification email.");
+  const actionMessage = getActionErrorMessage(err, "auth.register", "Unable to send verification email.");
 
   if (message.includes("already exists for this email")) {
     return "An account already exists for this email. Please log in.";
@@ -59,10 +59,10 @@ function mapVerificationError(err) {
   if (message.includes("weak-password")) {
     return "Password must be at least 8 characters with letters and numbers.";
   }
-  if (code === "internal" || code === "unavailable" || normalizedMessage.toLowerCase() === "internal") {
+  if (code === "internal" || code === "unavailable") {
     return "Unable to send verification email. Please try again.";
   }
-  return resolveVerificationError(err, "Unable to send verification email.");
+  return actionMessage || resolveVerificationError(err, "Unable to send verification email.");
 }
 
 // Reusable input field component

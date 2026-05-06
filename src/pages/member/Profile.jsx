@@ -12,7 +12,7 @@ import { getFriendProfiles, removeFriend } from "../../services/partnerService";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getAvatarForActor } from "../../utils/avatar";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, toTitleText } from "../../utils/presentation";
 import { hasMeaningfulText } from "../../utils/text";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
@@ -191,11 +191,11 @@ export default function Profile() {
       const nextFriends = await getFriendProfiles(sessionProfile);
       setFriends(sortFriends(nextFriends));
     } catch (loadError) {
-      setToast({
-        tone: "error",
-        title: "Unable to load friends",
-        message: getErrorMessage(loadError, "Unable to load your partners."),
-      });
+        setToast({
+          tone: "error",
+          title: "Unable to load friends",
+          message: getActionErrorMessage(loadError, "friends.load", "Unable to load your partners."),
+        });
     } finally {
       setFriendsLoading(false);
     }
@@ -284,13 +284,13 @@ export default function Profile() {
       setIsEditing(false);
       setProfileAlert(buildAlert("Saved", "Basic information updated successfully."));
     } catch (saveError) {
-      setProfileAlert(
-        buildAlert(
-          "Save failed",
-          getErrorMessage(saveError, "Unable to update the profile."),
-          "error",
-        ),
-      );
+        setProfileAlert(
+          buildAlert(
+            "Save failed",
+            getActionErrorMessage(saveError, "profile.save", "Unable to update the profile."),
+            "error",
+          ),
+        );
     } finally {
       setSavingProfile(false);
     }
@@ -324,11 +324,11 @@ export default function Profile() {
       });
     } catch (error) {
       setPasswordConfirmOpen(false);
-      setToast({
-        tone: "error",
-        title: "Update failed",
-        message: getErrorMessage(error, "Unable to update the password."),
-      });
+        setToast({
+          tone: "error",
+          title: "Update failed",
+          message: getActionErrorMessage(error, "password.update", "Unable to update the password."),
+        });
     } finally {
       setSavingPassword(false);
     }
@@ -351,13 +351,13 @@ export default function Profile() {
       setDeleteModalError("");
       setDeleteModalOpen(true);
     } catch (checkError) {
-      setDangerAlert(
-        buildAlert(
-          "Check failed",
-          getErrorMessage(checkError, "Unable to check the account status."),
-          "error",
-        ),
-      );
+        setDangerAlert(
+          buildAlert(
+            "Check failed",
+            getActionErrorMessage(checkError, "profile.deleteCheck", "Unable to check the account status."),
+            "error",
+          ),
+        );
     }
   }
 
@@ -371,7 +371,7 @@ export default function Profile() {
       navigate(ROUTE_PATHS.LOGIN, { replace: true });
     } catch (deleteError) {
       setDeleteModalError(
-        getErrorMessage(deleteError, "Unable to delete this account right now."),
+        getActionErrorMessage(deleteError, "profile.delete", "Unable to delete this account right now."),
       );
       setDeletingAccount(false);
     }
@@ -396,7 +396,7 @@ export default function Profile() {
         message: "Friend removed successfully.",
       });
     } catch (removeError) {
-      const message = getErrorMessage(removeError, "Unable to remove this friend right now.");
+      const message = getActionErrorMessage(removeError, "friends.remove", "Unable to remove this friend right now.");
       setFriendModalError(message);
       setToast({
         tone: "error",

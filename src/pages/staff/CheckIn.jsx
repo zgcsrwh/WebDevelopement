@@ -11,7 +11,7 @@ import {
   subscribeToStaffCheckIns,
 } from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
@@ -146,7 +146,7 @@ export default function CheckIn() {
       });
       setPageError("");
     } catch (loadError) {
-      setPageError(getErrorMessage(loadError, "Unable to load check-in bookings."));
+      setPageError(getActionErrorMessage(loadError, "staff.checkin.load", "Unable to load check-in bookings."));
     } finally {
       setLoading(false);
     }
@@ -183,7 +183,7 @@ export default function CheckIn() {
         setPageError("");
       } catch (loadError) {
         if (active) {
-          setPageError(getErrorMessage(loadError, "Unable to load check-in bookings."));
+            setPageError(getActionErrorMessage(loadError, "staff.checkin.load", "Unable to load check-in bookings."));
         }
       } finally {
         if (active) {
@@ -205,12 +205,12 @@ export default function CheckIn() {
             if (!active) {
               return;
             }
-            setPageError(getErrorMessage(subscriptionError, "Unable to keep check-in bookings up to date."));
+            setPageError(getActionErrorMessage(subscriptionError, "staff.checkin.load", "Unable to keep check-in bookings up to date."));
           },
         );
       } catch (subscriptionError) {
         if (active) {
-          setPageError(getErrorMessage(subscriptionError, "Unable to keep check-in bookings up to date."));
+          setPageError(getActionErrorMessage(subscriptionError, "staff.checkin.load", "Unable to keep check-in bookings up to date."));
         }
       }
     }
@@ -302,7 +302,7 @@ export default function CheckIn() {
       setPageMessage(`Request ${selectedItem.id} was checked in successfully.`);
       await refresh(selectedItem.id);
     } catch (checkInError) {
-      setPageError(getErrorMessage(checkInError, "Unable to confirm arrival for this booking."));
+      setPageError(getActionErrorMessage(checkInError, "staff.checkin.confirm", "Unable to confirm arrival for this booking."));
     } finally {
       setCheckingInId("");
     }

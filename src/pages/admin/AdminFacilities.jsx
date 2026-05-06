@@ -6,7 +6,7 @@ import "./AdminFacilities.css";
 import { deleteFacility, getAdminFacilities, getAdminStaff, upsertFacility } from "../../services/adminService";
 import { formatEffectiveDateLabel } from "../../services/centreService";
 import { useAuth } from "../../provider/AuthContext";
-import { getErrorCode, getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
 import { countMeaningfulCharacters } from "../../utils/text";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
@@ -73,7 +73,7 @@ function getUpsertErrorMessage(error) {
   if (code === "failed-precondition") {
     return "Please keep one active staff member assigned to this facility.";
   }
-  return getErrorMessage(error, "Unable to save this facility.");
+  return getActionErrorMessage(error, "facility.save", "Unable to save this facility.");
 }
 
 function getDeleteErrorMessage(error) {
@@ -81,7 +81,7 @@ function getDeleteErrorMessage(error) {
   if (code === "not-found") {
     return "This facility could not be found.";
   }
-  return getErrorMessage(error, "Unable to delete this facility.");
+  return getActionErrorMessage(error, "facility.delete", "Unable to delete this facility.");
 }
 
 export default function AdminFacilities() {
@@ -123,7 +123,7 @@ export default function AdminFacilities() {
       );
       setPageError("");
     } catch (loadError) {
-      setPageError(getErrorMessage(loadError, "Unable to load facilities."));
+      setPageError(getActionErrorMessage(loadError, "facility.load", "Unable to load facilities."));
     } finally {
       if (showLoader) {
         setLoading(false);

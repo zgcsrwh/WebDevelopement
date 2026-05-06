@@ -50,10 +50,9 @@ function unwrapCallableResponse(payload) {
   }
 
   const normalizedErrorCode = normalizeErrorCode(payload.error?.code || payload.code);
-  const errorMessage = String(payload.error?.message || payload.message || "").trim();
 
   if (payload.success === false || payload.error) {
-    throw createAppError(normalizedErrorCode || "internal", errorMessage || "The request could not be completed.");
+    throw createAppError(normalizedErrorCode || "internal");
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "data")) {
@@ -72,19 +71,12 @@ function unwrapCallableResponse(payload) {
 
 function normalizeCallableError(error) {
   const normalizedCode = normalizeErrorCode(error?.details?.code || error?.code);
-  const message =
-    String(error?.details?.message || error?.message || "").trim() ||
-    "The request could not be completed.";
 
   if (!normalizedCode) {
-    return new Error(message);
+    return createAppError("internal");
   }
 
-  if (!message || message.toLowerCase() === normalizedCode) {
-    return createAppError(normalizedCode);
-  }
-
-  return createAppError(normalizedCode, message);
+  return createAppError(normalizedCode);
 }
 
 export async function callSubmitAction(functionName, payload, fallbackImplementation) {

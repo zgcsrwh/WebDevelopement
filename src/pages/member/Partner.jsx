@@ -7,7 +7,7 @@ import { useAuth } from "../../provider/AuthContext";
 import { getCurrentMatchProfile, toggleMatchStatus, upsertMatchProfile } from "../../services/partnerService";
 import { getFacilitySportTypes } from "../../services/bookingService";
 import { ROUTE_PATHS } from "../../constants/routes";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { getAvatarIdForActor, getAvatarOptions, setStoredAvatarId } from "../../utils/avatar";
 import { toTitleText } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
@@ -172,7 +172,7 @@ export default function Partner() {
         if (!cancelled) {
           setSportTypeOptions([]);
           setLoadError(
-            getErrorMessage(profileLoadError, "Unable to load your match profile right now."),
+            getActionErrorMessage(profileLoadError, "partner.profile.load", "Unable to load your match profile right now."),
           );
         }
       })
@@ -317,7 +317,7 @@ export default function Partner() {
       setForm(nextForm);
       setMessage("Profile saved successfully.");
     } catch (saveError) {
-      setError(getErrorMessage(saveError, "Unable to save the profile."));
+      setError(getActionErrorMessage(saveError, "partner.profile.save", "Unable to save the profile."));
     }
   }
 
@@ -334,7 +334,7 @@ export default function Partner() {
           return;
         }
       } catch (loadError) {
-        setError(getErrorMessage(loadError, "Unable to verify the saved profile."));
+        setError(getActionErrorMessage(loadError, "partner.profile.load", "Unable to verify the saved profile."));
         return;
       }
     }
@@ -345,7 +345,7 @@ export default function Partner() {
       setEnabled(nextValue);
       setMessage(nextValue ? "Partner matching enabled." : "Partner matching disabled.");
     } catch (toggleError) {
-      setError(getErrorMessage(toggleError, "Unable to update the matching status."));
+      setError(getActionErrorMessage(toggleError, "partner.profile.toggle", "Unable to update the matching status."));
     }
   }
 

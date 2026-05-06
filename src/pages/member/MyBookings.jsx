@@ -11,7 +11,7 @@ import {
 } from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS, getBookingDetailRoute } from "../../constants/routes";
-import { getErrorCode, getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import PageLayout from "../../components/common/PageLayout";
@@ -179,7 +179,7 @@ function mapBookingActionError(action, error) {
     }
   }
 
-  return getErrorMessage(error, "Unable to update the selected booking.");
+  return getActionErrorMessage(error, "booking.update", "Unable to update the selected booking.");
 }
 
 export default function MyBookings() {
@@ -212,7 +212,7 @@ export default function MyBookings() {
       } catch (loadError) {
         if (!cancelled) {
           setItems([]);
-          setError(getErrorMessage(loadError, "Unable to load your booking records right now."));
+          setError(getActionErrorMessage(loadError, "booking.load", "Unable to load your booking records right now."));
         }
       } finally {
         if (!cancelled) {
@@ -258,7 +258,7 @@ export default function MyBookings() {
       }
       setError("");
     } catch (loadError) {
-      setError(getErrorMessage(loadError, "Unable to refresh your booking list right now."));
+      setError(getActionErrorMessage(loadError, "booking.load", "Unable to refresh your booking list right now."));
     } finally {
       setLoading(false);
     }

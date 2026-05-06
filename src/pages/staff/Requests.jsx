@@ -12,7 +12,7 @@ import {
   getFacilities,
 } from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { formatStaffCardTimestamp, formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 import { hasMeaningfulText } from "../../utils/text";
@@ -123,7 +123,7 @@ export default function Requests() {
         return "";
       });
     } catch (loadError) {
-      setPageError(getErrorMessage(loadError, "Unable to load booking requests."));
+      setPageError(getActionErrorMessage(loadError, "staff.requests.load", "Unable to load booking requests."));
     } finally {
       setLoading(false);
     }
@@ -153,7 +153,7 @@ export default function Requests() {
         setPageError("");
       } catch (loadError) {
         if (!cancelled) {
-          setPageError(getErrorMessage(loadError, "Unable to load booking requests."));
+            setPageError(getActionErrorMessage(loadError, "staff.requests.load", "Unable to load booking requests."));
         }
       } finally {
         if (!cancelled) {
@@ -224,7 +224,7 @@ export default function Requests() {
           setConflictSummary({
             state: "conflict",
             title: "Unable to determine request status",
-            message: getErrorMessage(summaryError, "The latest time-slot availability could not be loaded."),
+            message: getActionErrorMessage(summaryError, "booking.availability", "The latest time-slot availability could not be loaded."),
           });
         }
       }
@@ -376,7 +376,7 @@ export default function Requests() {
       await refresh(selectedItem.id);
       setPageMessage(`Request ${selectedItem.id} was updated to Upcoming.`);
     } catch (approvalError) {
-      setPageError(getErrorMessage(approvalError, "Unable to process this booking request."));
+      setPageError(getActionErrorMessage(approvalError, "booking.approval", "Unable to process this booking request."));
     } finally {
       setProcessingAction("");
     }
@@ -420,7 +420,7 @@ export default function Requests() {
         }.`,
       );
     } catch (decisionRequestError) {
-      setDecisionError(getErrorMessage(decisionRequestError, "Unable to process this booking request."));
+      setDecisionError(getActionErrorMessage(decisionRequestError, "booking.approval", "Unable to process this booking request."));
     } finally {
       setProcessingAction("");
     }

@@ -3,7 +3,7 @@ import { LogOut, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { hasMeaningfulText } from "../../utils/text";
 import { getDocById, updateCollectionDoc } from "../../services/firestoreService";
 import ConfirmDialog from "../common/ConfirmDialog";
@@ -123,7 +123,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
           setPageAlert(
             buildAlert(
               "Unable to refresh profile",
-              getErrorMessage(error, "Unable to load the latest profile details."),
+              getActionErrorMessage(error, "profile.load", "Unable to load the latest profile details."),
               "error",
             ),
           );
@@ -206,7 +206,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
         try {
           await passwordPanelRef.current?.savePassword();
         } catch (error) {
-          const message = getErrorMessage(error, "Unable to update the password right now.");
+          const message = getActionErrorMessage(error, "password.update", "Unable to update the password right now.");
           setConfirmModalOpen(false);
           setPageAlert(buildAlert("Password update failed", message, "error"));
           return;
@@ -219,7 +219,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
             address: trimmedAddress,
           });
         } catch (error) {
-          const message = getErrorMessage(error, "Unable to save the address right now.");
+          const message = getActionErrorMessage(error, "profile.save", "Unable to save the address right now.");
 
           if (shouldUpdatePassword) {
             setPageAlert(

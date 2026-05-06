@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
-import { getErrorCode, getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import styles from "./LoginRegister.module.css";
 import googleIcon from '../../images/google_logo.svg';
 
@@ -44,27 +44,7 @@ const LoginForm = () => {
         navigate(ROUTE_PATHS.FACILITIES);
       }
     } catch (err) {
-      const code = getErrorCode(err);
-      const message = getErrorMessage(err, "Unable to sign in right now.");
-      const loweredMessage = message.toLowerCase();
-
-      if (loweredMessage.includes("incorrect") || loweredMessage.includes("invalid email or password")) {
-        setError("Invalid email or password");
-        } else if (code === "permission-denied") {
-          setError("This account has been suspended. Please contact the administrator.");
-        } else if (message.includes("Please verify your email")) {
-          setError("Please verify your email before signing in.");
-        } else if (message.includes("complete your registration details")) {
-          setError("Please finish the registration profile after email verification.");
-        } else if (message.includes("suspended or deactivated")) {
-          setError("This account has been suspended or deactivated by an administrator.");
-        } else if (message.includes("Selected identity does not match")) {
-          setError(message);
-        } else if (code === "internal" || code === "unavailable" || message.toLowerCase() === "internal") {
-          setError("Login error. Please try again.");
-        } else {
-          setError(message || "Unable to sign in right now.");
-        }
+      setError(getActionErrorMessage(err, "auth.login"));
     }
   };
 
@@ -74,7 +54,7 @@ const LoginForm = () => {
       await loginWithGoogle();
       navigate('/home');
     } catch (err) {
-      console.error(err);
+      setError(getActionErrorMessage(err, "auth.login"));
     }
   };
 

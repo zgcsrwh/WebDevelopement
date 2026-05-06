@@ -15,6 +15,7 @@ import {
   subscribeToMatchRequests,
 } from "../../services/partnerService";
 import { useAuth } from "../../provider/AuthContext";
+import { getActionErrorMessage } from "../../utils/errors";
 import { statusTone, toTitleText } from "../../utils/presentation";
 import "./NotificationBell.css";
 
@@ -592,10 +593,10 @@ export default function NotificationBell({ variant = "member" }) {
           setPanelError("");
         }
       },
-      () => {
+      (error) => {
         if (!cancelled) {
           setNotifications([]);
-          setPanelError("Notifications could not be loaded.");
+          setPanelError(getActionErrorMessage(error, "notifications.load"));
         }
       },
     ).then((unsubscribe) => {
@@ -614,10 +615,10 @@ export default function NotificationBell({ variant = "member" }) {
             setMatchRequests(items);
           }
         },
-        () => {
+        (error) => {
           if (!cancelled) {
             setMatchRequests([]);
-            setPanelError("Match notifications could not be loaded.");
+            setPanelError(getActionErrorMessage(error, "notifications.load"));
           }
         },
       ).then((unsubscribe) => {
@@ -626,10 +627,10 @@ export default function NotificationBell({ variant = "member" }) {
           return;
         }
         unsubscribeMatchRequests = unsubscribe;
-      }).catch(() => {
+      }).catch((error) => {
         if (!cancelled) {
           setMatchRequests([]);
-          setPanelError("Match notifications could not be loaded.");
+          setPanelError(getActionErrorMessage(error, "notifications.load"));
         }
       });
     } else {
@@ -844,13 +845,14 @@ export default function NotificationBell({ variant = "member" }) {
     try {
       const detail = await loadMatchDetail(item.referenceId);
       if (!detail) {
-        throw new Error("This match request is no longer available.");
+        setModalError(getActionErrorMessage({ code: "not-found" }, "match.load"));
+        return;
       }
 
       setModalDetail(detail);
       setMatchRespondMessage(detail.response || "");
     } catch (error) {
-      setModalError(error?.message || "The full match request could not be loaded.");
+      setModalError(getActionErrorMessage(error, "match.load"));
     } finally {
       setModalLoading(false);
     }
@@ -894,7 +896,7 @@ export default function NotificationBell({ variant = "member" }) {
     const detail = modalDetail;
 
     if (!detail?.id || detail.direction !== "incoming" || detail.status !== "pending") {
-      setModalError("This request has expired or has already been processed.");
+      setModalError(getActionErrorMessage({ code: "failed-precondition" }, "match.respond"));
       return;
     }
 
@@ -918,11 +920,7 @@ export default function NotificationBell({ variant = "member" }) {
       );
       closeModal();
     } catch (error) {
-      if (String(error?.code || "").toLowerCase().includes("failed-precondition")) {
-        setModalError("This request has expired or has already been processed.");
-      } else {
-        setModalError(error?.message || "The request could not be updated.");
-      }
+      setModalError(getActionErrorMessage(error, "match.respond"));
     } finally {
       setMatchDecisionPending(false);
     }
@@ -949,7 +947,7 @@ export default function NotificationBell({ variant = "member" }) {
     const detail = getMatchDetailForItem(item);
 
     if (!detail?.id || detail.direction !== "incoming" || detail.status !== "pending") {
-      setPanelError("This request has expired or has already been processed.");
+      setPanelError(getActionErrorMessage({ code: "failed-precondition" }, "match.respond"));
       return;
     }
 
@@ -974,11 +972,7 @@ export default function NotificationBell({ variant = "member" }) {
         nextStatus === "accepted" ? "Partner request accepted." : "Partner request rejected.",
       );
     } catch (error) {
-      if (String(error?.code || "").toLowerCase().includes("failed-precondition")) {
-        setPanelError("This request has expired or has already been processed.");
-      } else {
-        setPanelError(error?.message || "The request could not be updated.");
-      }
+      setPanelError(getActionErrorMessage(error, "match.respond"));
     } finally {
       setMatchDecisionPending(false);
     }
@@ -999,7 +993,7 @@ export default function NotificationBell({ variant = "member" }) {
         })),
       );
     } catch (error) {
-      setPanelError(error?.message || "Notifications could not be marked as read.");
+      setPanelError(getActionErrorMessage(error, "notifications.markRead"));
     }
   }
 

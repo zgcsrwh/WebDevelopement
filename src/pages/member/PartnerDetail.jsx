@@ -13,7 +13,7 @@ import {
 } from "../../services/partnerService";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getAvatarForActor } from "../../utils/avatar";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone, toTitleText } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
 import MatchRequestModal from "../../components/member/MatchRequestModal";
@@ -54,7 +54,7 @@ export default function PartnerDetail() {
           }
         } catch (loadError) {
           if (!cancelled) {
-            setError(getErrorMessage(loadError, "Unable to load match requests."));
+            setError(getActionErrorMessage(loadError, "match.load", "Unable to load match requests."));
           }
         } finally {
           if (!cancelled) {
@@ -72,7 +72,7 @@ export default function PartnerDetail() {
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(getErrorMessage(loadError, "Unable to load this profile."));
+          setError(getActionErrorMessage(loadError, "partner.profile.load", "Unable to load this profile."));
         }
       } finally {
         if (!cancelled) {
@@ -142,7 +142,7 @@ export default function PartnerDetail() {
       closeRequestModal();
     } catch (sendError) {
       setRequestPending(false);
-      setRequestError(getErrorMessage(sendError, "Unable to send this request."));
+      setRequestError(getActionErrorMessage(sendError, "partner.request.send", "Unable to send this request."));
     }
   }
 
@@ -246,7 +246,7 @@ export default function PartnerDetail() {
                               await refreshRequests();
                               setMessage(`Request from ${request.from} accepted.`);
                             } catch (actionError) {
-                              setError(getErrorMessage(actionError, "Unable to accept this request."));
+                              setError(getActionErrorMessage(actionError, "match.respond", "Unable to accept this request."));
                             }
                           }}
                         >
@@ -268,7 +268,7 @@ export default function PartnerDetail() {
                               await refreshRequests();
                               setMessage(`Request from ${request.from} rejected.`);
                             } catch (actionError) {
-                              setError(getErrorMessage(actionError, "Unable to reject this request."));
+                              setError(getActionErrorMessage(actionError, "match.respond", "Unable to reject this request."));
                             }
                           }}
                         >

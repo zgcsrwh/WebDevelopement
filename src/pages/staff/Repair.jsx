@@ -5,7 +5,7 @@ import "./Repair.css";
 import { getAllFacilityFilterOptions } from "../../services/bookingService";
 import { getRepairTickets, updateTicketStatus } from "../../services/reportService";
 import { useAuth } from "../../provider/AuthContext";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { formatStaffCardTimestamp, formatStaffDateTime, getDateInputMaxValue, toDateInputValue } from "../../utils/staffPages";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
@@ -78,7 +78,7 @@ export default function Repair() {
       });
       setPageError("");
     } catch (loadError) {
-      setPageError(getErrorMessage(loadError, "Unable to load repair tickets."));
+      setPageError(getActionErrorMessage(loadError, "repair.load", "Unable to load repair tickets."));
     } finally {
       setLoading(false);
     }
@@ -156,7 +156,7 @@ export default function Repair() {
       await refresh(selectedItem.id);
       setPageMessage(`Ticket ${selectedItem.id} was updated to resolved.`);
     } catch (resolveError) {
-      setDetailError(getErrorMessage(resolveError, "Unable to update this repair ticket."));
+      setDetailError(getActionErrorMessage(resolveError, "repair.resolve", "Unable to update this repair ticket."));
     } finally {
       setResolvingId("");
     }

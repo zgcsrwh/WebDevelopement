@@ -13,7 +13,7 @@ import {
   sendMatchRequest,
 } from "../../services/partnerService";
 import { getAvatarForActor } from "../../utils/avatar";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { countMeaningfulCharacters } from "../../utils/text";
 import MatchRequestModal from "../../components/member/MatchRequestModal";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
@@ -109,7 +109,7 @@ export default function Discover() {
         setSportOptions(sports);
       } catch (loadError) {
         if (!cancelled) {
-          setError(getErrorMessage(loadError, "Unable to load partner recommendations."));
+          setError(getActionErrorMessage(loadError, "partner.discover.load", "Unable to load partner recommendations."));
         }
       } finally {
         if (!cancelled) {
@@ -160,7 +160,7 @@ export default function Discover() {
       setRequestTarget(null);
       setRequestDraft("");
     } catch (sendError) {
-      setError(getErrorMessage(sendError, "Unable to send match request right now."));
+      setError(getActionErrorMessage(sendError, "partner.request.send", "Unable to send match request right now."));
     } finally {
       setRequestBusy(false);
     }

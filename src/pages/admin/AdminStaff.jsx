@@ -5,7 +5,7 @@ import "../workspaceStyles.css";
 import "./AdminStaff.css";
 import { createStaffAccount, disableStaffAccount, getAdminStaff } from "../../services/adminService";
 import { useAuth } from "../../provider/AuthContext";
-import { getErrorCode, getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
@@ -61,22 +61,11 @@ function getManagedFacilityNames(item) {
 }
 
 function getCreateErrorMessage(error) {
-  const code = getErrorCode(error);
-  if (code === "already-exists") {
-    return "This email address is already registered.";
-  }
-  return getErrorMessage(error, "Unable to create this staff account.");
+  return getActionErrorMessage(error, "staff.create", "Unable to create this staff account.");
 }
 
 function getDeactivateErrorMessage(error) {
-  const code = getErrorCode(error);
-  if (code === "not-found") {
-    return "The selected staff account could not be found.";
-  }
-  if (code === "failed-precondition") {
-    return "This staff member still manages facilities. Please transfer those facilities before deactivating.";
-  }
-  return getErrorMessage(error, "Unable to deactivate this staff account.");
+  return getActionErrorMessage(error, "staff.disable", "Unable to deactivate this staff account.");
 }
 
 export default function AdminStaff() {
@@ -105,7 +94,7 @@ export default function AdminStaff() {
       setItems(nextItems.filter((item) => String(item.role || "").toLowerCase() === "staff"));
       setPageError("");
     } catch (loadError) {
-      setPageError(getErrorMessage(loadError, "Unable to load staff accounts."));
+      setPageError(getActionErrorMessage(loadError, "staff.load", "Unable to load staff accounts."));
     } finally {
       if (showLoader) {
         setLoading(false);

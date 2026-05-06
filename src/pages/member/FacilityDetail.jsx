@@ -5,7 +5,7 @@ import "./FacilityDetail.css";
 import PageLayout from "../../components/common/PageLayout";
 import { getFacilityById, getFacilityDateBounds, getTimeSlotsByFacility } from "../../services/bookingService";
 import { ROUTE_PATHS, getBookingNewRoute } from "../../constants/routes";
-import { getErrorMessage } from "../../utils/errors";
+import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { getFrontendBookableSlotStatus, getLocalDateKey } from "../../utils/bookingSlotRules";
 
@@ -151,7 +151,7 @@ export default function FacilityDetail() {
 
         setFacility(null);
         setSlots([]);
-        setError(getErrorMessage(loadError, "Unable to load facility details right now."));
+        setError(getActionErrorMessage(loadError, "facility.load", "Unable to load facility details right now."));
       } finally {
         if (isActive) {
           setLoading(false);
