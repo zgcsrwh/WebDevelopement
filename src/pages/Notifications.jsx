@@ -53,7 +53,7 @@ function getInvitedFriendNames(booking) {
     .filter((name) => name.toLowerCase() !== applicantName);
 }
 
-function NotificationModal({ item, detail, loading, error, onClose }) {
+function NotificationModal({ item, detail, loading, onClose }) {
   if (!item) return null;
 
   const group = getNotificationGroup(item.type);
@@ -77,24 +77,12 @@ function NotificationModal({ item, detail, loading, error, onClose }) {
                 X
               </button>
             </div>
-            <p>
-              {item.referenceId
-                ? "Review the related update without leaving the current page."
-                : "Review the notification summary from the database record."}
-            </p>
           </div>
 
           {loading ? (
             <div className="notification-bell__loading">
               <span>Loading details...</span>
             </div>
-          ) : null}
-
-          {!loading && error ? (
-            <section className="notification-bell__alert notification-bell__alert--error">
-              <strong>{getTypeLabel(item.type)} details unavailable</strong>
-              <p>{error}</p>
-            </section>
           ) : null}
 
           {!loading ? (
@@ -129,7 +117,6 @@ function renderNotificationDetail(item, detail, group) {
   if (!item.referenceId || !detail) {
     return (
       <>
-        <strong>{item.message || "Notification"}</strong>
         <div className="notification-bell__detailGrid">
           <div>
             <span>Category</span>
@@ -157,7 +144,7 @@ function renderNotificationDetail(item, detail, group) {
 
     return (
       <>
-        <strong>{detail.facilityLabel || detail.facilityName || item.message}</strong>
+        <strong>{detail.facilityLabel || detail.facilityName || "Booking update"}</strong>
         <div className="notification-bell__detailGrid">
           <div>
             <span>Date</span>
@@ -199,7 +186,7 @@ function renderNotificationDetail(item, detail, group) {
   if (group === "repair") {
     return (
       <>
-        <strong>{detail.facilityLabel || detail.facility || item.message}</strong>
+        <strong>{detail.facilityLabel || detail.facility || "Repair update"}</strong>
         <div className="notification-bell__detailGrid">
           <div>
             <span>Status</span>
@@ -229,7 +216,7 @@ function renderNotificationDetail(item, detail, group) {
   if (group === "match") {
     return (
       <>
-        <strong>{detail.counterpartName || item.message || "Match update"}</strong>
+        <strong>{detail.counterpartName || "Match update"}</strong>
         <div className="notification-bell__detailGrid">
           <div>
             <span>Status</span>
@@ -258,7 +245,6 @@ function renderNotificationDetail(item, detail, group) {
 
   return (
     <>
-      <strong>{item.message || "Notification"}</strong>
       <div className="notification-bell__applicationBox">
         <span>Message</span>
         <p>{item.message || "No notification message was provided."}</p>
@@ -274,7 +260,6 @@ export default function Notifications() {
   const [activeItem, setActiveItem] = useState(null);
   const [activeDetail, setActiveDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState("");
 
   useEffect(() => {
     let unsubscribe = () => {};
@@ -340,7 +325,6 @@ export default function Notifications() {
   async function openDetails(item) {
     setActiveItem(item);
     setActiveDetail(null);
-    setDetailError("");
     void markItemRead(item);
 
     if (!item.referenceId) {
@@ -370,8 +354,8 @@ export default function Notifications() {
         }
         setActiveDetail(match);
       }
-    } catch (error) {
-      setDetailError(error?.message || "Detailed information could not be loaded.");
+    } catch {
+      setActiveDetail(null);
     } finally {
       setDetailLoading(false);
     }
@@ -471,11 +455,9 @@ export default function Notifications() {
         item={activeItem}
         detail={activeDetail}
         loading={detailLoading}
-        error={detailError}
         onClose={() => {
           setActiveItem(null);
           setActiveDetail(null);
-          setDetailError("");
           setDetailLoading(false);
         }}
       />

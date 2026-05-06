@@ -12,6 +12,7 @@ import { getRepairTicketById } from "../../services/reportService";
 import {
   getMatchRequests,
   respondToMatchRequest,
+  subscribeToMatchRequests,
 } from "../../services/partnerService";
 import { useAuth } from "../../provider/AuthContext";
 import { statusTone, toTitleText } from "../../utils/presentation";
@@ -35,6 +36,23 @@ function sortByNewest(items = []) {
 
     return String(right.createdAt || "").localeCompare(String(left.createdAt || ""));
   });
+}
+
+function getSortValue(value) {
+  if (!value) {
+    return 0;
+  }
+
+  if (value?.seconds) {
+    return value.seconds * 1000;
+  }
+
+  if (value?.toDate) {
+    return value.toDate().getTime();
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function getNormalizedTypeKey(type = "") {
@@ -103,7 +121,46 @@ function normalizeNotificationItem(item) {
   };
 }
 
-function ModalShell({ title, description, onClose, children }) {
+function getMatchNotificationMessage(request) {
+  const name = request.counterpartName || (request.direction === "incoming" ? request.from : request.to) || "A member";
+  const status = String(request.status || "").trim().toLowerCase();
+
+  if (request.direction === "incoming" && status === "pending") {
+    return `${name} sent you a partner request.`;
+  }
+
+  if (request.direction === "incoming") {
+    return `You ${status || "updated"} ${name}'s partner request.`;
+  }
+
+  if (status === "pending") {
+    return `Your partner request to ${name} is pending.`;
+  }
+
+  return `${name} ${status || "updated"} your partner request.`;
+}
+
+function normalizeMatchRequestItem(request) {
+  const createdSort = getSortValue(request.raw?.created_at);
+  const completedSort = getSortValue(request.raw?.completed_at);
+
+  return {
+    id: `matching:${request.id}`,
+    source: "matching",
+    group: "match",
+    type: "match_request",
+    message: getMatchNotificationMessage(request),
+    statusContext: request.status || "pending",
+    referenceId: request.id,
+    memberId: request.direction === "incoming" ? request.toId : request.fromId,
+    isRead: true,
+    createdAt: request.completedAt || request.createdAt,
+    sortValue: completedSort || createdSort,
+    raw: request,
+  };
+}
+
+function ModalShell({ title, onClose, children }) {
   const modal = (
     <div className="notification-bell__modalOverlay" role="presentation">
       <div className="notification-bell__modal" role="dialog" aria-modal="true" aria-labelledby="notification-bell-modal-title">
@@ -120,7 +177,6 @@ function ModalShell({ title, description, onClose, children }) {
                 <X size={20} />
               </button>
             </div>
-            {description ? <p>{description}</p> : null}
           </div>
           {children}
         </div>
@@ -186,23 +242,20 @@ function getInvitedFriendNames(detail) {
     .filter((name) => name.toLowerCase() !== applicantName);
 }
 
-function BookingDetailModal({ item, detail, loading, error, onClose }) {
+function BookingDetailModal({ item, detail, loading, onClose }) {
   const invitedFriendNames = getInvitedFriendNames(detail);
 
   return (
     <ModalShell
       title="Booking Notification"
-      description="Open a full booking summary directly from the bell without leaving the current page."
       onClose={onClose}
     >
       {loading ? <LoadingState label="Loading booking details..." /> : null}
-      {!loading && error ? <ModalAlert title="Booking details unavailable" message={error} /> : null}
-
       {!loading ? (
         <NotificationSummaryCard item={item}>
-          <strong>{detail?.facilityLabel || detail?.facilityName || item.message}</strong>
           {detail ? (
             <>
+              <strong>{detail.facilityLabel || detail.facilityName || "Booking update"}</strong>
               <div className="notification-bell__detailGrid">
                 <div>
                   <span>Date</span>
@@ -256,21 +309,18 @@ function BookingDetailModal({ item, detail, loading, error, onClose }) {
   );
 }
 
-function RepairDetailModal({ item, detail, loading, error, onClose }) {
+function RepairDetailModal({ item, detail, loading, onClose }) {
   return (
     <ModalShell
       title="Repair Notification"
-      description="Review the submitted repair record without leaving the current page."
       onClose={onClose}
     >
       {loading ? <LoadingState label="Loading repair details..." /> : null}
-      {!loading && error ? <ModalAlert title="Repair details unavailable" message={error} /> : null}
-
       {!loading ? (
         <NotificationSummaryCard item={item}>
-          <strong>{detail?.facilityLabel || item.message}</strong>
           {detail ? (
             <>
+              <strong>{detail.facilityLabel || "Repair update"}</strong>
               <div className="notification-bell__detailGrid">
                 <div>
                   <span>Reported At</span>
@@ -322,7 +372,6 @@ function MatchReviewModal({
   return (
     <ModalShell
       title="Review Match Request"
-      description={`${actorName} wants to connect with you. Review the application before responding.`}
       onClose={onClose}
     >
       {loading ? <LoadingState label="Loading match request..." /> : null}
@@ -379,25 +428,26 @@ function MatchReviewModal({
   );
 }
 
-function MatchInfoModal({ item, detail, loading, error, onClose }) {
+function MatchInfoModal({ item, detail, loading, onClose }) {
   const counterpartInterests = detail?.counterpartInterestsRaw || detail?.counterpartInterests || [];
   const counterpartAvailability = detail?.counterpartAvailabilityRaw || detail?.counterpartAvailability || [];
 
   return (
     <ModalShell
       title="Match Notification"
-      description="Review this partner matching update without leaving the current page."
       onClose={onClose}
     >
       {loading ? <LoadingState label="Loading match details..." /> : null}
-      {!loading && error ? <ModalAlert title="Match details unavailable" message={error} /> : null}
-
       {!loading ? (
         <NotificationSummaryCard item={item}>
-          <strong>{detail?.counterpartName || "Match update"}</strong>
-          <p className="notification-bell__description">
-            {detail?.counterpartBio || item.message}
-          </p>
+          {detail ? (
+            <>
+              <strong>{detail.counterpartName || "Match update"}</strong>
+              <p className="notification-bell__description">
+                {detail.counterpartBio || "No profile description has been added yet."}
+              </p>
+            </>
+          ) : null}
           {detail?.message ? (
             <div className="notification-bell__applicationBox">
               <span>Application</span>
@@ -444,11 +494,9 @@ function NotificationSummaryModal({ item, onClose }) {
   return (
     <ModalShell
       title="Notification Details"
-      description="Review this notification without leaving the current page."
       onClose={onClose}
     >
       <NotificationSummaryCard item={item}>
-        <strong>{item.message || "Notification"}</strong>
         <div className="notification-bell__detailGrid">
           <div>
             <span>Category</span>
@@ -485,7 +533,6 @@ function StaffNotificationModal({ item, onClose }) {
       onClose={onClose}
     >
       <NotificationSummaryCard item={item}>
-        <strong>{item.message || "Staff update"}</strong>
         <div className="notification-bell__applicationBox">
           <span>Message</span>
           <p>{item.message || "No additional message was provided."}</p>
@@ -534,6 +581,7 @@ export default function NotificationBell({ variant = "member" }) {
 
   useEffect(() => {
     let unsubscribeNotifications = () => {};
+    let unsubscribeMatchRequests = () => {};
     let cancelled = false;
 
     subscribeToNotifications(
@@ -558,13 +606,40 @@ export default function NotificationBell({ variant = "member" }) {
       unsubscribeNotifications = unsubscribe;
     });
 
-    if (sessionRole !== "Member" || isStaffVariant) {
+    if (sessionRole === "Member" && !isStaffVariant) {
+      subscribeToMatchRequests(
+        sessionProfile,
+        (items) => {
+          if (!cancelled) {
+            setMatchRequests(items);
+          }
+        },
+        () => {
+          if (!cancelled) {
+            setMatchRequests([]);
+            setPanelError("Match notifications could not be loaded.");
+          }
+        },
+      ).then((unsubscribe) => {
+        if (cancelled) {
+          unsubscribe();
+          return;
+        }
+        unsubscribeMatchRequests = unsubscribe;
+      }).catch(() => {
+        if (!cancelled) {
+          setMatchRequests([]);
+          setPanelError("Match notifications could not be loaded.");
+        }
+      });
+    } else {
       setMatchRequests([]);
     }
 
     return () => {
       cancelled = true;
       unsubscribeNotifications();
+      unsubscribeMatchRequests();
     };
   }, [sessionProfile, sessionRole, isStaffVariant]);
 
@@ -603,9 +678,25 @@ export default function NotificationBell({ variant = "member" }) {
     [notifications],
   );
 
+  const matchNotificationItems = useMemo(() => {
+    if (isStaffVariant || sessionRole !== "Member") {
+      return [];
+    }
+
+    const notifiedMatchIds = new Set(
+      notificationItems
+        .filter((item) => item.group === "match" && item.referenceId)
+        .map((item) => item.referenceId),
+    );
+
+    return matchRequests
+      .filter((request) => request.id && !notifiedMatchIds.has(request.id))
+      .map(normalizeMatchRequestItem);
+  }, [isStaffVariant, matchRequests, notificationItems, sessionRole]);
+
   const allItems = useMemo(
-    () => sortByNewest(notificationItems),
-    [notificationItems],
+    () => sortByNewest([...notificationItems, ...matchNotificationItems]),
+    [matchNotificationItems, notificationItems],
   );
 
   const unreadCount = useMemo(
@@ -715,8 +806,8 @@ export default function NotificationBell({ variant = "member" }) {
     try {
       const detail = await getBookingById(item.referenceId, sessionProfile);
       setModalDetail(detail);
-    } catch (error) {
-      setModalError(error?.message || "Detailed booking data could not be loaded.");
+    } catch {
+      setModalDetail(null);
     } finally {
       setModalLoading(false);
     }
@@ -734,8 +825,8 @@ export default function NotificationBell({ variant = "member" }) {
     try {
       const detail = await getRepairTicketById(item.referenceId, sessionProfile);
       setModalDetail(detail);
-    } catch (error) {
-      setModalError(error?.message || "Detailed repair data could not be loaded.");
+    } catch {
+      setModalDetail(null);
     } finally {
       setModalLoading(false);
     }
@@ -777,8 +868,8 @@ export default function NotificationBell({ variant = "member" }) {
     try {
       const detail = await loadMatchDetail(item.referenceId);
       setModalDetail(detail);
-    } catch (error) {
-      setModalError(error?.message || "The full match details could not be loaded.");
+    } catch {
+      setModalDetail(null);
     } finally {
       setModalLoading(false);
     }
@@ -837,6 +928,62 @@ export default function NotificationBell({ variant = "member" }) {
     }
   }
 
+  function getMatchDetailForItem(item) {
+    if (item?.source === "matching") {
+      return item.raw;
+    }
+
+    if (item?.referenceId) {
+      return matchRequestIndex.get(item.referenceId) || null;
+    }
+
+    return null;
+  }
+
+  function canRespondToMatchItem(item) {
+    const detail = getMatchDetailForItem(item);
+    return detail?.direction === "incoming" && detail?.status === "pending";
+  }
+
+  async function handleMatchDecisionFromItem(item, nextStatus) {
+    const detail = getMatchDetailForItem(item);
+
+    if (!detail?.id || detail.direction !== "incoming" || detail.status !== "pending") {
+      setPanelError("This request has expired or has already been processed.");
+      return;
+    }
+
+    setMatchDecisionPending(true);
+    setPanelError("");
+    setPanelMessage("");
+
+    try {
+      await respondToMatchRequest(
+        {
+          match_id: detail.id,
+          status: nextStatus,
+          respond_message: "",
+        },
+        sessionProfile,
+      );
+
+      const latestRequests = await getMatchRequests(sessionProfile);
+      setMatchRequests(latestRequests);
+      await markItemRead(item);
+      setPanelMessage(
+        nextStatus === "accepted" ? "Partner request accepted." : "Partner request rejected.",
+      );
+    } catch (error) {
+      if (String(error?.code || "").toLowerCase().includes("failed-precondition")) {
+        setPanelError("This request has expired or has already been processed.");
+      } else {
+        setPanelError(error?.message || "The request could not be updated.");
+      }
+    } finally {
+      setMatchDecisionPending(false);
+    }
+  }
+
   async function handleMarkAllAsRead() {
     setPanelMessage("");
     try {
@@ -867,7 +1014,6 @@ export default function NotificationBell({ variant = "member" }) {
           item={activeModal.item}
           detail={modalDetail}
           loading={modalLoading}
-          error={modalError}
           onClose={closeModal}
         />
       );
@@ -879,7 +1025,6 @@ export default function NotificationBell({ variant = "member" }) {
           item={activeModal.item}
           detail={modalDetail}
           loading={modalLoading}
-          error={modalError}
           onClose={closeModal}
         />
       );
@@ -914,7 +1059,6 @@ export default function NotificationBell({ variant = "member" }) {
         item={activeModal.item}
         detail={modalDetail}
         loading={modalLoading}
-        error={modalError}
         onClose={closeModal}
       />
     );
@@ -1047,13 +1191,35 @@ export default function NotificationBell({ variant = "member" }) {
                     {!isStaffVariant &&
                     item.group === "match" &&
                     String(item.statusContext || "").trim().toLowerCase() === "pending" ? (
-                      <button
-                        className={item.referenceId ? "btn" : "btn-secondary"}
-                        type="button"
-                        onClick={() => openMatchReview(item)}
-                      >
-                        {item.referenceId ? "Review Request" : "View Details"}
-                      </button>
+                      <div className="notification-bell__matchActions">
+                        <button
+                          className="btn-secondary notification-bell__matchReviewButton"
+                          type="button"
+                          onClick={() => openMatchReview(item)}
+                        >
+                          {item.referenceId ? "Review Request" : "View Details"}
+                        </button>
+                        {canRespondToMatchItem(item) ? (
+                          <div className="notification-bell__matchDecisionRow">
+                            <button
+                              className="btn-secondary"
+                              type="button"
+                              disabled={matchDecisionPending}
+                              onClick={() => handleMatchDecisionFromItem(item, "rejected")}
+                            >
+                              Reject
+                            </button>
+                            <button
+                              className="btn"
+                              type="button"
+                              disabled={matchDecisionPending}
+                              onClick={() => handleMatchDecisionFromItem(item, "accepted")}
+                            >
+                              Accept
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     ) : null}
 
                     {!isStaffVariant &&
