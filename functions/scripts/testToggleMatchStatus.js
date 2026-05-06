@@ -595,11 +595,12 @@ const preProcesses = {
     await createUserWithEmailAndPassword(auth, email, "test-password-123");
     const memberUid = auth.currentUser.uid;
 
+    // member 文档本身代表 Member 身份，没有 role 字段
+    // role 只存在于 admin_staff，用来区分 Staff/Admin
     await db.collection("member").doc(memberUid).set({
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;
@@ -629,7 +630,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;
@@ -659,7 +659,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     ctx.memberUid = memberUid;
@@ -679,7 +678,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;
@@ -720,7 +718,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;
@@ -761,7 +758,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;
@@ -801,7 +797,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;
@@ -865,7 +860,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;
@@ -906,7 +900,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;
@@ -955,7 +948,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "inactive",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;
@@ -1049,7 +1041,6 @@ const preProcesses = {
       name: "Test Member",
       email: email,
       status: "active",
-      role: "Member",
     });
 
     const profileId = `profile-${uuidv4()}`;

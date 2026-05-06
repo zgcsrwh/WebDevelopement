@@ -24,12 +24,9 @@ const toggleMatchStatus = functions.https.onCall(async (data, context) => {
   }
 
   const memberData = memberDoc.data();
-  const memberRole = String(memberData.role || "").toLowerCase();
+  // 注意：member 文档本身代表 Member 身份，没有 role 字段
+  // role 只存在于 admin_staff，用来区分 Staff/Admin
   const memberStatus = String(memberData.status || "").toLowerCase();
-
-  if (memberRole !== "member") {
-    throw new functions.https.HttpsError("permission-denied", "Only members can change match status.");
-  }
 
   if (memberStatus !== "active") {
     throw new functions.https.HttpsError("failed-precondition", "Your account is not active.");
