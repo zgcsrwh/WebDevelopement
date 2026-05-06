@@ -10,6 +10,7 @@ import {
   where,
 } from "./firestoreService";
 import { createAppError } from "../utils/errors";
+import { toDateInputValue } from "../utils/dateFields";
 
 export const BOOKING_ACTIVE_STATUSES = new Set(["pending", "accepted"]);
 export const BOOKING_HISTORY_STATUSES = new Set(["rejected", "cancelled", "completed", "no_show", "suggested"]);
@@ -34,20 +35,7 @@ function normalizeEmail(email = "") {
 }
 
 function normalizeDateInput(value) {
-  if (!value) {
-    return "";
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  return parsed.toISOString().slice(0, 10);
+  return toDateInputValue(value);
 }
 
 export function toStoredDateString(value) {

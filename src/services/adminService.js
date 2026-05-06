@@ -25,6 +25,7 @@ import {
   where,
 } from "./firestoreService";
 import { createAppError } from "../utils/errors";
+import { toDateInputValue } from "../utils/dateFields";
 import { displayStatus, formatRole } from "../utils/presentation";
 import { callSubmitAction } from "./callableService";
 
@@ -40,20 +41,7 @@ function normalizeEmail(email = "") {
 }
 
 function normalizeDateInput(value) {
-  if (!value) {
-    return "";
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
-    return String(value);
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  return parsed.toISOString().slice(0, 10);
+  return toDateInputValue(value);
 }
 
 function normalizeHour(value) {

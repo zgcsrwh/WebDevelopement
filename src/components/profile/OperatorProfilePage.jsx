@@ -4,47 +4,34 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getActionErrorMessage } from "../../utils/errors";
+import { formatDateOnly, formatDateTimeDisplay, toDateInputValue } from "../../utils/dateFields";
 import { hasMeaningfulText } from "../../utils/text";
 import { getDocById, updateCollectionDoc } from "../../services/firestoreService";
 import ConfirmDialog from "../common/ConfirmDialog";
 import PasswordChangePanel from "./PasswordChangePanel";
 
-function formatDateInput(value) {
-  if (!value) {
-    return "";
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
-    return String(value);
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  return parsed.toISOString().slice(0, 10);
-}
-
-function formatDateDisplay(value) {
-  const normalized = formatDateInput(value);
-  if (!normalized) {
-    return "";
-  }
-
-  const [year, month, day] = normalized.split("-");
-  return `${day}/${month}/${year}`;
-}
-
 function normalizeProfile(record = {}, fallback = {}) {
+  const rawDateOfBirth =
+    record.date_of_birth ??
+    record.dateOfBirth ??
+    fallback.date_of_birth ??
+    fallback.dateOfBirth ??
+    "";
+  const rawCreatedAt =
+    record.created_at ??
+    record.createdAt ??
+    fallback.created_at ??
+    fallback.createdAt ??
+    "";
+
   return {
     id: record.id || fallback.id || "",
     name: record.name || fallback.name || "",
-    dateOfBirth: formatDateInput(record.date_of_birth || record.dateOfBirth || fallback.dateOfBirth || ""),
+    dateOfBirth: toDateInputValue(rawDateOfBirth),
     address: record.address || fallback.address || "",
     email: record.email || fallback.email || "",
     role: String(record.role || fallback.role || "staff"),
-    createdAt: record.created_at || fallback.createdAt || "",
+    createdAt: rawCreatedAt,
   };
 }
 
@@ -291,34 +278,6 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
     );
   }
 
-  function formatDateTime(value) {
-  if (!value) {
-    return "Not available";
-  }
-
-  if (typeof value === "object" && value !== null) {
-    const seconds = value.seconds ?? value._seconds;
-    const nanoseconds = value.nanoseconds ?? value._nanoseconds ?? 0;
-    if (typeof seconds === "number") {
-      const milliseconds = seconds * 1000 + Math.floor(nanoseconds / 1000000);
-      return formatDateTime(new Date(milliseconds));
-    }
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return String(value);
-  }
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  const hours = String(parsed.getHours()).padStart(2, "0");
-  const minutes = String(parsed.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-
   return (
     <div className="staff-profile-page">
       <section className={`staff-profile staff-profile--${roleVariant}`}>
@@ -363,7 +322,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
 
             <label className="staff-profile__field">
               <span>Date of Birth</span>
-              <input type="text" value={formatDateDisplay(draftProfile.dateOfBirth)} readOnly disabled />
+              <input type="text" value={formatDateOnly(draftProfile.dateOfBirth)} readOnly disabled />
             </label>
 
 
@@ -374,7 +333,12 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
 
             <label className="staff-profile__field">
               <span>Join Date</span>
-              <input type="text" value={formatDateTime(draftProfile.createdAt)} readOnly disabled />
+              <input
+                type="text"
+                value={formatDateTimeDisplay(draftProfile.createdAt, "Not available", { includeTime: false })}
+                readOnly
+                disabled
+              />
             </label>
 
             <label className="staff-profile__field staff-profile__field--full">

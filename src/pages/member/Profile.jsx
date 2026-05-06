@@ -8,74 +8,18 @@ import {
   deleteMyAccount,
   updateUserProfile,
 } from "../../services/profileService";
+import { getDocById } from "../../services/firestoreService";
 import { getFriendProfiles, removeFriend } from "../../services/partnerService";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getAvatarForActor } from "../../utils/avatar";
+import { formatDateOnly, formatDateTimeDisplay, toDateInputValue } from "../../utils/dateFields";
 import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, toTitleText } from "../../utils/presentation";
 import { hasMeaningfulText } from "../../utils/text";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Toast from "../../components/common/Toast";
 import PasswordChangePanel from "../../components/profile/PasswordChangePanel";
-
-function formatDateInput(value) {
-  if (!value) {
-    return "";
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
-    return String(value);
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "";
-  }
-
-  return parsed.toISOString().slice(0, 10);
-}
-
-function formatDateDisplay(value) {
-  if (!value) {
-    return "Not available";
-  }
-
-  const normalized = formatDateInput(value);
-  if (!normalized) {
-    return String(value);
-  }
-
-  const [year, month, day] = normalized.split("-");
-  return `${day}/${month}/${year}`;
-}
-
-function formatDateTime(value) {
-  if (!value) {
-    return "Not available";
-  }
-
-  if (typeof value === "object" && value !== null) {
-    const seconds = value.seconds ?? value._seconds;
-    const nanoseconds = value.nanoseconds ?? value._nanoseconds ?? 0;
-    if (typeof seconds === "number") {
-      const milliseconds = seconds * 1000 + Math.floor(nanoseconds / 1000000);
-      return formatDateTime(new Date(milliseconds));
-    }
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return String(value);
-  }
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getDate()).padStart(2, "0");
-  const hours = String(parsed.getHours()).padStart(2, "0");
-  const minutes = String(parsed.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-}
 
 function formatAvailabilityParts(value = "") {
   const [day = "", time = ""] = String(value)
@@ -93,6 +37,30 @@ function sortFriends(items = []) {
 
 function buildAlert(title, body, tone = "success") {
   return { title, body, tone };
+}
+
+function normalizeProfileRecord(record = {}, fallback = {}) {
+  const rawDateOfBirth =
+    record.date_of_birth ??
+    record.dateOfBirth ??
+    fallback.date_of_birth ??
+    fallback.dateOfBirth ??
+    "";
+  const rawCreatedAt =
+    record.created_at ??
+    record.createdAt ??
+    fallback.created_at ??
+    fallback.createdAt ??
+    "";
+
+  return {
+    name: record.name || fallback.name || "",
+    dateOfBirth: toDateInputValue(rawDateOfBirth),
+    address: record.address || fallback.address || "",
+    email: record.email || fallback.email || "",
+    status: record.status || fallback.status || "active",
+    createdAt: rawCreatedAt,
+  };
 }
 
 function renderAlert(alert, className = "") {
@@ -158,26 +126,41 @@ export default function Profile() {
   const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
-    if (!sessionProfile) {
-      return;
+    let cancelled = false;
+
+    async function loadProfile() {
+      if (!sessionProfile) {
+        return;
+      }
+
+      let record = null;
+      if (sessionProfile.id) {
+        try {
+          record = await getDocById("member", sessionProfile.id);
+        } catch {
+          record = null;
+        }
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      const nextView = normalizeProfileRecord(record || {}, sessionProfile);
+      setProfileView(nextView);
+      setOriginalProfile(nextView);
+      setForm({
+        name: nextView.name,
+        dateOfBirth: nextView.dateOfBirth,
+        address: nextView.address,
+      });
     }
 
-    const nextView = {
-      name: sessionProfile.name || "",
-      dateOfBirth: formatDateInput(sessionProfile.dateOfBirth),
-      address: sessionProfile.address || "",
-      email: sessionProfile.email || "",
-      status: sessionProfile.status || "active",
-      createdAt: sessionProfile.createdAt || "",
-    };
+    loadProfile();
 
-    setProfileView(nextView);
-    setOriginalProfile(nextView);
-    setForm({
-      name: nextView.name,
-      dateOfBirth: nextView.dateOfBirth,
-      address: nextView.address,
-    });
+    return () => {
+      cancelled = true;
+    };
   }, [sessionProfile]);
 
   const loadFriends = useCallback(async () => {
@@ -271,7 +254,7 @@ export default function Profile() {
       const nextView = {
         ...profileView,
         name: profilePayload.name,
-        dateOfBirth: formatDateInput(profilePayload.dateOfBirth),
+        dateOfBirth: toDateInputValue(profilePayload.dateOfBirth),
         address: profilePayload.address,
       };
       setProfileView(nextView);
@@ -542,7 +525,7 @@ export default function Profile() {
                   {renderFieldError(fieldErrors.dateOfBirth)}
                 </>
               ) : (
-                <div className="profile-staticValue">{formatDateDisplay(profileView.dateOfBirth)}</div>
+                <div className="profile-staticValue">{formatDateOnly(profileView.dateOfBirth)}</div>
               )}
             </div>
 
@@ -630,7 +613,7 @@ export default function Profile() {
 
             <div className="profile-field profile-field--full">
               <label>Registered At</label>
-              <div className="profile-staticValue">{formatDateTime(profileView.createdAt)}</div>
+              <div className="profile-staticValue">{formatDateTimeDisplay(profileView.createdAt)}</div>
             </div>
           </div>
         </section>
