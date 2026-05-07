@@ -84,3 +84,7 @@ exports.disableStaffAccount = disableStaffAccount;
 // 导入 toggleMatchStatus
 const { toggleMatchStatus } = require("./toggleMatchStatus");
 exports.toggleMatchStatus = toggleMatchStatus;
+
+// 导入 sendMatchRequest
+const { sendMatchRequest } = require("./sendMatchRequest");
+exports.sendMatchRequest = sendMatchRequest;
