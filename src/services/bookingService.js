@@ -229,10 +229,14 @@ function isActiveMember(member) {
   return Boolean(member) && String(member.status || "").toLowerCase() === "active";
 }
 
-function getMemberDisplayName(member, fallback = MISSING_MEMBER_LABEL) {
+function getMemberDisplayName(member, fallback = MISSING_MEMBER_LABEL, options = {}) {
   // Deleted or inactive members should not leak raw Firestore ids to the page.
   if (!isActiveMember(member)) {
     return fallback;
+  }
+
+  if (options.memberNameMode === "real") {
+    return member.name || fallback;
   }
 
   return member.profile?.nickname || member.name || fallback;
@@ -367,13 +371,13 @@ function mapFacility(item, slotItems = []) {
   };
 }
 
-function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "") {
+function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "", options = {}) {
   const facility = facilityLookup.get(item.facility_id);
   const member = memberLookup.get(item.member_id);
   const staff = staffLookup.get(item.staff_id);
   const participantIds = normalizeParticipantIds(item);
   const participantNames = participantIds
-    .map((participantId) => getMemberDisplayName(memberLookup.get(participantId)))
+    .map((participantId) => getMemberDisplayName(memberLookup.get(participantId), MISSING_MEMBER_LABEL, options))
     .filter(Boolean);
   const effectiveStatus = normalizeBookingStatusValue(getEffectiveBookingStatus(item));
 
@@ -384,11 +388,11 @@ function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "
     facilityLabel: facility ? `${facility.name} (${facility.sportType})` : item.facility_id,
     sportType: facility?.sportType || "",
     memberId: item.member_id || "",
-    memberName: getMemberDisplayName(member),
+    memberName: getMemberDisplayName(member, MISSING_MEMBER_LABEL, options),
     staffId: item.staff_id || "",
     staffName: staff?.name || "Staff",
     status: effectiveStatus,
-      statusLabel: effectiveStatus || String(item.status || "").toLowerCase(),
+    statusLabel: effectiveStatus || String(item.status || "").toLowerCase(),
     date: item.date || "",
     startTime: toHourString(item.start_time),
     endTime: toHourString(item.end_time),
@@ -522,9 +526,9 @@ async function validateParticipantConflicts(actor, payload, selectedHours, curre
   }
 }
 
-async function decorateRequests(items, actorId = "") {
+async function decorateRequests(items, actorId = "", options = {}) {
   const { memberLookup, facilityLookup, staffLookup } = await getLookups();
-  return sortBookings(items).map((item) => mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId));
+  return sortBookings(items).map((item) => mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId, options));
 }
 
 export async function getFacilities(selectedDate = getTodayDate(), options = {}) {
@@ -914,9 +918,75 @@ export async function getStaffRequests(actor) {
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
   const allRequests = await getCollectionDocs("request");
-  const relevantRequests = allRequests.filter((item) => (resolvedActor.role === "Admin" ? true : item.staff_id === resolvedActor.id));
+  const relevantRequests = filterRequestsForStaff(allRequests, resolvedActor);
 
-  return decorateRequests(relevantRequests, resolvedActor.id);
+  return decorateRequests(relevantRequests, resolvedActor.id, { memberNameMode: "real" });
+}
+
+function filterRequestsForStaff(items = [], actor = {}) {
+  return items.filter((item) => (actor.role === "Admin" ? true : item.staff_id === actor.id));
+}
+
+function filterCheckInRequestsForStaff(items = [], actor = {}) {
+  return filterRequestsForStaff(items, actor).filter((item) => {
+    const status = normalizeBookingStatusValue(item.status);
+    return ["accepted", "cancelled", "no_show", "no show", "completed"].includes(status);
+  });
+}
+
+export async function subscribeToStaffRequests(actor, onNext, onError) {
+  const resolvedActor = await resolveActor(actor);
+  assertRole(resolvedActor, ["Staff", "Admin"]);
+
+  let latestRequests = [];
+  let hasRequestSnapshot = false;
+  let active = true;
+  let version = 0;
+
+  async function emit() {
+    if (!hasRequestSnapshot) {
+      return;
+    }
+
+    const currentVersion = ++version;
+
+    try {
+      const decorated = await decorateRequests(
+        filterRequestsForStaff(latestRequests, resolvedActor),
+        resolvedActor.id,
+        { memberNameMode: "real" },
+      );
+
+      if (active && currentVersion === version) {
+        onNext?.(decorated);
+      }
+    } catch (mappingError) {
+      if (active) {
+        onError?.(mappingError);
+      }
+    }
+  }
+
+  const requestConstraints = resolvedActor.role === "Admin" ? [] : [where("staff_id", "==", resolvedActor.id)];
+  const unsubscribers = [
+    subscribeToCollection(
+      "request",
+      requestConstraints,
+      (items) => {
+        latestRequests = items;
+        hasRequestSnapshot = true;
+        void emit();
+      },
+      onError,
+    ),
+    subscribeToCollection("facility", [], () => void emit(), onError),
+    subscribeToCollection("member", [], () => void emit(), onError),
+  ];
+
+  return () => {
+    active = false;
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+  };
 }
 
 export async function getStaffManagedFacilities(actor) {
@@ -1038,16 +1108,9 @@ export async function getStaffCheckIns(actor) {
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
   const allRequests = await getCollectionDocs("request");
-  const checkInRequests = allRequests.filter((item) => {
-    const status = normalizeBookingStatusValue(item.status);
-    const allowed = ["accepted", "cancelled", "no_show", "no show", "completed"].includes(status);
-    if (!allowed) {
-      return false;
-    }
-    return resolvedActor.role === "Admin" ? true : item.staff_id === resolvedActor.id;
-  });
+  const checkInRequests = filterCheckInRequestsForStaff(allRequests, resolvedActor);
 
-  return decorateRequests(checkInRequests, resolvedActor.id);
+  return decorateRequests(checkInRequests, resolvedActor.id, { memberNameMode: "real" });
 }
 
 export async function subscribeToStaffCheckIns(actor, onNext, onError) {
@@ -1055,24 +1118,53 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
   const constraints = resolvedActor.role === "Admin" ? [] : [where("staff_id", "==", resolvedActor.id)];
+  let latestRequests = [];
+  let hasRequestSnapshot = false;
+  let active = true;
+  let version = 0;
 
-  return subscribeToCollection(
-    "request",
-    constraints,
-    async (items) => {
-      try {
-        const checkInRequests = items.filter((item) => {
-          const status = normalizeBookingStatusValue(item.status);
-          return ["accepted", "cancelled", "no_show", "no show", "completed"].includes(status);
-        });
-        const decorated = await decorateRequests(checkInRequests, resolvedActor.id);
+  async function emit() {
+    if (!hasRequestSnapshot) {
+      return;
+    }
+
+    const currentVersion = ++version;
+
+    try {
+      const decorated = await decorateRequests(
+        filterCheckInRequestsForStaff(latestRequests, resolvedActor),
+        resolvedActor.id,
+        { memberNameMode: "real" },
+      );
+      if (active && currentVersion === version) {
         onNext?.(decorated);
-      } catch (mappingError) {
+      }
+    } catch (mappingError) {
+      if (active) {
         onError?.(mappingError);
       }
-    },
-    onError,
-  );
+    }
+  }
+
+  const unsubscribers = [
+    subscribeToCollection(
+      "request",
+      constraints,
+      (items) => {
+        latestRequests = items;
+        hasRequestSnapshot = true;
+        void emit();
+      },
+      onError,
+    ),
+    subscribeToCollection("facility", [], () => void emit(), onError),
+    subscribeToCollection("member", [], () => void emit(), onError),
+  ];
+
+  return () => {
+    active = false;
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+  };
 }
 
 export async function checkInBooking(idOrPayload, actor) {

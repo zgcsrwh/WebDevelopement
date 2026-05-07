@@ -10,7 +10,7 @@ import { isFacilityBookable } from "../../services/centreService";
 import { getCurrentMatchProfile, getFriendProfiles } from "../../services/partnerService";
 import { ROUTE_PATHS, getFacilityDetailRoute } from "../../constants/routes";
 import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
-import { displayStatus, statusTone } from "../../utils/presentation";
+import { displayStatus, formatAvailabilityLabel, statusTone } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
 import { getFrontendBookableSlotStatus, getLocalDateKey, normalizeSlotClock} from "../../utils/bookingSlotRules";
 
@@ -75,7 +75,8 @@ function parseGuidelines(value = "") {
 function getFriendMeta(friend) {
   const sport = friend.sport || "Sports";
   const firstAvailability = Array.isArray(friend.availability) ? friend.availability[0] : "";
-  return firstAvailability ? `${sport} - ${firstAvailability}` : sport;
+  const availabilityLabel = formatAvailabilityLabel(firstAvailability);
+  return availabilityLabel ? `${sport} - ${availabilityLabel}` : sport;
 }
 
 // This function only can access from BookingDetail page's new booking button

@@ -17,7 +17,7 @@ import {
 } from "../../services/partnerService";
 import { useAuth } from "../../provider/AuthContext";
 import { getActionErrorMessage } from "../../utils/errors";
-import { statusTone, toTitleText } from "../../utils/presentation";
+import { formatAvailabilityLabel, statusTone, toTitleText } from "../../utils/presentation";
 import "./NotificationBell.css";
 
 const NOTIFICATION_TABS = [
@@ -113,6 +113,10 @@ function getMatchRoleLabel(detail) {
   if (detail?.direction === "incoming") return "Receiver";
   if (detail?.direction === "outgoing") return "Sender";
   return "Not available";
+}
+
+function formatAvailabilityItems(items = []) {
+  return items.map((entry) => formatAvailabilityLabel(entry)).filter(Boolean);
 }
 
 // Use a small icon so cards are easy to scan by category.
@@ -422,7 +426,11 @@ function MatchReviewModal({
   onDecision,
 }) {
   const counterpartInterests = detail?.counterpartInterestsRaw || detail?.counterpartInterests || [];
-  const counterpartAvailability = detail?.counterpartAvailabilityRaw || detail?.counterpartAvailability || [];
+  const counterpartAvailability = formatAvailabilityItems(
+    detail?.counterpartAvailabilityRaw?.length
+      ? detail.counterpartAvailabilityRaw
+      : detail?.counterpartAvailability || [],
+  );
   const actorName = detail?.counterpartName || "this member";
 
   return (
@@ -493,7 +501,11 @@ function MatchReviewModal({
 
 function MatchInfoModal({ item, detail, loading, onClose }) {
   const counterpartInterests = detail?.counterpartInterestsRaw || detail?.counterpartInterests || [];
-  const counterpartAvailability = detail?.counterpartAvailabilityRaw || detail?.counterpartAvailability || [];
+  const counterpartAvailability = formatAvailabilityItems(
+    detail?.counterpartAvailabilityRaw?.length
+      ? detail.counterpartAvailabilityRaw
+      : detail?.counterpartAvailability || [],
+  );
 
   return (
     <ModalShell

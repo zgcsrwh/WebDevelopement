@@ -22,6 +22,7 @@ import {
   normalizeTimestamp,
   serverTimestamp,
   setCollectionDoc,
+  subscribeToCollection,
   updateCollectionDoc,
   where,
 } from "./firestoreService";
@@ -247,6 +248,39 @@ export async function getAdminStaff(actor) {
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
+export async function subscribeToAdminStaff(actor, onNext, onError) {
+  const resolvedActor = await resolveActor(actor);
+  assertRole(resolvedActor, ["Admin"]);
+
+  let active = true;
+  let version = 0;
+
+  async function emit() {
+    const currentVersion = ++version;
+
+    try {
+      const items = await getAdminStaff(resolvedActor);
+      if (active && currentVersion === version) {
+        onNext?.(items);
+      }
+    } catch (error) {
+      if (active) {
+        onError?.(error);
+      }
+    }
+  }
+
+  const unsubscribers = [
+    subscribeToCollection("admin_staff", [], () => void emit(), onError),
+    subscribeToCollection("facility", [], () => void emit(), onError),
+  ];
+
+  return () => {
+    active = false;
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+  };
+}
+
 async function createStaffAccountDirect(form, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Admin"]);
@@ -421,6 +455,40 @@ export async function getAdminFacilities(actor) {
       };
     })
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+export async function subscribeToAdminFacilities(actor, onNext, onError) {
+  const resolvedActor = await resolveActor(actor);
+  assertRole(resolvedActor, ["Admin"]);
+
+  let active = true;
+  let version = 0;
+
+  async function emit() {
+    const currentVersion = ++version;
+
+    try {
+      const items = await getAdminFacilities(resolvedActor);
+      if (active && currentVersion === version) {
+        onNext?.(items);
+      }
+    } catch (error) {
+      if (active) {
+        onError?.(error);
+      }
+    }
+  }
+
+  const unsubscribers = [
+    subscribeToCollection("facility", [], () => void emit(), onError),
+    subscribeToCollection("admin_staff", [], () => void emit(), onError),
+    subscribeToCollection("repair", [], () => void emit(), onError),
+  ];
+
+  return () => {
+    active = false;
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+  };
 }
 
 async function upsertFacilityDirect(form, actor) {

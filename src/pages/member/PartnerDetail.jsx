@@ -6,20 +6,23 @@ import "./memberWorkspace.css";
 import "./PartnerDetail.css";
 import PageLayout from "../../components/common/PageLayout";
 import { useAuth } from "../../provider/AuthContext";
-import { getMatchRequests, getPartnerProfiles, respondToMatchRequest, sendMatchRequest, } from "../../services/partnerService";
+import {
+  getMatchRequests,
+  getPartnerProfiles,
+  respondToMatchRequest,
+  sendMatchRequest,
+  subscribeToMatchRequests,
+} from "../../services/partnerService";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getAvatarForActor } from "../../utils/avatar";
 import { getActionErrorMessage } from "../../utils/errors";
-import { displayStatus, statusTone, toTitleText } from "../../utils/presentation";
+import { displayStatus, formatAvailabilityLabel, statusTone, toTitleText } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
 import MatchRequestModal from "../../components/member/MatchRequestModal";
 
-function formatAvailabilityEntry(value = "") {
-  return String(value)
-    .split("_")
-    .filter(Boolean)
-    .map((part) => toTitleText(part))
-    .join(" - ");
+function formatAvailabilityParts(value = "") {
+  const [day = "", ...timeParts] = formatAvailabilityLabel(value).split(" ").filter(Boolean);
+  return [day, timeParts.join(" ")];
 }
 
 // This fucntion can only accessed from Partner Recmmendation page
@@ -43,21 +46,30 @@ export default function PartnerDetail() {
   // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
+    let unsubscribe = () => {};
 
     async function loadData() {
       if (isRequestsPage) {
         try {
-          const nextRequests = await getMatchRequests(sessionProfile);
-          if (!cancelled) {
-            setRequests(nextRequests);
-            setError("");
-          }
+          unsubscribe = await subscribeToMatchRequests(
+            sessionProfile,
+            (nextRequests) => {
+              if (!cancelled) {
+                setRequests(nextRequests);
+                setError("");
+                setProfileLoaded(true);
+              }
+            },
+            (loadError) => {
+              if (!cancelled) {
+                setError(getActionErrorMessage(loadError, "match.load", "Unable to load match requests."));
+                setProfileLoaded(true);
+              }
+            },
+          );
         } catch (loadError) {
           if (!cancelled) {
             setError(getActionErrorMessage(loadError, "match.load", "Unable to load match requests."));
-          }
-        } finally {
-          if (!cancelled) {
             setProfileLoaded(true);
           }
         }
@@ -84,6 +96,7 @@ export default function PartnerDetail() {
     loadData();
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [id, isRequestsPage, sessionProfile]);
 
@@ -420,7 +433,7 @@ export default function PartnerDetail() {
             <h2>Availability</h2>
             <div className="partner-detail__availabilityList">
               {(profile.availableTime || profile.availableTimeRaw || []).map((slot) => {
-                const [day, time] = formatAvailabilityEntry(slot).split(" - ");
+                const [day, time] = formatAvailabilityParts(slot);
                 return (
                   <div key={slot} className="partner-detail__availabilityItem">
                     <strong>{day}</strong>

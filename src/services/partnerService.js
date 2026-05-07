@@ -20,7 +20,7 @@ import {
   where,
 } from "./firestoreService";
 import { createAppError } from "../utils/errors";
-import { displayStatus, toTitleText } from "../utils/presentation";
+import { displayStatus, formatAvailabilityLabel, toTitleText } from "../utils/presentation";
 import { callSubmitAction } from "./callableService";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../utils/text";
 
@@ -46,7 +46,7 @@ function getMemberDisplayName(member) {
     return MISSING_MEMBER_LABEL;
   }
 
-  return member.profile?.nickname || member.name || MISSING_MEMBER_LABEL;
+  return member.profile?.nickname || MISSING_MEMBER_LABEL;
 }
 
 function mapProfile(item, memberLookup, currentActorId = "") {
@@ -57,12 +57,12 @@ function mapProfile(item, memberLookup, currentActorId = "") {
   return {
     id: normalized.id,
     memberId: normalized.memberId,
-    nickname: normalized.nickname || member?.name || "Member",
+    nickname: normalized.nickname || "Member",
     sport: normalized.interests[0] ? toTitleText(normalized.interests[0]) : "Sports",
     interests: normalized.interests,
     interestsRaw: normalized.interests,
     availableTime: normalized.availableTime,
-    availability: normalized.availableTime.map((entry) => toTitleText(entry)).join(", "),
+    availability: normalized.availableTime.map((entry) => formatAvailabilityLabel(entry)).filter(Boolean).join(", "),
     availableTimeRaw: normalized.availableTime,
     bio: normalized.bio,
     description: normalized.bio,
@@ -104,7 +104,7 @@ function mapMatchRequest(item, memberLookup, actorId = "") {
     counterpartInterestsRaw: counterpartProfile?.interests || [],
     counterpartInterests: (counterpartProfile?.interests || []).map((entry) => toTitleText(entry)),
     counterpartAvailabilityRaw: counterpartProfile?.availableTime || [],
-    counterpartAvailability: (counterpartProfile?.availableTime || []).map((entry) => toTitleText(entry)),
+    counterpartAvailability: (counterpartProfile?.availableTime || []).map((entry) => formatAvailabilityLabel(entry)).filter(Boolean),
     raw: item,
   };
 }
@@ -161,15 +161,15 @@ export async function getFriendProfiles(actor) {
     .map((member) => ({
       id: member.id,
       memberId: member.id,
-      name: member.profile?.nickname || member.name,
-      nickname: member.profile?.nickname || member.name,
+      name: member.profile?.nickname || "Member",
+      nickname: member.profile?.nickname || "Member",
       sport: member.profile?.interests?.[0] ? toTitleText(member.profile.interests[0]) : "Sports",
       interests: member.profile?.interests || [],
       level: member.profile?.raw?.level || "Intermediate",
       bio: member.profile?.bio || "No description yet.",
       description: member.profile?.bio || "No description yet.",
       selfDescription: member.profile?.bio || "No description yet.",
-      availability: member.profile?.availableTime || [],
+      availability: (member.profile?.availableTime || []).map((entry) => formatAvailabilityLabel(entry)).filter(Boolean),
       availableTime: member.profile?.availableTime || [],
       openMatch: Boolean(member.profile?.openMatch),
       status: member.status,

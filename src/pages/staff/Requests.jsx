@@ -11,6 +11,7 @@ import {
   processBookingApproval,
   getTimeSlotsByFacility,
   getFacilities,
+  subscribeToStaffRequests,
 } from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
 import { getActionErrorMessage } from "../../utils/errors";
@@ -132,44 +133,68 @@ export default function Requests() {
 
   // Load real data when this part opens or changes.
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
+    let unsubscribe = () => {};
 
-    async function loadPage() {
+    async function updateFacilityOptions() {
       try {
-        const [nextRequests, nextFacilities] = await Promise.all([
-          getStaffRequests(sessionProfile),
-          getAllFacilityFilterOptions(),
-        ]);
-        if (cancelled) {
-          return;
+        const nextFacilities = await getAllFacilityFilterOptions();
+        if (active) {
+          setFacilityOptions(nextFacilities);
         }
+      } catch {
+        if (active) {
+          setFacilityOptions([]);
+        }
+      }
+    }
 
-        const mappedRequests = sortStaffRequests(
-          nextRequests
-            .map(toPageItem)
-            .filter((item) => STAFF_REQUEST_STATUS_SET.has(item.pageStatus)),
+    async function startSubscription() {
+      setLoading(true);
+      await updateFacilityOptions();
+
+      try {
+        unsubscribe = await subscribeToStaffRequests(
+          sessionProfile,
+          (nextRequests) => {
+            if (!active) {
+              return;
+            }
+
+            const mappedRequests = sortStaffRequests(
+              nextRequests
+                .map(toPageItem)
+                .filter((item) => STAFF_REQUEST_STATUS_SET.has(item.pageStatus)),
+            );
+            setItems(mappedRequests);
+            setSelectedId((current) => (current && mappedRequests.some((item) => item.id === current) ? current : ""));
+            setPageError("");
+            setLoading(false);
+            void updateFacilityOptions();
+          },
+          (subscriptionError) => {
+            if (!active) {
+              return;
+            }
+            setPageError(getActionErrorMessage(subscriptionError, "staff.requests.load", "Unable to keep booking requests up to date."));
+            setLoading(false);
+          },
         );
-        setItems(mappedRequests);
-        setFacilityOptions(nextFacilities);
-        setSelectedId("");
-        setPageError("");
-      } catch (loadError) {
-        if (!cancelled) {
-            setPageError(getActionErrorMessage(loadError, "staff.requests.load", "Unable to load booking requests."));
-        }
-      } finally {
-        if (!cancelled) {
+      } catch (subscriptionError) {
+        if (active) {
+          setPageError(getActionErrorMessage(subscriptionError, "staff.requests.load", "Unable to keep booking requests up to date."));
           setLoading(false);
         }
       }
     }
 
     if (sessionProfile?.id) {
-      loadPage();
+      startSubscription();
     }
 
     return () => {
-      cancelled = true;
+      active = false;
+      unsubscribe();
     };
   }, [sessionProfile]);
 

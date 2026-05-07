@@ -4,7 +4,7 @@ import { CheckCircle2 } from "lucide-react";
 import "../pageStyles.css";
 import "./Repair.css";
 import { getAllFacilityFilterOptions } from "../../services/bookingService";
-import { getRepairTickets, updateTicketStatus } from "../../services/reportService";
+import { getRepairTickets, subscribeToRepairTickets, updateTicketStatus } from "../../services/reportService";
 import { useAuth } from "../../provider/AuthContext";
 import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
@@ -25,6 +25,10 @@ function getRepairStatusLabel(status = "") {
 
   if (normalized === "resolved") {
     return "Resolved";
+  }
+
+  if (normalized === "terminated") {
+    return "Terminated";
   }
 
   return normalized || "unknown";
@@ -65,7 +69,7 @@ export default function Repair() {
         getAllFacilityFilterOptions(),
       ]);
       const nextItems = sortRepairItems(
-        ticketItems.filter((item) => ["pending", "resolved"].includes(item.status)),
+        ticketItems.filter((item) => ["pending", "resolved", "terminated"].includes(item.status)),
       );
 
       setItems(nextItems);
@@ -87,9 +91,67 @@ export default function Repair() {
 
   // Load real data when this part opens or changes.
   useEffect(() => {
-    if (sessionProfile?.id) {
-      refresh();
+    let active = true;
+    let unsubscribe = () => {};
+
+    async function updateFacilityOptions() {
+      try {
+        const facilityItems = await getAllFacilityFilterOptions();
+        if (active) {
+          setFacilityOptions(facilityItems);
+        }
+      } catch {
+        if (active) {
+          setFacilityOptions([]);
+        }
+      }
     }
+
+    async function startSubscription() {
+      setLoading(true);
+      await updateFacilityOptions();
+
+      try {
+        unsubscribe = await subscribeToRepairTickets(
+          sessionProfile,
+          (ticketItems) => {
+            if (!active) {
+              return;
+            }
+
+            const nextItems = sortRepairItems(
+              ticketItems.filter((item) => ["pending", "resolved", "terminated"].includes(item.status)),
+            );
+            setItems(nextItems);
+            setSelectedId((current) => (current && nextItems.some((item) => item.id === current) ? current : ""));
+            setPageError("");
+            setLoading(false);
+            void updateFacilityOptions();
+          },
+          (subscriptionError) => {
+            if (!active) {
+              return;
+            }
+            setPageError(getActionErrorMessage(subscriptionError, "repair.load", "Unable to keep repair tickets up to date."));
+            setLoading(false);
+          },
+        );
+      } catch (subscriptionError) {
+        if (active) {
+          setPageError(getActionErrorMessage(subscriptionError, "repair.load", "Unable to keep repair tickets up to date."));
+          setLoading(false);
+        }
+      }
+    }
+
+    if (sessionProfile?.id) {
+      startSubscription();
+    }
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [sessionProfile]);
 
   // Build the list that the user can see.
@@ -256,6 +318,7 @@ export default function Repair() {
               <option value="">All Status</option>
               <option value="pending">Pending</option>
               <option value="resolved">Resolved</option>
+              <option value="terminated">Terminated</option>
             </select>
           </FilterField>
 
@@ -335,7 +398,11 @@ export default function Repair() {
                     ) : (
                       <div className="staff-repair-detail__readonly">
                         <CheckCircle2 size={18} />
-                        <span>This ticket has been fully resolved.</span>
+                        <span>
+                          {selectedItem.status === "terminated"
+                            ? "This ticket was terminated and is read-only."
+                            : "This ticket has been fully resolved."}
+                        </span>
                       </div>
                     )}
                   </div>

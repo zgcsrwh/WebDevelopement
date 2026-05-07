@@ -12,7 +12,7 @@ import { ROUTE_PATHS } from "../../constants/routes";
 import { getAvatarForActor } from "../../utils/avatar";
 import { formatDateOnly, formatDateTimeDisplay, toDateInputValue } from "../../utils/dateFields";
 import { getActionErrorMessage } from "../../utils/errors";
-import { displayStatus, toTitleText } from "../../utils/presentation";
+import { displayStatus, formatAvailabilityLabel, toTitleText } from "../../utils/presentation";
 import { hasMeaningfulText } from "../../utils/text";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Toast from "../../components/common/Toast";
@@ -20,11 +20,8 @@ import PasswordChangePanel from "../../components/profile/PasswordChangePanel";
 
 // Format a raw availability string into an array containing [day, time]
 function formatAvailabilityParts(value = "") {
-  const [day = "", time = ""] = String(value)
-    .split("_")
-    .filter(Boolean)
-    .map((part) => toTitleText(part));
-  return [day, time];
+  const [day = "", ...timeParts] = formatAvailabilityLabel(value).split(" ").filter(Boolean);
+  return [day, timeParts.join(" ")];
 }
 
 // Sort an array of friends alphabetically by their nickname or name

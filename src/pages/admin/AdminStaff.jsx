@@ -4,7 +4,7 @@ import { Plus, X } from "lucide-react";
 import "../pageStyles.css";
 import "../workspaceStyles.css";
 import "./AdminStaff.css";
-import { createStaffAccount, disableStaffAccount, getAdminStaff } from "../../services/adminService";
+import { createStaffAccount, disableStaffAccount, getAdminStaff, subscribeToAdminStaff } from "../../services/adminService";
 import { useAuth } from "../../provider/AuthContext";
 import { getActionErrorMessage } from "../../utils/errors";
 import { statusTone } from "../../utils/presentation";
@@ -105,7 +105,47 @@ export default function AdminStaff() {
 
   // Load real data when this part opens or changes.
   useEffect(() => {
-    refreshStaff({ showLoader: true });
+    let active = true;
+    let unsubscribe = () => {};
+
+    async function startSubscription() {
+      setLoading(true);
+
+      try {
+        unsubscribe = await subscribeToAdminStaff(
+          sessionProfile,
+          (nextItems) => {
+            if (!active) {
+              return;
+            }
+            setItems(nextItems.filter((item) => String(item.role || "").toLowerCase() === "staff"));
+            setPageError("");
+            setLoading(false);
+          },
+          (subscriptionError) => {
+            if (!active) {
+              return;
+            }
+            setPageError(getActionErrorMessage(subscriptionError, "staff.load", "Unable to keep staff accounts up to date."));
+            setLoading(false);
+          },
+        );
+      } catch (subscriptionError) {
+        if (active) {
+          setPageError(getActionErrorMessage(subscriptionError, "staff.load", "Unable to keep staff accounts up to date."));
+          setLoading(false);
+        }
+      }
+    }
+
+    if (sessionProfile?.id) {
+      startSubscription();
+    }
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [sessionProfile]);
 
   // Build the list that the user can see.

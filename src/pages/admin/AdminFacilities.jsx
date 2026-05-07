@@ -4,7 +4,14 @@ import { Plus, X } from "lucide-react";
 import "../pageStyles.css";
 import "../workspaceStyles.css";
 import "./AdminFacilities.css";
-import { deleteFacility, getAdminFacilities, getAdminStaff, upsertFacility } from "../../services/adminService";
+import {
+  deleteFacility,
+  getAdminFacilities,
+  getAdminStaff,
+  subscribeToAdminFacilities,
+  subscribeToAdminStaff,
+  upsertFacility,
+} from "../../services/adminService";
 import { formatEffectiveDateLabel } from "../../services/centreService";
 import { useAuth } from "../../provider/AuthContext";
 import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
@@ -134,7 +141,71 @@ export default function AdminFacilities() {
 
   // Load real data when this part opens or changes.
   useEffect(() => {
-    refreshFacilities({ showLoader: true });
+    let active = true;
+    let unsubscribeFacilities = () => {};
+    let unsubscribeStaff = () => {};
+
+    async function startSubscriptions() {
+      setLoading(true);
+
+      try {
+        unsubscribeFacilities = await subscribeToAdminFacilities(
+          sessionProfile,
+          (facilityItems) => {
+            if (!active) {
+              return;
+            }
+            setItems(facilityItems);
+            setPageError("");
+            setLoading(false);
+          },
+          (subscriptionError) => {
+            if (!active) {
+              return;
+            }
+            setPageError(getActionErrorMessage(subscriptionError, "facility.load", "Unable to keep facilities up to date."));
+            setLoading(false);
+          },
+        );
+
+        unsubscribeStaff = await subscribeToAdminStaff(
+          sessionProfile,
+          (staffItems) => {
+            if (!active) {
+              return;
+            }
+            setStaffMembers(
+              staffItems.filter((item) => {
+                const status = String(item.status || "").toLowerCase();
+                return String(item.role || "").toLowerCase() === "staff" && ["active", "unassigned"].includes(status);
+              }),
+            );
+            setPageError("");
+          },
+          (subscriptionError) => {
+            if (!active) {
+              return;
+            }
+            setPageError(getActionErrorMessage(subscriptionError, "staff.load", "Unable to keep staff options up to date."));
+          },
+        );
+      } catch (subscriptionError) {
+        if (active) {
+          setPageError(getActionErrorMessage(subscriptionError, "facility.load", "Unable to keep facilities up to date."));
+          setLoading(false);
+        }
+      }
+    }
+
+    if (sessionProfile?.id) {
+      startSubscriptions();
+    }
+
+    return () => {
+      active = false;
+      unsubscribeFacilities();
+      unsubscribeStaff();
+    };
   }, [sessionProfile]);
 
   // Build the list that the user can see.

@@ -35,6 +35,15 @@ export function toTitleText(value = "") {
     .join(" ");
 }
 
+export function formatAvailabilityLabel(value = "") {
+  const source = String(value || "").trim();
+  if (!source) {
+    return "";
+  }
+
+  return toTitleText(source);
+}
+
 export function displayFilterOption(value = "") {
   const source = Array.isArray(value) ? value.find(Boolean) : value;
   return toTitleText(String(source || ""));

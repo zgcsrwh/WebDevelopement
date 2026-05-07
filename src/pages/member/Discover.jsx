@@ -11,6 +11,7 @@ import { getFacilitySportTypes } from "../../services/bookingService";
 import { getCurrentMatchProfile, getPartnerProfiles, sendMatchRequest,} from "../../services/partnerService";
 import { getAvatarForActor } from "../../utils/avatar";
 import { getActionErrorMessage } from "../../utils/errors";
+import { formatAvailabilityLabel, toTitleText } from "../../utils/presentation";
 import { countMeaningfulCharacters } from "../../utils/text";
 import MatchRequestModal from "../../components/member/MatchRequestModal";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
@@ -35,20 +36,11 @@ const TIME_OPTIONS = [
   { value: "evening", label: "Evening" },
 ];
 
-// Format a string to Title Case
-function toTitleText(value) {
-  return String(value || "")
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
 // Parse a raw availability string
 function parseAvailabilityEntry(entry) {
   const [day = "", time = ""] = String(entry || "").split("_");
   return { day, time,
-    label: [toTitleText(day), toTitleText(time)].filter(Boolean).join(" - "),
+    label: formatAvailabilityLabel(entry),
   };
 }
 

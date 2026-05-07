@@ -20,7 +20,8 @@ import PageLayout from "../../components/common/PageLayout";
 import StaffListCard from "../../components/staff/StaffListCard";
 
 const ALL_STATUS_VALUE = "all";
-const CHECK_IN_PAGE_STATUSES = new Set(["accepted"]);
+const CHECK_IN_STATUS_OPTIONS = ["accepted", "completed", "cancelled", "no_show"];
+const CHECK_IN_PAGE_STATUSES = new Set(CHECK_IN_STATUS_OPTIONS);
 
 const todayKey = new Date().toISOString().slice(0, 10);
 
@@ -89,6 +90,35 @@ function getStatusBanner(item, canCheckIn) {
     };
   }
 
+  if (item.pageStatus === "completed") {
+    return {
+      tone: "completed",
+      title: "Check-in Completed",
+      body: "This booking has already been checked in and is now read-only.",
+    };
+  }
+
+  if (item.pageStatus === "cancelled") {
+    return {
+      tone: "cancelled",
+      title: "Booking Cancelled",
+      body: "This booking was cancelled and can no longer be checked in.",
+    };
+  }
+
+  if (item.pageStatus === "no_show") {
+    return {
+      tone: "no_show",
+      title: "No-show Recorded",
+      body: "The check-in window has passed or the booking was marked as no-show.",
+    };
+  }
+
+  return {
+    tone: "unknown",
+    title: "Read-only Booking",
+    body: "This booking cannot be checked in from the current state.",
+  };
 }
 
 function getHistoryEntries(item, pageStatus) {
@@ -106,6 +136,15 @@ function getHistoryEntries(item, pageStatus) {
 }
 
 function getReadonlyMessage(item) {
+  if (item.pageStatus === "completed") {
+    return "This booking has already been checked in.";
+  }
+  if (item.pageStatus === "cancelled") {
+    return "This booking was cancelled.";
+  }
+  if (item.pageStatus === "no_show") {
+    return "This booking is marked as no-show.";
+  }
   return "This booking cannot be checked in from the current state.";
 }
 
@@ -168,6 +207,19 @@ export default function CheckIn() {
     let active = true;
     let unsubscribe = null;
 
+    async function updateFacilityOptions() {
+      try {
+        const nextFacilities = await getAllFacilityFilterOptions();
+        if (active) {
+          setFacilityOptions(nextFacilities);
+        }
+      } catch {
+        if (active) {
+          setFacilityOptions([]);
+        }
+      }
+    }
+
     async function loadPage() {
       setLoading(true);
       try {
@@ -201,6 +253,7 @@ export default function CheckIn() {
               return;
             }
             setItems(sortCheckInItems(nextItems));
+            void updateFacilityOptions();
             setLoading(false);
           },
           (subscriptionError) => {
@@ -334,7 +387,7 @@ export default function CheckIn() {
 
       <FilterPanel
         className="staff-checkin-filters"
-        columns={3}
+        columns={4}
         onClear={clearFilters}
       >
           <FilterField id="staff-checkin-member" label="Member Name">
@@ -378,6 +431,25 @@ export default function CheckIn() {
               <option value="">All Facilities</option>
               {facilityOptions.map((facility) => (
                 <option key={facility.id} value={facility.id}>{facility.name}</option>
+              ))}
+            </select>
+          </FilterField>
+
+          <FilterField id="staff-checkin-status" label="Status">
+            <select
+              id="staff-checkin-status"
+              value={filters.status}
+              onChange={(event) => {
+                setFilters((previous) => ({ ...previous, status: event.target.value }));
+                setPageError("");
+                setPageMessage("");
+              }}
+            >
+              <option value={ALL_STATUS_VALUE}>All Status</option>
+              {CHECK_IN_STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {displayStatus(status)}
+                </option>
               ))}
             </select>
           </FilterField>

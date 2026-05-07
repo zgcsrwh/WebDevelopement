@@ -10,7 +10,7 @@ import { getFacilitySportTypes } from "../../services/bookingService";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getActionErrorMessage } from "../../utils/errors";
 import { getAvatarIdForActor, getAvatarOptions, setStoredAvatarId } from "../../utils/avatar";
-import { toTitleText } from "../../utils/presentation";
+import { formatAvailabilityLabel, toTitleText } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
 
 const DAY_OPTIONS = [
@@ -58,13 +58,6 @@ function createAvailabilityDraft() {
     day: DAY_OPTIONS[0],
     period: PERIOD_OPTIONS[0],
   };
-}
-
-// Format a raw availability string (e.g., "monday_morning") into a display label (e.g., "Monday - Morning")
-function formatAvailabilityLabel(value = "") {
-  const [day = "", ...periodParts] = String(value).split("_");
-  const period = periodParts.join("_");
-  return `${toTitleText(day)} - ${toTitleText(period)}`;
 }
 
 // Validate the partner profile form, returning an object of field-specific error messages

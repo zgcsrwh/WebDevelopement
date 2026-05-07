@@ -17,6 +17,7 @@ import {
   orderBy,
   runDbTransaction,
   serverTimestamp,
+  subscribeToCollection,
   where,
 } from "./firestoreService";
 import { createAppError } from "../utils/errors";
@@ -116,6 +117,40 @@ export async function getRepairTicketById(id, actor) {
   }
 
   return mapRepairTicket(item, memberLookup, facilityLookup, staffLookup);
+}
+
+export async function subscribeToRepairTickets(actor, onNext, onError) {
+  const resolvedActor = await resolveActor(actor);
+  assertRole(resolvedActor, ["Member", "Staff", "Admin"]);
+
+  let active = true;
+  let version = 0;
+
+  async function emit() {
+    const currentVersion = ++version;
+
+    try {
+      const items = await getRepairTickets(resolvedActor);
+      if (active && currentVersion === version) {
+        onNext?.(items);
+      }
+    } catch (error) {
+      if (active) {
+        onError?.(error);
+      }
+    }
+  }
+
+  const unsubscribers = [
+    subscribeToCollection("repair", [], () => void emit(), onError),
+    subscribeToCollection("facility", [], () => void emit(), onError),
+    subscribeToCollection("member", [], () => void emit(), onError),
+  ];
+
+  return () => {
+    active = false;
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+  };
 }
 
 export async function getReportFacilities() {
