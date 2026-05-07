@@ -88,3 +88,7 @@ exports.toggleMatchStatus = toggleMatchStatus;
 // 导入 sendMatchRequest
 const { sendMatchRequest } = require("./sendMatchRequest");
 exports.sendMatchRequest = sendMatchRequest;
+
+// 导入 respondToMatchRequest
+const { respondToMatchRequest } = require("./respondToMatchRequest");
+exports.respondToMatchRequest = respondToMatchRequest;
