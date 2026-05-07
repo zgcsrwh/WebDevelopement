@@ -1,3 +1,4 @@
+// This staff page shows Requests content.
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import "../pageStyles.css";
@@ -129,6 +130,7 @@ export default function Requests() {
     }
   }
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
 
@@ -171,6 +173,7 @@ export default function Requests() {
     };
   }, [sessionProfile]);
 
+  // Build the list that the user can see.
   const visibleItems = useMemo(() => {
     return sortStaffRequests(
       items.filter((item) => {

@@ -1,3 +1,4 @@
+// Notification service reads notification documents for the current signed-in user.
 import { getCurrentActor } from "./centreService";
 import { getCollectionDocs, normalizeTimestamp, subscribeToCollection, updateCollectionDoc, where } from "./firestoreService";
 
@@ -5,6 +6,7 @@ async function resolveActor(actor) {
   return actor || getCurrentActor();
 }
 
+// Sort by real stored time only. Notifications without time are hidden from users.
 function getNotificationSortValue(value) {
   if (!value) {
     return 0;
@@ -22,6 +24,7 @@ function getNotificationSortValue(value) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+// Support both old and new notification field names from the database.
 function mapNotification(item) {
   const createdAt = normalizeTimestamp(item.created_at);
   const isRead = Boolean(item.isRead ?? item.is_read ?? false);
@@ -44,6 +47,7 @@ function mapNotification(item) {
   };
 }
 
+// Do not show temporary or broken notification rows with no real created_at value.
 function getDisplayableNotifications(docs = []) {
   return docs
     .map(mapNotification)
@@ -58,6 +62,7 @@ function getDisplayableNotifications(docs = []) {
     });
 }
 
+// Some documents use member_id and some use recipient_id, so merge both queries.
 function mergeNotificationDocs(...groups) {
   const merged = new Map();
   groups.flat().forEach((item) => {

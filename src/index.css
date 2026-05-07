@@ -1,3 +1,4 @@
+/* Global styles reset browser defaults and set the base page background. */
 :root {
   color-scheme: light;
   --font-body: "Segoe UI", Inter, Arial, sans-serif;

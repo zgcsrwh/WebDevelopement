@@ -1,3 +1,4 @@
+// Route constants keep page paths in one place so links do not use random strings.
 export const ROUTE_PATHS = {
   ROOT: "/",
   LOGIN: "/login",

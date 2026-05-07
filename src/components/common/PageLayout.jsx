@@ -1,3 +1,4 @@
+// PageLayout keeps page title, back link, and page actions in one place.
 import { Link } from "react-router-dom";
 import "./Button.css";
 import "./PageLayout.css";
@@ -14,6 +15,7 @@ export function PageHeader({
     <header className={["page-header", className].filter(Boolean).join(" ")}>
       <div className="page-header__copy">
         {backTo ? (
+          // Back links stay above the title, like detail pages.
           <Link className="page-header__back" to={backTo}>
             <span aria-hidden="true">&larr;</span>
             {backLabel}
@@ -39,6 +41,7 @@ export default function PageLayout({
 }) {
   return (
     <div className={["page-layout", className].filter(Boolean).join(" ")}>
+      {/* Most pages use this header so their content starts from the same left edge. */}
       {title || subtitle || actions || backTo ? (
         <PageHeader
           title={title}

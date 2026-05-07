@@ -1,3 +1,4 @@
+// This staff page shows Repair content.
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import "../pageStyles.css";
@@ -84,12 +85,14 @@ export default function Repair() {
     }
   }
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     if (sessionProfile?.id) {
       refresh();
     }
   }, [sessionProfile]);
 
+  // Build the list that the user can see.
   const visibleItems = useMemo(() => {
     const normalizedTicketId = filters.ticketId.trim().toLowerCase();
 

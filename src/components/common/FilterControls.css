@@ -1,3 +1,4 @@
+/* Filter styles keep select boxes, date inputs, search boxes, and clear buttons consistent. */
 .filter-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

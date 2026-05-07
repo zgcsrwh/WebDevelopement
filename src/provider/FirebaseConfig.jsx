@@ -1,3 +1,4 @@
+// FirebaseConfig creates the Firebase app, Auth, Firestore, and callable Functions clients.
 import { initializeApp } from "firebase/app";
 import { initializeFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage } from "firebase/storage";

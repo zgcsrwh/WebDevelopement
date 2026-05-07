@@ -1,3 +1,4 @@
+// Callable service wraps Firebase callable functions so pages call one small helper.
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../provider/FirebaseConfig";
 import { createAppError } from "../utils/errors";

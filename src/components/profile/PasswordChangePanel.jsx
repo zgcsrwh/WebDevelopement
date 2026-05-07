@@ -1,3 +1,4 @@
+// Folded password area for profile pages.
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { Lock, LockKeyhole, LockOpen } from "lucide-react";
 import { updateOwnPassword } from "../../services/profileService";
@@ -21,6 +22,7 @@ const PasswordChangePanel = forwardRef(function PasswordChangePanel(
     .join(" ");
 
   function reset({ collapse = true } = {}) {
+    // Closing the panel also removes unfinished password text.
     formRef.current?.reset();
     if (collapse) {
       setExpanded(false);
@@ -32,6 +34,7 @@ const PasswordChangePanel = forwardRef(function PasswordChangePanel(
     open: () => setExpanded(true),
     hasPasswordChange: () => (expanded ? Boolean(formRef.current?.hasPasswordChange()) : false),
     validate: (options = {}) => {
+      // If the panel is closed, empty password fields do not count as a change.
       if (!expanded) {
         if (options.requirePassword) {
           setExpanded(true);
@@ -52,6 +55,7 @@ const PasswordChangePanel = forwardRef(function PasswordChangePanel(
 
   function handleToggle() {
     if (expanded) {
+      // Hide and clear the password draft when the user clicks the lock again.
       reset({ collapse: true });
       return;
     }

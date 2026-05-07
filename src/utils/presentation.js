@@ -1,4 +1,6 @@
+// Display helpers turn database values into readable labels and badge colors.
 export function statusTone(status = "") {
+  // Badge color is only visual. The database value is not changed here.
   const value = status.toLowerCase();
 
   if (["active", "booked", "completed", "resolved", "accepted", "normal", "upcoming"].includes(value)) {
@@ -25,6 +27,7 @@ export function formatRole(role = "") {
 }
 
 export function toTitleText(value = "") {
+  // Convert values like no_show or alternative-suggested into title text.
   return value
     .split(/[_\s-]+/)
     .filter(Boolean)
@@ -38,6 +41,7 @@ export function displayFilterOption(value = "") {
 }
 
 export function displayStatus(value = "") {
+  // Accepted is shown as Upcoming in member-facing booking pages.
   const normalized = String(value).toLowerCase();
   
   const labels = {

@@ -1,3 +1,4 @@
+// InitFooter keeps the small footer text below the login/register card.
 import styles from "./LoginRegister.module.css";
 
 export default function InitFooter() {

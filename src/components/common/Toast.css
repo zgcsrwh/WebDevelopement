@@ -1,3 +1,4 @@
+/* Toast styles show short success or error messages fixed at the top of the browser. */
 .app-toast {
   position: fixed;
   top: 18px;

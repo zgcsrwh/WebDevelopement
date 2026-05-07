@@ -1,3 +1,4 @@
+// Carousel shows the welcome slides beside the login and register forms.
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import styles from "./LoginRegister.module.css";

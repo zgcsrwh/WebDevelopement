@@ -1,3 +1,4 @@
+// This admin page shows AdminFacilities content.
 import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import "../pageStyles.css";
@@ -131,10 +132,12 @@ export default function AdminFacilities() {
     }
   }
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     refreshFacilities({ showLoader: true });
   }, [sessionProfile]);
 
+  // Build the list that the user can see.
   const filteredItems = useMemo(() => {
     const query = searchInput.trim().toLowerCase();
     return items.filter((item) => {

@@ -1,3 +1,4 @@
+// Booking service reads and prepares real booking, facility, member, and time_slot data.
 import { doc, getCollectionRef, runDbTransaction, serverTimestamp } from "./firestoreService";
 import {
   assertRole,
@@ -48,6 +49,7 @@ function getMaxBookingDate() {
   return getMaxLocalBookingDate(7);
 }
 
+// Build one-hour labels like "09:00 - 10:00" for filter options.
 function buildHourSlotRange(startHour, endHour) {
   const safeStart = Number(startHour);
   const safeEnd = Number(endHour);
@@ -63,6 +65,7 @@ function buildHourSlotRange(startHour, endHour) {
   });
 }
 
+// Staff and member pages should show time slots from early to late.
 function sortTimeSlots(slots = []) {
   return [...slots].sort((left, right) => {
     const leftStart = Number(String(left).slice(0, 2));
@@ -75,6 +78,7 @@ function sortTimeSlotDocs(slots = []) {
   return [...slots].sort((left, right) => toHourNumber(left.start_time) - toHourNumber(right.start_time));
 }
 
+// Read the real time_slot records for one facility and one date.
 async function getStoredTimeSlotsForFacilityDate(facilityId, selectedDate = getTodayDate()) {
   const safeDate = toStoredDateString(selectedDate).slice(0, 10);
   const slots = await getCollectionDocs("time_slot", [
@@ -136,6 +140,7 @@ export async function getFacilityTimeFilterOptions(selectedType = "All") {
     getCollectionDocs("repair"),
   ]);
 
+  // Build the list that the user can see.
   const visibleFacilities = facilityDocs
     .map((item) => {
       const virtualFacility = getVirtualFacilityDoc(item);
@@ -214,6 +219,7 @@ async function resolveActor(actor) {
 }
 
 function normalizeParticipantIds(item = {}) {
+  // Old exports used user_id_list, while newer records use participant_ids.
   return [...new Set([...(item.participant_ids || []), ...(item.user_id_list || [])].filter(Boolean))];
 }
 
@@ -224,6 +230,7 @@ function isActiveMember(member) {
 }
 
 function getMemberDisplayName(member, fallback = MISSING_MEMBER_LABEL) {
+  // Deleted or inactive members should not leak raw Firestore ids to the page.
   if (!isActiveMember(member)) {
     return fallback;
   }
@@ -252,6 +259,7 @@ const MEMBER_BOOKING_VISIBLE_STATUSES = new Set([
 ]);
 
 function normalizeMemberBookingPageStatus(value = "") {
+  // Member pages show accepted as upcoming and suggested as alternative suggested.
   const normalizedStatus = normalizeBookingStatusValue(value);
   const compactStatus = normalizedStatus.replace(/\s+/g, "");
 

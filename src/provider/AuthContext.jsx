@@ -1,3 +1,4 @@
+// AuthContext keeps the signed-in user, role, and profile data for all pages.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   createUserWithEmailAndPassword,
@@ -31,12 +32,14 @@ export function useAuth() {
 }
 
 async function signInAndLoad(email, password) {
+  // Reload after login so email verification is not using stale browser data.
   const credential = await signInWithEmailAndPassword(auth, email, password);
   await reload(credential.user);
   return credential.user;
 }
 
 async function assertEmailAvailableForMemberRegistration(email) {
+  // Member registration cannot reuse a staff, admin, or existing member email.
   const context = await getRegistrationEligibility(email);
   if (context.canRegister) {
     return;
@@ -54,6 +57,7 @@ function normalizeSessionContext(context = {}) {
 }
 
 function canUseAccountStatus(role = "", status = "") {
+  // Unassigned staff can still sign in. Deactivated staff cannot.
   const normalizedRole = String(role || "").toLowerCase();
   const normalizedStatus = String(status || "").toLowerCase();
 
@@ -86,7 +90,7 @@ export function AuthProvider({ children }) {
     try {
       await assertEmailAvailableForMemberRegistration(email);
       const credential = await createUserWithEmailAndPassword(auth, email, password);
-      // Store the uid in a tmp doc in firestor
+      // Store the uid in a temporary document before profile creation.
       const uid = credential.user.uid;
       FirestoreFunc.create("TempUser", {email:email, uid:uid});
 
@@ -147,7 +151,7 @@ export function AuthProvider({ children }) {
         throw new Error("Please verify your email before completing registration.");
       }
 
-      // Get the tmp doc
+      // Read the temporary uid document before creating the member profile.
       const tmpMember = await FirestoreFunc.filterSingle("TempUser", [{ field: "email", operator: "==", value: email }]);
       const uid = tmpMember[0].uid;
       await createUserProfile({
@@ -161,7 +165,7 @@ export function AuthProvider({ children }) {
       clearRegistrationPending();
       await signOut(auth);
 
-      // Clear the tmp doc
+      // Remove the temporary uid document after registration is complete.
       await FirestoreFunc.remove("TempUser", tmpMember[0].id)
 
       return { success: true };
@@ -212,7 +216,7 @@ export function AuthProvider({ children }) {
     try {
       const credential = await signInWithPopup(auth, googleProvider);
       
-      // Store the uid in a tmp doc in firestor
+      // Keep the Firebase uid so a new Google member can be created in Firestore.
       const uid = credential.user.uid;     
 
       const context = normalizeSessionContext(
@@ -260,6 +264,7 @@ export function AuthProvider({ children }) {
     await signOut(auth);
   }, [clearRegistrationPending, resetSession]);
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);

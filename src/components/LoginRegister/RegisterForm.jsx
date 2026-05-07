@@ -1,3 +1,4 @@
+// RegisterForm collects new member details and starts email verification.
 import { useEffect, useState, useCallback } from "react";
 import { Calendar, CheckCircle, Eye, EyeOff, Lock, Mail, MapPin, User } from "lucide-react";
 import styles from "./LoginRegister.module.css";

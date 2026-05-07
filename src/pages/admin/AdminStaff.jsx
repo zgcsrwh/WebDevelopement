@@ -1,3 +1,4 @@
+// This admin page shows AdminStaff content.
 import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import "../pageStyles.css";
@@ -102,10 +103,12 @@ export default function AdminStaff() {
     }
   }
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     refreshStaff({ showLoader: true });
   }, [sessionProfile]);
 
+  // Build the list that the user can see.
   const filteredItems = useMemo(() => {
     const normalizedQuery = searchInput.trim().toLowerCase();
     if (!normalizedQuery) {

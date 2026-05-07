@@ -1,3 +1,4 @@
+/* Login and register styles control the auth card, form fields, and carousel area. */
 .pageWrapper {
   height: 100vh;
   display: flex;
@@ -479,18 +480,18 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  max-width: 600px; /* 与卡片宽度一致 */
-  margin: 10px 0;   /* 上下留出一点间距 */
-  color: #9ca3af;   /* 浅灰色文字 */
+  max-width: 600px;
+  margin: 10px 0;
+  color: #9ca3af;
   font-size: 14px;
 }
 
 .divider::before,
 .divider::after {
   content: "";
-  flex: 1;          /* 自动填满剩余空间 */
+  flex: 1;
   height: 1px;
-  background-color: #e5e7eb; /* 横线的颜色 */
+  background-color: #e5e7eb;
 }
 
 .divider span {
@@ -514,7 +515,7 @@
 }
 
 .externalGoogleBtn:hover {
-  background-color: rgba(0, 0, 0, 0.03); /* 极淡的灰色悬停效果 */
+  background-color: rgba(0, 0, 0, 0.03);
   border-color: #d1d5db;
 }
 
@@ -608,3 +609,5 @@
     gap: 10px;
   }
 }
+
+

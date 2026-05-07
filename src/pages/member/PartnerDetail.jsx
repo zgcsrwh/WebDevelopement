@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
+// This member page shows PartnerDetail content.
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import "../pageStyles.css";
 import "./memberWorkspace.css";
@@ -41,6 +42,7 @@ export default function PartnerDetail() {
   const [requestPending, setRequestPending] = useState(false);
   const isRequestsPage = !id;
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
 

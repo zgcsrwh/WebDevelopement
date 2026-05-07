@@ -1,3 +1,4 @@
+/* AppShell styles keep member, staff, and admin navigation bars in one visual system. */
 .member-shell {
   min-height: 100vh;
   display: flex;

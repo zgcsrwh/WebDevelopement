@@ -1,3 +1,4 @@
+// This staff page shows CheckIn content.
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3 } from "lucide-react";
 import "../pageStyles.css";
@@ -152,6 +153,7 @@ export default function CheckIn() {
     }
   }
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       setClockTick(Date.now());
@@ -235,6 +237,7 @@ export default function CheckIn() {
     );
   }, [items, now]);
 
+  // Build the list that the user can see.
   const visibleItems = useMemo(() => {
     const normalizedSearch = filters.search.trim().toLowerCase();
     const normalizedRequestId = filters.requestId.trim().toLowerCase();

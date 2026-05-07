@@ -1,3 +1,4 @@
+// This page shows LoginRegister content.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "../components/LoginRegister/LoginRegister.module.css";
@@ -11,6 +12,7 @@ const LoginRegister = ({ initialMode = "login" }) => {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(initialMode !== "register");
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     setIsLogin(initialMode !== "register");
   }, [initialMode]);

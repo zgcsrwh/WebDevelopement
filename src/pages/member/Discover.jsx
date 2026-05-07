@@ -1,3 +1,4 @@
+// This member page shows Discover content.
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Dumbbell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -81,6 +82,7 @@ export default function Discover() {
   const [requestDraft, setRequestDraft] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
     async function loadData() {
@@ -123,6 +125,7 @@ export default function Discover() {
     };
   }, [navigate, sessionProfile]);
 
+  // Build the list that the user can see.
   const filteredProfiles = useMemo(
     () => profiles.filter((profile) => applyProfileFilters(profile, filters)),
     [profiles, filters],

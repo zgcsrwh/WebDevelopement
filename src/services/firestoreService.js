@@ -1,3 +1,4 @@
+// Firestore service keeps direct document reads and simple frontend writes.
 import {
   addDoc,
   collection,

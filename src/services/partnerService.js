@@ -1,3 +1,4 @@
+// Partner service reads match profiles, friends, and matching requests.
 import {
   assertRole,
   getCurrentActor,
@@ -28,6 +29,7 @@ async function resolveActor(actor) {
 }
 
 async function getOwnProfile(actorId) {
+  // A member has one match profile document linked by member_id.
   const profiles = await getCollectionDocs("profile", [where("member_id", "==", actorId)]);
   return profiles[0] || null;
 }
@@ -39,6 +41,7 @@ function isActiveMember(member) {
 }
 
 function getMemberDisplayName(member) {
+  // Missing or inactive members can appear in old matching records.
   if (!isActiveMember(member)) {
     return MISSING_MEMBER_LABEL;
   }
@@ -47,6 +50,7 @@ function getMemberDisplayName(member) {
 }
 
 function mapProfile(item, memberLookup, currentActorId = "") {
+  // Mix profile data with member data so cards can show nickname and account status.
   const normalized = normalizeProfileDoc(item);
   const member = memberLookup.get(normalized.memberId);
 
@@ -74,6 +78,7 @@ function mapProfile(item, memberLookup, currentActorId = "") {
 }
 
 function mapMatchRequest(item, memberLookup, actorId = "") {
+  // The same matching row is shown as incoming for receiver and outgoing for sender.
   const sender = memberLookup.get(item.sender_id);
   const receiver = memberLookup.get(item.reciever_id);
   const isIncoming = item.reciever_id === actorId;
@@ -148,6 +153,7 @@ export async function getFriendProfiles(actor) {
     getMemberLookup(),
   ]);
 
+  // If a friend account was deleted, it will not be in the member lookup and will be hidden.
   const friendIds = friendRecord?.friends_ids || [];
   return friendIds
     .map((friendId) => memberLookup.get(friendId))
@@ -178,6 +184,7 @@ export async function upsertMatchProfile(payload, actor) {
   const selfDescription = String(payload.self_description || "").trim();
   const interests = Array.isArray(payload.interests) ? payload.interests.filter(Boolean) : [];
   const availableTime = Array.isArray(payload.available_time) ? payload.available_time.filter(Boolean) : [];
+  // The full day + time text must be unique, not only the day or only the time.
   const normalizedSlots = availableTime.map((slot) => String(slot).trim().toLowerCase());
   const uniqueAvailabilitySlots = new Set(normalizedSlots.filter(Boolean));
 

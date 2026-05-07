@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
+// This member page shows FacilityDetail content.
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import "../pageStyles.css";
 import "./FacilityDetail.css";
@@ -77,6 +78,7 @@ export default function FacilityDetail() {
   const [error, setError] = useState("");
   const [clockTick, setClockTick] = useState(Date.now());
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let isActive = true;
 

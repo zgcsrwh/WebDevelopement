@@ -1,3 +1,4 @@
+// Small password rules shared by all profile pages.
 import { hasMeaningfulText } from "../../utils/text";
 
 export function isStrongPassword(value) {
@@ -11,6 +12,7 @@ export function validatePasswordDraft(draft = {}, { requirePassword = false } = 
   const shouldValidate = requirePassword || dirty;
   const errors = {};
 
+  // Empty boxes are allowed when the user is not changing password.
   if (!shouldValidate) {
     return { dirty, errors, valid: true };
   }

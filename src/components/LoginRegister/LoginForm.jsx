@@ -1,3 +1,4 @@
+// LoginForm collects role, email, and password before calling the auth context.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
@@ -5,7 +6,7 @@ import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getActionErrorMessage } from "../../utils/errors";
 import styles from "./LoginRegister.module.css";
-import googleIcon from '../../images/google_logo.svg';
+import googleIcon from "../../images/google_logo.svg";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -17,7 +18,6 @@ const LoginForm = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const { login, loginWithGoogle, loading } = useAuth();
-
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -34,8 +34,8 @@ const LoginForm = () => {
     }
 
     try {
-      const context = await login(email, password, role);  
-      
+      const context = await login(email, password, role);
+
       if (context.role === "Admin") {
         navigate(ROUTE_PATHS.ADMIN_FACILITIES);
       } else if (context.role === "Staff") {
@@ -50,9 +50,9 @@ const LoginForm = () => {
 
   const handleGoogle = async () => {
     try {
-      // 使用 AuthContext 封装好的 Google 登录
+      // Use the shared Google login helper.
       await loginWithGoogle();
-      navigate('/home');
+      navigate("/home");
     } catch (err) {
       setError(getActionErrorMessage(err, "auth.login"));
     }
@@ -65,7 +65,7 @@ const LoginForm = () => {
       </div>
 
       {error && <p className={styles.errorMessage}>{error}</p>}
-      
+
       <form onSubmit={handleLogin} className={styles.verticalForm} noValidate>
         <div className={styles.inputGroup}>
           <label>Identity</label>
@@ -127,12 +127,11 @@ const LoginForm = () => {
       </form>
 
       <div className={styles.divider}><span>Or</span></div>
-      
+
       <button onClick={handleGoogle} className={styles.externalGoogleBtn} type="button">
         <img src={googleIcon} width="18" alt="G" />
         Sign up / in with Google
       </button>
-
     </div>
   );
 };

@@ -1,3 +1,4 @@
+// Auth service calls login/register APIs and normalizes the returned user context.
 import { getActorByEmail, setFriendIds, toStoredDateString } from "./centreService";
 import { callSubmitAction } from "./callableService";
 import { addCollectionDoc, getCollectionDocs, where } from "./firestoreService";

@@ -1,3 +1,5 @@
+// Date field helpers convert real database dates into input values and display text.
+// They support Firestore timestamps, ISO strings, and old exported Chinese date strings.
 function pad2(value) {
   return String(value).padStart(2, "0");
 }
@@ -7,6 +9,7 @@ function isValidDate(value) {
 }
 
 function timestampToDate(value) {
+  // Firestore timestamps may be SDK objects or plain exported objects.
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -27,6 +30,7 @@ function timestampToDate(value) {
 }
 
 function datePartsFromString(value) {
+  // Read the date part without shifting it through the browser timezone.
   const text = String(value || "").trim();
   if (!text) {
     return null;
@@ -84,6 +88,7 @@ export function formatDateOnly(value, fallback = "Not available") {
 }
 
 function timePartsFromString(value) {
+  // Keep the stored hour and minute exactly as the database string shows them.
   const text = String(value || "").trim();
   if (!text) {
     return null;

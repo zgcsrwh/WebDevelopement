@@ -1,3 +1,4 @@
+// MatchRequestModal lets a member write a short message before sending a partner request.
 import { useEffect, useState } from "react";
 import { countMeaningfulCharacters } from "../../utils/text";
 import "./MatchRequestModal.css";

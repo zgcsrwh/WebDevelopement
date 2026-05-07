@@ -1,3 +1,4 @@
+// This member page shows MyBookings content.
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "../pageStyles.css";
@@ -192,6 +193,7 @@ export default function MyBookings() {
   const [pendingAction, setPendingAction] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
 
@@ -227,6 +229,7 @@ export default function MyBookings() {
     };
   }, [sessionProfile]);
 
+  // Build the list that the user can see.
   const visibleItems = useMemo(() => {
     return items.filter((booking) => {
       const status = normalizeBookingStatus(booking.status || booking.raw?.status);

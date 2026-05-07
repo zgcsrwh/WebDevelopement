@@ -1,4 +1,6 @@
+// Staff page date helpers format database time values without changing the stored data.
 function parseStoredDateTime(value = "") {
+  // Accept Date objects and date strings from Firestore/exported data.
   if (!value) {
     return null;
   }
@@ -67,6 +69,7 @@ export function formatStaffDateTime(value = "") {
 }
 
 export function formatStaffCardTimestamp(value = "", nowInput = new Date()) {
+  // Staff cards show today as hours ago, yesterday with time, and older dates normally.
   const parsed = parseStoredDateTime(value);
   if (!parsed) {
     return typeof value === "string" ? value : "";

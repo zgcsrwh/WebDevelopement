@@ -1,3 +1,4 @@
+// This admin page shows AdminProfile content.
 import "../../components/profile/StaffProfile.css";
 import OperatorProfilePage from "../../components/profile/OperatorProfilePage";
 

@@ -1,3 +1,4 @@
+// AppShell is the top frame after login: brand, tabs, bell, and profile avatar.
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { CalendarRange, ClipboardList, UserRound, Wrench } from "lucide-react";
@@ -9,6 +10,7 @@ import "../common/Button.css";
 import "./AppShell.css";
 
 const navConfig = {
+  // Each role has different tabs, but the top bar layout stays the same.
   Member: [
     {
       to: ROUTE_PATHS.FACILITIES,
@@ -63,6 +65,7 @@ function AppShell({ children }) {
   const profileInitial = String(sessionProfile?.name || "S").trim().charAt(0).toUpperCase() || "S";
 
   function isLinkActive(link) {
+    // Some tabs must also stay active on their detail pages.
     const matches = Array.isArray(link.matches) && link.matches.length ? link.matches : [link.to];
     return matches.some((match) => {
       if (typeof match === "string") {
@@ -85,6 +88,7 @@ function AppShell({ children }) {
     const isStaff = sessionRole === "Staff";
     const isAdmin = sessionRole === "Admin";
     const usesFixedLetterAvatar = isStaff || isAdmin;
+    // Staff and admin use fixed letter avatars. Members still use editable avatars.
     const roleBadgeLabel = isStaff ? "Staff" : isAdmin ? "Admin" : "";
     const avatarLinkClass = isStaff
       ? "member-shell__profileLink member-shell__profileLink--staff"
@@ -137,6 +141,7 @@ function AppShell({ children }) {
               </div>
             ) : null}
 
+            {/* Admin has no bell because admin does not receive app notifications. */}
             {!isAdmin ? <NotificationBell variant={isStaff ? "staff" : "member"} /> : null}
 
             <Link

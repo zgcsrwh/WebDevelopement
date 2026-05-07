@@ -1,3 +1,4 @@
+// ConfirmDialog asks the user to check a risky action before it runs.
 import { createPortal } from "react-dom";
 import { Button } from "./Button";
 import "./ConfirmDialog.css";
@@ -44,5 +45,6 @@ export default function ConfirmDialog({
     return dialog;
   }
 
+  // Portal keeps the dialog above cards, drawers, and notification panels.
   return createPortal(dialog, document.body);
 }

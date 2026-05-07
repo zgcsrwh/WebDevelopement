@@ -1,3 +1,4 @@
+// Staff and admin use this page to edit address and change password.
 import { useEffect, useRef, useState } from "react";
 import { LogOut, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +11,7 @@ import { getDocById, updateCollectionDoc } from "../../services/firestoreService
 import ConfirmDialog from "../common/ConfirmDialog";
 import PasswordChangePanel from "./PasswordChangePanel";
 
+// Real admin_staff data and cached login data can use different date names.
 function normalizeProfile(record = {}, fallback = {}) {
   const rawDateOfBirth =
     record.date_of_birth ??
@@ -35,6 +37,7 @@ function normalizeProfile(record = {}, fallback = {}) {
   };
 }
 
+// Page alerts are for save results, not for field-level validation.
 function buildAlert(title, body, tone = "success") {
   return { title, body, tone };
 }
@@ -80,6 +83,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
   const [saving, setSaving] = useState(false);
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
 
+  // Always read the real admin_staff document before showing editable data.
   useEffect(() => {
     let cancelled = false;
 
@@ -170,6 +174,7 @@ export default function OperatorProfilePage({ roleVariant = "staff", roleLabel =
     };
   }
 
+  // Save password and address carefully so one failed part gives a clear message.
   async function persistChanges() {
     const trimmedAddress = String(draftProfile.address || "").trim();
     const shouldUpdateAddress = trimmedAddress !== String(originalProfile?.address || "").trim();

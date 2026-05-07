@@ -1,6 +1,8 @@
+// Booking slot rules decide which real time_slot records members can choose.
 const MIN_BOOKING_LEAD_HOURS = 2;
 
 export function getLocalDateKey(value = new Date()) {
+  // Build a local yyyy-mm-dd key without moving the date through UTC.
   const parsed = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return "";
@@ -13,6 +15,7 @@ export function getLocalDateKey(value = new Date()) {
 }
 
 export function getMaxLocalBookingDate(daysAhead = 7, baseDate = new Date()) {
+  // Members can only book inside the next seven-day window.
   const parsed = baseDate instanceof Date ? new Date(baseDate) : new Date(baseDate);
   if (Number.isNaN(parsed.getTime())) {
     return "";
@@ -23,6 +26,7 @@ export function getMaxLocalBookingDate(daysAhead = 7, baseDate = new Date()) {
 }
 
 function normalizeDateKey(value = "") {
+  // Only the date part matters for matching slot documents.
   const source = String(value || "").trim();
   if (!source) {
     return "";
@@ -33,6 +37,7 @@ function normalizeDateKey(value = "") {
 }
 
 export function normalizeSlotClock(value) {
+  // Stored hours like 9 are shown and compared as 09:00.
   const source = String(value ?? "").trim();
   if (!source) {
     return "";
@@ -51,6 +56,7 @@ export function normalizeSlotClock(value) {
 }
 
 function parseWholeHour(value, { allow24 = false } = {}) {
+  // Booking is only allowed on whole-hour slots.
   const normalized = normalizeSlotClock(value);
   const match = normalized.match(/^(\d{2}):00$/);
   if (!match) {
@@ -67,6 +73,7 @@ function parseWholeHour(value, { allow24 = false } = {}) {
 }
 
 export function buildSlotDateTime(slot = {}, fallbackDate = "") {
+  // Combine the slot date and start hour into one local Date object.
   const dateKey = normalizeDateKey(slot.date || fallbackDate);
   const startHour = parseWholeHour(slot.start_time ?? slot.startTime);
   if (!dateKey || startHour === null) {
@@ -78,6 +85,7 @@ export function buildSlotDateTime(slot = {}, fallbackDate = "") {
 }
 
 export function getFrontendBookableSlotStatus(slot = {}, fallbackDate = "", nowInput = new Date()) {
+  // A slot is bookable only when it is open, one hour long, and not too soon.
   const status = String(slot.status || "").trim().toLowerCase();
   if (status !== "open") {
     return { bookable: false, reason: "Unavailable" };

@@ -1,3 +1,4 @@
+// Error helpers turn Firebase and callable error codes into messages users can understand.
 const ERROR_MESSAGES = {
   unauthenticated: "Please sign in again before continuing.",
   "permission-denied": "This account does not have permission to complete that action.",
@@ -13,6 +14,7 @@ const ERROR_MESSAGES = {
   internal: "The request could not be completed right now. Please try again later.",
 };
 
+// Page actions can override the default message with a more useful one.
 const ACTION_ERROR_MESSAGES = {
   "auth.login": {
     "invalid-credential": "The email address or password is incorrect.",

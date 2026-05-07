@@ -1,3 +1,4 @@
+// This form only checks the new password text. The parent page does the saving.
 import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { validatePasswordDraft } from "./passwordChangeUtils";
@@ -22,12 +23,14 @@ const PasswordChangeForm = forwardRef(function PasswordChangeForm(
   const dirty = useMemo(() => validatePasswordDraft(draft).dirty, [draft]);
 
   function reset() {
+    // Clear old drafts so a hidden password is never saved later by mistake.
     setDraft(EMPTY_DRAFT);
     setErrors({});
     setVisible({ nextPassword: false, confirmPassword: false });
   }
 
   function validate(options) {
+    // Validation is shared by member, staff, and admin profile pages.
     const result = validatePasswordDraft(draft, options);
     setErrors(result.errors);
     return result;
@@ -47,6 +50,7 @@ const PasswordChangeForm = forwardRef(function PasswordChangeForm(
         ...previous,
         [field]: value,
       }));
+      // Remove the old field error as soon as the user edits that field.
       setErrors((previous) => ({
         ...previous,
         [field]: "",

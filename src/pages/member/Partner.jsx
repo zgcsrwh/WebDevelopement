@@ -1,3 +1,4 @@
+// This member page shows Partner content.
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "../pageStyles.css";
@@ -136,6 +137,7 @@ export default function Partner() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
 

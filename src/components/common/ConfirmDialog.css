@@ -1,3 +1,4 @@
+/* Confirm dialog styles are for delete, cancel, logout, and password confirmation popups. */
 .confirm-dialog__overlay {
   position: fixed;
   inset: 0;

@@ -1,3 +1,4 @@
+// This member page shows Reports content.
 import { useEffect, useMemo, useState } from "react";
 import "../pageStyles.css";
 import "./memberWorkspace.css";
@@ -65,6 +66,7 @@ export default function Reports() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
 
@@ -97,6 +99,7 @@ export default function Reports() {
   const descriptionLength = countMeaningfulCharacters(form.description);
   const isDescriptionTooLong = descriptionLength > 500;
 
+  // Build the list that the user can see.
   const sortedItems = useMemo(() => {
     return [...items].sort((left, right) => {
       const leftTime = normalizeDateValue(left.raw?.created_at || left.createdAt);

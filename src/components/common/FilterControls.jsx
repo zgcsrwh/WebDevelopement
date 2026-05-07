@@ -1,3 +1,4 @@
+// FilterControls keeps select boxes, search boxes, and Clear aligned.
 import "./FilterControls.css";
 
 export function FilterPanel({
@@ -10,6 +11,7 @@ export function FilterPanel({
   className = "",
   surface = true,
 }) {
+  // A page can pass its own buttons, or use the normal Clear button here.
   const actionContent =
     actions ||
     (onClear || extraActions ? (
@@ -30,6 +32,7 @@ export function FilterPanel({
   ]
     .filter(Boolean)
     .join(" ");
+  // Fixed columns help staff and admin filter bars keep the same width.
   const style = columns ? { "--filter-columns": columns } : undefined;
 
   return (
@@ -41,6 +44,7 @@ export function FilterPanel({
 }
 
 export function FilterField({ id, label, children, className = "" }) {
+  // One label plus one control, so every filter has the same spacing.
   return (
     <div className={`filter-field ${className}`.trim()}>
       {label ? <label htmlFor={id}>{label}</label> : null}
@@ -50,6 +54,7 @@ export function FilterField({ id, label, children, className = "" }) {
 }
 
 export function FilterClearButton({ children = "Clear", className = "", ...props }) {
+  // Small clear button used inside the filter card.
   return (
     <button className={`btn-ghost filter-clear-button ${className}`.trim()} type="button" {...props}>
       {children}

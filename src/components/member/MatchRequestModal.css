@@ -1,3 +1,4 @@
+/* Match request modal styles keep the partner message box and action buttons tidy. */
 .match-request-modal__overlay {
   background: rgba(233, 240, 245, 0.98);
   backdrop-filter: none;

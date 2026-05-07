@@ -1,3 +1,4 @@
+// Admin service calls staff and facility management APIs.
 import { getApps, initializeApp } from "firebase/app";
 import { createUserWithEmailAndPassword, getAuth as getFirebaseAuth, signOut as signOutSecondaryAuth } from "firebase/auth";
 import { firebaseConfig } from "../provider/FirebaseConfig";

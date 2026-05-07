@@ -1,3 +1,4 @@
+// This page shows Notifications content.
 import { useEffect, useMemo, useState } from "react";
 import "./pageStyles.css";
 import "../components/layout/NotificationBell.css";
@@ -12,6 +13,15 @@ function normalizeKey(value = "") {
   return String(value || "").trim().toLowerCase().replaceAll(" ", "_").replaceAll("-", "_");
 }
 
+function isMatchType(type = "") {
+  const value = normalizeKey(type);
+  return (
+    ["match_request", "friend", "friend_request", "match", "matching", "partner_request"].includes(value) ||
+    value.includes("match") ||
+    value.includes("partner")
+  );
+}
+
 function getNotificationGroup(type = "") {
   const value = normalizeKey(type);
 
@@ -23,7 +33,7 @@ function getNotificationGroup(type = "") {
     return "repair";
   }
 
-  if (["match_request", "friend", "match", "matching", "partner_request"].includes(value)) {
+  if (isMatchType(value)) {
     return "match";
   }
 
@@ -261,6 +271,7 @@ export default function Notifications() {
   const [activeDetail, setActiveDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let unsubscribe = () => {};
     let cancelled = false;
@@ -296,6 +307,7 @@ export default function Notifications() {
     [items],
   );
 
+  // Build the list that the user can see.
   const filteredItems = useMemo(() => {
     if (filter === "all") return items;
     if (filter === "unread") return items.filter((item) => !item.isRead);

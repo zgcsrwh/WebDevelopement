@@ -1,3 +1,4 @@
+/* Notification bell styles cover the dropdown panel, message cards, and detail dialog. */
 .notification-bell {
   position: relative;
 }
@@ -337,26 +338,22 @@
 }
 
 .notification-bell__matchActions {
-  width: 100%;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  justify-items: end;
-}
-
-.notification-bell__matchReviewButton {
-  width: 100%;
+  align-items: flex-end;
 }
 
 .notification-bell__matchDecisionRow {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
   gap: 10px;
-  width: 100%;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .notification-bell__matchDecisionRow .btn,
 .notification-bell__matchDecisionRow .btn-secondary {
-  width: 100%;
+  min-width: 96px;
 }
 
 .notification-bell__unreadDot {
@@ -442,8 +439,7 @@
   color: #627785;
 }
 
-.notification-bell__applicationBox p,
-.notification-bell__description {
+.notification-bell__applicationBox p {
   margin: 0;
   color: #667b88;
   line-height: 1.6;
@@ -629,6 +625,17 @@
   .notification-bell__actions .btn,
   .notification-bell__actions .btn-secondary {
     width: 100%;
+  }
+
+  .notification-bell__matchActions,
+  .notification-bell__matchDecisionRow {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .notification-bell__matchDecisionRow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .notification-bell__detailGrid {

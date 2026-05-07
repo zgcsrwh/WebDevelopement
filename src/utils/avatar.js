@@ -1,7 +1,9 @@
+// Avatar helpers build member picture choices and remember the selected avatar.
 const AVATAR_STORAGE_KEY = "sports-centre-avatar-selections";
 const AVATAR_CHANGE_EVENT = "sports-centre-avatar-change";
 
 function buildAvatarSvg({ background, accent, detail, pattern, label }) {
+  // Build small SVG avatars so we do not need separate image files.
   return `data:image/svg+xml;utf8,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
       <rect width="120" height="120" rx="28" fill="${background}" />
@@ -89,6 +91,7 @@ function canUseStorage() {
 }
 
 function readAvatarSelections() {
+  // Read saved avatar choices from this browser.
   if (!canUseStorage()) {
     return {};
   }
@@ -102,6 +105,7 @@ function readAvatarSelections() {
 }
 
 function writeAvatarSelections(nextSelections) {
+  // Save choices and tell other open pages to refresh their avatar.
   if (!canUseStorage()) {
     return;
   }
@@ -111,6 +115,7 @@ function writeAvatarSelections(nextSelections) {
 }
 
 function hashSeed(seed = "") {
+  // The same name or id should get the same default avatar.
   return Array.from(String(seed || "member")).reduce((total, char) => total + char.charCodeAt(0), 0);
 }
 
@@ -151,6 +156,7 @@ export function subscribeToAvatarChanges(onChange) {
     return () => {};
   }
 
+  // Handle a user action from this page.
   const handler = () => onChange();
   window.addEventListener(AVATAR_CHANGE_EVENT, handler);
   return () => window.removeEventListener(AVATAR_CHANGE_EVENT, handler);
@@ -172,6 +178,7 @@ export function getAvatarIdForActor(actor, fallbackSeed = "Member") {
 }
 
 export function getAvatarForActor(actor, fallbackSeed = "Member") {
+  // Return the selected avatar, or a stable default if the user never chose one.
   const selectedAvatarId = getAvatarIdForActor(actor, fallbackSeed);
   const selectedAvatar = AVATAR_OPTIONS.find((item) => item.id === selectedAvatarId);
   if (selectedAvatar) {

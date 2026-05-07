@@ -1,3 +1,4 @@
+// This member page shows Facilities content.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../pageStyles.css";
@@ -108,6 +109,7 @@ export default function Facilities() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [clockTick, setClockTick] = useState(Date.now());
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     const timer = window.setInterval(() => {
       setClockTick(Date.now());
@@ -225,6 +227,7 @@ export default function Facilities() {
     }
   }, [filters.time, timeOptions]);
 
+  // Build the list that the user can see.
   const filteredItems = useMemo(() => {
     return displayItems.filter((item) => {
       const normalizedFilterType = normalizeFacilityType(filters.type);

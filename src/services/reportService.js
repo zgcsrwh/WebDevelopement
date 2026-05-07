@@ -1,3 +1,4 @@
+// Report service reads member repair history and staff repair tickets.
 import {
   assertRole,
   getCurrentActor,
@@ -75,6 +76,7 @@ export async function getRepairTickets(actor) {
     getStaffLookup(),
   ]);
 
+  // Build the list that the user can see.
   const filteredItems = items.filter((item) => {
     if (resolvedActor.role === "Member") {
       return item.member_id === resolvedActor.id;

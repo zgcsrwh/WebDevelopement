@@ -1,3 +1,4 @@
+// Centre service joins requests, repairs, facilities, staff, and members for staff pages.
 import { auth } from "../provider/FirebaseConfig";
 import {
   createWriteBatch,

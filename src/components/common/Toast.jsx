@@ -1,3 +1,4 @@
+// Toast shows short page messages, like saved, deleted, or failed.
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import "./Toast.css";
@@ -8,6 +9,7 @@ export default function Toast({ toast, onClose, duration = 3200 }) {
       return undefined;
     }
 
+    // Success messages should close by themselves after a short time.
     const timeoutId = window.setTimeout(() => {
       onClose?.();
     }, duration);
@@ -37,5 +39,6 @@ export default function Toast({ toast, onClose, duration = 3200 }) {
     return content;
   }
 
+  // Portal keeps the toast fixed at the top even when the page scrolls.
   return createPortal(content, document.body);
 }

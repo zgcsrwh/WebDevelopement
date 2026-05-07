@@ -1,3 +1,4 @@
+// App defines every frontend route and sends each role to the right page.
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./provider/AuthContext";
 import AppShell from "./components/layout/AppShell";

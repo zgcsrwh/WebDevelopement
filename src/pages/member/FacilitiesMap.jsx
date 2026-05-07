@@ -1,4 +1,5 @@
-﻿import { useEffect, useState, useMemo } from "react";
+// This member page shows FacilitiesMap content.
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
@@ -203,6 +204,7 @@ export default function FacilitiesMap() {
     }
   }, [sportTypes, selectedTypes.size]);
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     const timer = window.setInterval(() => {
       setClockTick(Date.now());
@@ -264,6 +266,7 @@ export default function FacilitiesMap() {
     };
   }, []);
 
+  // Build the list that the user can see.
   const filteredVenueLocations = useMemo(() => {
     if (selectedTypes.size === 0) return venueLocations;
     

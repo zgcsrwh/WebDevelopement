@@ -1,3 +1,4 @@
+/* Page layout styles set the same content width, title spacing, and page padding. */
 .page-layout {
   display: grid;
   gap: 22px;

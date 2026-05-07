@@ -1,3 +1,4 @@
+// StaffListCard shows one left-side card in staff request, check-in, and repair pages.
 import "./StaffListCard.css";
 
 export default function StaffListCard({ isActive, onClick, gridTemplateColumns, cells }) {

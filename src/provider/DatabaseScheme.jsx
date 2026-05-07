@@ -1,19 +1,20 @@
-// The standard database segment definition
+// DatabaseScheme stores old default shapes used by early Firebase helper code.
+// Some service files use these shapes as simple defaults.
 export const FB_SCHEMAS = {
 
-  // Member信息
+  // Member data.
   DB_MEMBER: {
     name: "",
-    date_of_birth:  "",
+    date_of_birth: "",
     email: "",
     address: "",
     status: "non_verified",
-    profile_ID : "",
+    profile_ID: "",
     cancel_times: 0,
     no_show_times: 0
   },
 
-  // 用户档案
+  // Match profile data.
   DB_PROFILE: {
     member_id: "",
     nickname: "",
@@ -21,34 +22,34 @@ export const FB_SCHEMAS = {
     interests: "",
     self_description: "",
     available_time: "",
-    last_updated:""
+    last_updated: ""
   },
 
-  // 员工信息
+  // Staff and admin data.
   DB_ADMIN_STAFF: {
     name: "",
-    date_of_birth:  "",
+    date_of_birth: "",
     email: "",
     address: "",
     role: "",
     status: "active"
   },
 
-  // 场馆信息
+  // Facility data.
   DB_FACILITY: {
     name: "",
     sport_type: "",
     description: "",
-    usage_guidelines : "",
+    usage_guidelines: "",
     capacity: 0,
-    status : "normal",
-    staff_id : "",
-    start_time : 9,
-    end_time : 18,
-    location : ""
+    status: "normal",
+    staff_id: "",
+    start_time: 9,
+    end_time: 18,
+    location: ""
   },
 
-  // 场馆申请订单
+  // Booking request data.
   DB_REQUEST: {
     member_id: "",
     facility_id: "",
@@ -63,7 +64,7 @@ export const FB_SCHEMAS = {
     completed_at: ""
   },
 
-  // 场馆维修订单
+  // Repair ticket data.
   DB_REPAIR: {
     member_id: "",
     facility_id: "",
@@ -74,7 +75,7 @@ export const FB_SCHEMAS = {
     completed_at: ""
   },
 
-  // 匹配好友交互信息
+  // Match request data.
   DB_MATCHING: {
     sender_id: "",
     reciever_id: "",
@@ -84,18 +85,19 @@ export const FB_SCHEMAS = {
     completed_at: ""
   },
 
-    // 通知信息
+  // Notification data.
   DB_NOTIFICATION: {
     user_id: "",
-    type : "",
+    type: "",
     message: "",
     status: "",
     completed_at: ""
   },
 
+  // Time slot data.
   DB_TIME_SLOT: {
     facility_id: "",
-    request_id : "",
+    request_id: "",
     date: "",
     start_time: "",
     status: ""

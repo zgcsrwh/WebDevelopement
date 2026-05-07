@@ -1,3 +1,4 @@
+// This member page shows Profile content.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import "../pageStyles.css";
@@ -126,6 +127,7 @@ export default function Profile() {
   const [deleteModalError, setDeleteModalError] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
 

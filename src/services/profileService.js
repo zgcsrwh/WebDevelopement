@@ -1,3 +1,4 @@
+// Profile service saves member profile fields and updates Firebase password.
 import { deleteUser, signOut, updatePassword } from "firebase/auth";
 import { auth } from "../provider/FirebaseConfig";
 import { assertRole, getCurrentActor, getEffectiveRepairStatus, toStoredDateString } from "./centreService";

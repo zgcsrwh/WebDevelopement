@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+// This member page shows BookingNew content.
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "../pageStyles.css";
 import "./BookingNew.css";
@@ -112,6 +113,7 @@ export default function BookingNew() {
   const [descriptionError, setDescriptionError] = useState("");
   const [clockTick, setClockTick] = useState(Date.now());
 
+  // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
 
