@@ -1,11 +1,11 @@
 /**
- * deleteFacility Cloud Function 实现
+ * deleteFacility Cloud Function Implementation
  *
- * 基于 deleteFacility_Implementation_Plan.md
+ * Based on deleteFacility_Implementation_Plan.md
  *
- * ID 类型：全部使用 string
- * Status 类型：string
- * 错误处理：throw new functions.https.HttpsError
+ * ID type: string (all use string)
+ * Status type: string
+ * Error handling: throw new functions.https.HttpsError
  */
 
 const functions = require("firebase-functions");
@@ -14,10 +14,10 @@ const { FieldValue } = require("firebase-admin/firestore");
 
 const db = admin.firestore();
 
-// ============ 工具函数 ============
+// ============ Utility functions ============
 
 /**
- * 校验必传参数
+ * Assert required parameters
  */
 function assertRequired(data, fields) {
   for (const field of fields) {
@@ -28,10 +28,10 @@ function assertRequired(data, fields) {
 }
 
 /**
- * 分批处理 batch 操作
- * @param {Array} docs - 文档数组
- * @param {Function} operation - 操作函数 (batch, doc) => void
- * @returns {Promise<number>} 处理的文档数量
+ * Batch process batch operations
+ * @param {Array} docs - Document array
+ * @param {Function} operation - Operation function (batch, doc) => void
+ * @returns {Promise<number>} Number of documents processed
  */
 async function batchProcess(docs, operation) {
   if (docs.length === 0) return 0;
@@ -44,7 +44,7 @@ async function batchProcess(docs, operation) {
     operation(currentBatch, doc);
     currentCount++;
 
-    // 每 499 条一个 batch（安全阈值）
+    // Every 499 documents per batch (safety threshold)
     if (currentCount >= 499) {
       batches.push(currentBatch);
       currentBatch = db.batch();
@@ -52,12 +52,12 @@ async function batchProcess(docs, operation) {
     }
   }
 
-  // 处理剩余的
+  // Process remaining
   if (currentCount > 0) {
     batches.push(currentBatch);
   }
 
-  // 执行所有 batch
+  // Execute all batches
   for (const batch of batches) {
     await batch.commit();
   }
@@ -66,7 +66,7 @@ async function batchProcess(docs, operation) {
 }
 
 /**
- * 格式化时间（安全版本）
+ * Format time (safe version)
  */
 function toHourString(value) {
   if (value === undefined || value === null || value === "") {
@@ -79,22 +79,22 @@ function toHourString(value) {
   return String(num).padStart(2, "0");
 }
 
-// ============ 主函数 ============
+// ============ Main function ============
 
 /**
- * 删除场地设施
+ * Delete facility
  *
- * 功能：
- * 1. 校验 Admin 权限
- * 2. 更新 facility 状态为 deleted
- * 3. 取消相关的 pending/accepted/upcoming/in_progress request
- * 4. 终止相关的 pending/in_progress repair
- * 5. 删除相关的 time_slot
- * 6. 检查并更新 staff assignment_status
- * 7. 发送通知
+ * Features:
+ * 1. Validate Admin permissions
+ * 2. Update facility status to deleted
+ * 3. Cancel related pending/accepted/upcoming/in_progress requests
+ * 4. Terminate related pending/in_progress repairs
+ * 5. Delete related time_slots
+ * 6. Check and update staff assignment_status
+ * 7. Send notifications
  */
 exports.deleteFacility = functions.https.onCall(async (data, context) => {
-  // ========== 1. 权限校验 ==========
+  // ========== 1. Permission validation ==========
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -104,7 +104,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
 
   const uid = context.auth.uid;
 
-  // 查询 admin_staff 确认角色
+  // Query admin_staff to confirm role
   const adminDoc = await db.collection("admin_staff").doc(uid).get();
 
   if (!adminDoc.exists) {
@@ -115,7 +115,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
   const role = String(adminData.role || "").toLowerCase();
   const status = String(adminData.status || "").toLowerCase();
 
-  // 校验 role（兼容大小写：Admin/admin）
+  // Validate role (case-insensitive: Admin/admin)
   if (role !== "admin") {
     throw new functions.https.HttpsError(
       "permission-denied",
@@ -123,7 +123,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 校验 status
+  // Validate status
   if (status !== "active") {
     throw new functions.https.HttpsError(
       "permission-denied",
@@ -131,7 +131,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // ========== 2. facility_id 校验 ==========
+  // ========== 2. facility_id validation ==========
   assertRequired(data, ["facility_id"]);
 
   const facility_id = String(data.facility_id).trim();
@@ -140,7 +140,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "facility_id is required");
   }
 
-  // ========== 3. 读取 facility ==========
+  // ========== 3. Read facility ==========
   const facilityRef = db.collection("facility").doc(facility_id);
   const facilityDoc = await facilityRef.get();
 
@@ -151,12 +151,12 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
   const facility = facilityDoc.data();
   const facilityName = facility.name || facility_id;
 
-  // 检查是否已删除
+  // Check if already deleted
   if (facility.status === "deleted") {
     throw new functions.https.HttpsError("failed-precondition", "Facility already deleted");
   }
 
-  // ========== 4. 统计和初始化 ==========
+  // ========== 4. Statistics and initialization ==========
   const stats = {
     cancelledRequests: 0,
     deletedTimeSlots: 0,
@@ -166,7 +166,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     notificationFailures: 0
   };
 
-  // ========== 5. 更新 facility（使用 transaction）==========
+  // ========== 5. Update facility (using transaction) ==========
   await db.runTransaction(async (transaction) => {
     const fDoc = await transaction.get(facilityRef);
     if (!fDoc.exists) {
@@ -187,7 +187,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
 
   console.log(`[deleteFacility] Facility ${facility_id} status updated to deleted`);
 
-  // ========== 6. 查询并取消 request ==========
+  // ========== 6. Query and cancel requests ==========
   const requestSnapshot = await db.collection("request")
     .where("facility_id", "==", facility_id)
     .get();
@@ -200,12 +200,12 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     // pending / accepted / upcoming / in_progress -> cancelled
     if (["pending", "accepted", "upcoming", "in_progress"].includes(req.status)) {
       requestsToCancel.push({ ref: doc.ref, id: doc.id, data: req });
-      // 保存 { id: requestDocId, data: requestData } 用于 notification
+      // Save { id: requestDocId, data: requestData } for notification
       requestDataForNotification.push({ id: doc.id, data: req });
     }
   });
 
-  // 使用 batch 分批更新 request
+  // Use batch to update requests in chunks
   if (requestsToCancel.length > 0) {
     const cancelBatchResult = await batchProcess(
       requestsToCancel,
@@ -221,7 +221,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     console.log(`[deleteFacility] Cancelled ${cancelBatchResult} requests`);
   }
 
-  // ========== 7. 查询并终止 repair ==========
+  // ========== 7. Query and terminate repairs ==========
   const repairSnapshot = await db.collection("repair")
     .where("facility_id", "==", facility_id)
     .get();
@@ -236,7 +236,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     }
   });
 
-  // 使用 batch 分批更新 repair
+  // Use batch to update repairs in chunks
   if (repairsToTerminate.length > 0) {
     const repairBatchResult = await batchProcess(
       repairsToTerminate,
@@ -251,7 +251,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     console.log(`[deleteFacility] Terminated ${repairBatchResult} repairs`);
   }
 
-  // ========== 8. 删除 time_slot ==========
+  // ========== 8. Delete time_slots ==========
   const slotSnapshot = await db.collection("time_slot")
     .where("facility_id", "==", facility_id)
     .get();
@@ -267,12 +267,12 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     console.log(`[deleteFacility] Deleted ${slotBatchResult} time_slots`);
   }
 
-  // ========== 9. 检查 staff assignment ==========
+  // ========== 9. Check staff assignment ==========
   const originalStaffId = facility.staff_id;
   let staffDoc = null;
 
   if (originalStaffId) {
-    // 查询该 staff 是否还有其他未删除 facility
+    // Query whether this staff has other undeleted facilities
     const otherFacilitySnapshot = await db.collection("facility")
       .where("staff_id", "==", originalStaffId)
       .where("status", "in", ["normal", "fixing"])
@@ -283,7 +283,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     );
 
     if (!hasOtherFacility) {
-      // 检查 admin_staff 是否存在
+      // Check if admin_staff exists
       staffDoc = await db.collection("admin_staff").doc(originalStaffId).get();
 
       if (staffDoc.exists) {
@@ -299,18 +299,18 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // ========== 10. 创建 notification（失败不回滚）==========
+  // ========== 10. Create notifications (failure does not rollback) ==========
   try {
-    // 收集被取消的 request 数据用于 notification
+    // Collect cancelled request data for notification
     const notifications = [];
 
     requestDataForNotification.forEach((item) => {
       const req = item.data;
-      const requestId = item.id; // 使用 request 文档 id
+      const requestId = item.id; // Use request document id
 
       const recipientIds = new Set();
 
-      // 收集收件人
+      // Collect recipients
       if (req.member_id) recipientIds.add(req.member_id);
       if (req.participant_ids && Array.isArray(req.participant_ids)) {
         req.participant_ids.forEach(id => id && recipientIds.add(id));
@@ -320,12 +320,12 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
       }
       if (req.staff_id) recipientIds.add(req.staff_id);
 
-      // 安全格式化时间
+      // Safe time formatting
       const startTime = toHourString(req.start_time);
       const endTime = toHourString(req.end_time);
       const timeRange = startTime && endTime ? `${startTime}-${endTime}` : "";
 
-      // 为每个收件人创建 notification
+      // Create notification for each recipient
       const uniqueIds = Array.from(recipientIds).filter(id => id);
       uniqueIds.forEach(recipientId => {
         notifications.push({
@@ -340,9 +340,9 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
       });
     });
 
-    // staff unassigned notification
+    // Staff unassigned notification
     if (stats.staffMarkedUnassigned && originalStaffId && staffDoc) {
-      // 查询 active Admin
+      // Query active Admin
       const adminSnapshot = await db.collection("admin_staff")
         .where("status", "==", "active")
         .get();
@@ -354,7 +354,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
         const adminData = doc.data();
         const adminRole = String(adminData.role || "").toLowerCase();
 
-        // 只通知 active Admin，不通知普通 Staff
+        // Only notify active Admin, not regular Staff
         if (adminRole === "admin" && doc.id !== originalStaffId) {
           notifications.push({
             member_id: doc.id,
@@ -369,7 +369,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
       });
     }
 
-    // 批量创建 notification
+    // Batch create notifications
     if (notifications.length > 0) {
       const notifBatchResult = await batchProcess(
         notifications,
@@ -386,7 +386,7 @@ exports.deleteFacility = functions.https.onCall(async (data, context) => {
     console.error("[deleteFacility] Failed to create notifications:", notifError);
   }
 
-  // ========== 11. 返回结果 ==========
+  // ========== 11. Return result ==========
   return {
     success: true,
     stats: stats

@@ -1,17 +1,17 @@
 /**
  * upsertFacility Cloud Function
  *
- * Admin 侧创建或编辑 facility
+ * Admin creates or edits facility
  *
- * 创建：facility_id 为空/不传
- * 编辑：facility_id 非空
+ * Create: facility_id is empty/not passed
+ * Edit: facility_id is provided
  *
- * 业务规则：
- * - 创建：所有必传字段，写入 status=normal, scheduled_change=null
- * - 编辑：立即生效字段 name/description/usage_guidelines/location
- * - 编辑：禁止修改 sport_type/capacity（保持原值）
- * - 编辑：start_time/end_time 进入 scheduled_change，effective_on=London today+8
- * - 编辑：staff_id 同步 pending/accepted/upcoming 请求
+ * Business rules:
+ * - Create: Required fields, write status=normal, scheduled_change=null
+ * - Edit: Immediate fields: name/description/usage_guidelines/location
+ * - Edit: Cannot modify sport_type/capacity (keep original values)
+ * - Edit: start_time/end_time go to scheduled_change, effective_on=London today+8
+ * - Edit: staff_id syncs to pending/accepted/upcoming requests
  */
 
 const functions = require("firebase-functions");
@@ -20,14 +20,14 @@ const { FieldValue } = require("firebase-admin/firestore");
 
 const db = admin.firestore();
 
-// 引入 time.js helper
+// Import time.js helper
 const { getLondonDateOffset } = require("./utils/time");
 
 /**
- * Admin 权限校验
+ * Admin permission validation
  *
  * @param {object} context - Cloud Function context
- * @returns {Promise<object>} admin_staff 文档数据
+ * @returns {Promise<object>} admin_staff document data
  */
 async function assertAdminAuth(context) {
   if (!context.auth) {
@@ -66,10 +66,10 @@ async function assertAdminAuth(context) {
 }
 
 /**
- * Staff 有效性校验
+ * Staff validity validation
  *
- * @param {string} staffId - staff 文档 ID
- * @returns {Promise<object>} staff 文档数据
+ * @param {string} staffId - staff document ID
+ * @returns {Promise<object>} staff document data
  */
 async function validateStaff(staffId) {
   if (!staffId) {
@@ -107,10 +107,10 @@ async function validateStaff(staffId) {
 }
 
 /**
- * Facility 存在性和状态校验
+ * Facility existence and status validation
  *
- * @param {string} facilityId - facility 文档 ID
- * @returns {Promise<object>} facility 文档数据
+ * @param {string} facilityId - facility document ID
+ * @returns {Promise<object>} facility document data
  */
 async function validateFacility(facilityId) {
   const doc = await db.collection("facility").doc(facilityId).get();
@@ -133,14 +133,14 @@ async function validateFacility(facilityId) {
 }
 
 /**
- * 同步 pending/accepted/upcoming 请求的 staff_id
+ * Sync pending/accepted/upcoming requests' staff_id
  *
  * @param {string} facilityId - facility ID
- * @param {string} newStaffId - 新的 staff ID
- * @returns {Promise<number>} 更新的请求数量
+ * @param {string} newStaffId - new staff ID
+ * @returns {Promise<number>} Number of updated requests
  */
 async function syncActiveFacilityAssignments(facilityId, newStaffId) {
-  // 同步范围：pending, accepted, upcoming（upcoming 兼容旧数据）
+  // Sync range: pending, accepted, upcoming (upcoming compatible with legacy data)
   const targetStatuses = ["pending", "accepted", "upcoming"];
 
   const snapshot = await db
@@ -166,10 +166,10 @@ async function syncActiveFacilityAssignments(facilityId, newStaffId) {
 }
 
 /**
- * 参数标准化
+ * Parameter normalization
  *
- * @param {object} data - 前端传入的 payload
- * @returns {object} 标准化后的参数
+ * @param {object} data - Payload from frontend
+ * @returns {object} Normalized parameters
  */
 function normalizePayload(data) {
   if (!data || typeof data !== "object") {
@@ -199,10 +199,10 @@ function normalizePayload(data) {
 }
 
 /**
- * 参数校验
+ * Parameter validation
  *
- * @param {object} payload - 标准化后的参数
- * @param {boolean} isCreate - 是否创建模式
+ * @param {object} payload - Normalized parameters
+ * @param {boolean} isCreate - Whether in create mode
  */
 function validatePayload(payload, isCreate) {
   const requiredFields = [
@@ -222,7 +222,7 @@ function validatePayload(payload, isCreate) {
     }
   }
 
-  // capacity 校验：只在 create 模式下校验
+  // Capacity validation: only in create mode
   if (isCreate && payload.capacity) {
     if (payload.capacity < 1 || payload.capacity > 200) {
       throw new functions.https.HttpsError(
@@ -232,7 +232,7 @@ function validatePayload(payload, isCreate) {
     }
   }
 
-  // opening hours 校验
+  // Opening hours validation
   const startTime = payload.start_time;
   const endTime = payload.end_time;
 
@@ -260,23 +260,23 @@ function validatePayload(payload, isCreate) {
 
 // Main function
 exports.upsertFacility = functions.https.onCall(async (data, context) => {
-  // 1. Admin 权限校验
+  // 1. Admin permission validation
   await assertAdminAuth(context);
 
-  // 2. 参数标准化
+  // 2. Parameter normalization
   const payload = normalizePayload(data);
 
-  // 3. 判断创建还是编辑
+  // 3. Determine create or edit
   const isCreate = !payload.facility_id;
 
-  // 4. 参数校验
+  // 4. Parameter validation
   validatePayload(payload, isCreate);
 
-  // 5. staff 校验
+  // 5. Staff validation
   await validateStaff(payload.staff_id);
 
   if (isCreate) {
-    // ========== 创建分支 ==========
+    // ========== Create branch ==========
     const newId = db.collection("facility").doc().id;
 
     const facilityData = {
@@ -302,18 +302,18 @@ exports.upsertFacility = functions.https.onCall(async (data, context) => {
       facility_id: newId,
     };
   } else {
-    // ========== 编辑分支 ==========
-    // 5. facility 存在性校验
+    // ========== Edit branch ==========
+    // 5. Facility existence validation
     const facility = await validateFacility(payload.facility_id);
 
-    // 检查 start_time/end_time 是否有变化
+    // Check if start_time/end_time have changed
     const originalStartTime = facility.start_time;
     const originalEndTime = facility.end_time;
     const startTimeChanged =
       originalStartTime !== payload.start_time ||
       originalEndTime !== payload.end_time;
 
-    // 构建更新字段
+    // Build update fields
     const updateData = {
       name: payload.name,
       description: payload.description,
@@ -322,18 +322,18 @@ exports.upsertFacility = functions.https.onCall(async (data, context) => {
       updated_at: FieldValue.serverTimestamp(),
     };
 
-    // staff_id：如果新值不同，则更新
+    // staff_id: Update if new value is different
     if (payload.staff_id !== facility.staff_id) {
       updateData.staff_id = payload.staff_id;
 
-      // 同步 pending/accepted/upcoming 请求
+      // Sync pending/accepted/upcoming requests
       await syncActiveFacilityAssignments(
         payload.facility_id,
         payload.staff_id
       );
     }
 
-    // start_time/end_time：检查是否需要 scheduled_change
+    // start_time/end_time: Check if scheduled_change is needed
     let scheduledChange = null;
     if (startTimeChanged) {
       const effectiveOn = getLondonDateOffset(8);
@@ -351,7 +351,7 @@ exports.upsertFacility = functions.https.onCall(async (data, context) => {
       updateData.scheduled_change = scheduledChange;
     }
 
-    // 更新 Firestore
+    // Update Firestore
     await db
       .collection("facility")
       .doc(payload.facility_id)

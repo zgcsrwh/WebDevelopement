@@ -1,34 +1,34 @@
 /**
- * sendMatchRequest Cloud Function 实现
+ * sendMatchRequest Cloud Function Implementation
  *
- * 基于 sendMatchRequest_Implementation_Plan.md
+ * Based on sendMatchRequest_Implementation_Plan.md
  *
- * ID 类型：全部使用 string
- * Status 类型：string
- * 错误处理：throw new functions.https.HttpsError
+ * ID type: string (all use string)
+ * Status type: string
+ * Error handling: throw new functions.https.HttpsError
  *
- * 不检查 member.role，member collection 本身代表 Member 身份
- * Member 身份判断只使用 member/{context.auth.uid} 是否存在
- * Member 可操作判断只使用 member.status === active
+ * Does not check member.role, member collection itself represents Member identity
+ * Member identity check only uses member/{context.auth.uid} existence
+ * Member operation check only uses member.status === active
  */
 
-// Firebase Functions v1 写法
+// Firebase Functions v1 implementation
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 
 const db = admin.firestore();
 
-// ============ 工具函数 ============
+// ============ Utility functions ============
 
 /**
- * 校验 apply_description
+ * Validate apply_description
  */
 function validateApplyDescription(description) {
-  // 后端重新 trim
+  // Backend re-trim
   const trimmed = String(description || "").trim();
 
-  // 超过 500 字符
+  // Exceeds 500 characters
   if (trimmed.length > 500) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -36,7 +36,7 @@ function validateApplyDescription(description) {
     );
   }
 
-  // 包含 < 或 >
+  // Contains < or >
   if (trimmed.includes("<") || trimmed.includes(">")) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -44,36 +44,36 @@ function validateApplyDescription(description) {
     );
   }
 
-  // 返回归一化后的消息，空值使用默认文案
+  // Return normalized message, use default message for empty value
   return trimmed || "Would you like to train together?";
 }
 
-// ============ 主函数 ============
+// ============ Main function ============
 
 /**
  * sendMatchRequest Cloud Function
  *
- * 业务逻辑：
- * 1. 校验用户已登录（context.auth.uid）
- * 2. 读取 member/{callerUid} 校验 Member 身份
- * 3. 校验 member.status === active
- * 4. Payload 校验（reciever_id / receiver_id）
- * 5. apply_description 校验
- * 6. caller profile 校验（open_match）
- * 7. receiver 校验（member + profile + status）
- * 8. friends 校验
- * 9. duplicate matching 校验
- * 10. 创建 matching 文档
+ * Business logic:
+ * 1. Validate user is logged in (context.auth.uid)
+ * 2. Read member/{callerUid} and validate Member identity
+ * 3. Validate member.status === active
+ * 4. Payload validation (reciever_id / receiver_id)
+ * 5. apply_description validation
+ * 6. caller profile validation (open_match)
+ * 7. receiver validation (member + profile + status)
+ * 8. friends validation
+ * 9. duplicate matching validation
+ * 10. Create matching document
  */
 exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
-  // 1. 校验用户已登录
+  // 1. Validate user is logged in
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "User must be logged in");
   }
 
   const callerUid = context.auth.uid;
 
-  // 2. 读取 member/{callerUid} 校验 Member 身份
+  // 2. Read member/{callerUid} and validate Member identity
   const memberDoc = await db.collection("member").doc(callerUid).get();
 
   if (!memberDoc.exists) {
@@ -83,7 +83,7 @@ exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
   const memberData = memberDoc.data();
   const memberStatus = String(memberData.status || "").toLowerCase();
 
-  // 3. 校验 member.status === active
+  // 3. Validate member.status === active
   if (memberStatus !== "active") {
     throw new functions.https.HttpsError(
       "failed-precondition",
@@ -91,11 +91,11 @@ exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 4. Payload 校验：读取目标 ID
+  // 4. Payload validation: read target ID
   const rawReceiverId = data.reciever_id || data.receiver_id;
   const receiverId = String(rawReceiverId || "").trim();
 
-  // 不相信前端已经校验，后端必须校验
+  // Do not trust frontend validation, backend must validate
   if (!receiverId) {
     throw new functions.https.HttpsError("invalid-argument", "reciever_id is required");
   }
@@ -104,10 +104,10 @@ exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "Cannot send match request to yourself");
   }
 
-  // 5. apply_description 校验
+  // 5. apply_description validation
   const normalizedMessage = validateApplyDescription(data.apply_description);
 
-  // 6. caller profile 校验
+  // 6. caller profile validation
   const callerProfileSnap = await db
     .collection("profile")
     .where("member_id", "==", callerUid)
@@ -130,8 +130,8 @@ exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 7. receiver 校验
-  // 7.1 receiver member 存在且 status === active
+  // 7. receiver validation
+  // 7.1 receiver member exists and status === active
   const receiverMemberDoc = await db.collection("member").doc(receiverId).get();
 
   if (!receiverMemberDoc.exists) {
@@ -151,7 +151,7 @@ exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 7.2 receiver profile 存在且 open_match === true
+  // 7.2 receiver profile exists and open_match === true
   const receiverProfileSnap = await db
     .collection("profile")
     .where("member_id", "==", receiverId)
@@ -174,8 +174,8 @@ exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 8. friends 校验
-  // 已查证：查询 friends where member_id == callerUid，取第一条，不校验 status
+  // 8. friends validation
+  // Verified: query friends where member_id == callerUid, take first, do not validate status
   const friendsSnap = await db
     .collection("friends")
     .where("member_id", "==", callerUid)
@@ -194,8 +194,8 @@ exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // 9. duplicate matching 校验
-  // 双向检查：pending 或 accepted
+  // 9. duplicate matching validation
+  // Bidirectional check: pending or accepted
   const matchingSnap = await db.collection("matching").get();
 
   const duplicate = matchingSnap.docs.find((doc) => {
@@ -216,12 +216,12 @@ exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 10. 创建 matching 文档
-  // 在 transaction 内再次检查 duplicate，降低并发重复创建 pending/accepted matching 的风险
+  // 10. Create matching document
+  // Re-check duplicate in transaction to reduce risk of concurrent duplicate pending/accepted matching creation
   const newMatchingRef = db.collection("matching").doc();
 
   await db.runTransaction(async (transaction) => {
-    // 再次检查 duplicate（在 transaction 中）
+    // Re-check duplicate (in transaction)
     const snapshot = await transaction.get(db.collection("matching"));
 
     const exists = snapshot.docs.find((d) => {
@@ -244,7 +244,7 @@ exports.sendMatchRequest = functions.https.onCall(async (data, context) => {
 
     transaction.create(newMatchingRef, {
       sender_id: callerUid,
-      reciever_id: receiverId, // 注意拼写：reciever_id
+      reciever_id: receiverId, // Note spelling: reciever_id
       apply_description: normalizedMessage,
       respond_message: "",
       status: "pending",

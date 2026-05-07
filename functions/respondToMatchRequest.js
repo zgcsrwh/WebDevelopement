@@ -1,30 +1,30 @@
 /**
- * respondToMatchRequest Cloud Function 实现
+ * respondToMatchRequest Cloud Function Implementation
  *
- * 基于 respondToMatchRequest_Implementation_Plan.md
+ * Based on respondToMatchRequest_Implementation_Plan.md
  *
- * ID 类型：全部使用 string
- * Status 类型：string
- * 错误处理：throw new functions.https.HttpsError
+ * ID type: string (all use string)
+ * Status type: string
+ * Error handling: throw new functions.https.HttpsError
  *
- * 不检查 member.role，member collection 本身代表 Member 身份
- * Member 身份判断只使用 member/{context.auth.uid} 是否存在
- * Member 可操作判断只使用 member.status === active
+ * Does not check member.role, member collection itself represents Member identity
+ * Member identity check only uses member/{context.auth.uid} existence
+ * Member operation check only uses member.status === active
  *
- * accepted 操作必须原子化：matching 更新 + friends 创建 + invalidation 必须在同一个 transaction 中
- * transaction 内遵循严格 read-before-write：所有 reads 必须在所有 writes 前完成
+ * accepted operation must be atomic: matching update + friends creation + invalidation must be in the same transaction
+ * Transaction follows strict read-before-write: all reads must complete before any writes
  */
 
-// Firebase Functions v1 写法
+// Firebase Functions v1 implementation
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 
 const db = admin.firestore();
 
-// ============ 工具函数 ============
+// ============ Utility functions ============
 
 /**
- * 校验 status
+ * Validate status
  */
 function normalizeStatus(status) {
   const normalized = String(status || "").trim().toLowerCase();
@@ -38,17 +38,17 @@ function normalizeStatus(status) {
 }
 
 /**
- * 校验并归一化 respond_message
+ * Validate and normalize respond_message
  */
 function normalizeRespondMessage(message) {
-  // 后端重新 trim
+  // Backend re-trim
   return String(message || "").trim();
 }
 
-// ============ 主函数 ============
+// ============ Main function ============
 
 const respondToMatchRequest = functions.https.onCall(async (data, context) => {
-  // 1. 校验认证
+  // 1. Validate authentication
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
@@ -58,7 +58,7 @@ const respondToMatchRequest = functions.https.onCall(async (data, context) => {
 
   const callerUid = context.auth.uid;
 
-  // 2. 读取当前用户 member 文档（transaction 外）
+  // 2. Read current user member document (outside transaction)
   const memberDoc = await db.collection("member").doc(callerUid).get();
   if (!memberDoc.exists) {
     throw new functions.https.HttpsError(
@@ -74,13 +74,13 @@ const respondToMatchRequest = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 3. 读取 payload（transaction 外）
+  // 3. Read payload (outside transaction)
   const rawMatchId = data.match_id || data.id;
   const matchId = String(rawMatchId || "").trim();
   const status = data.status;
   const respondMessage = data.respond_message || "";
 
-  // 4. 参数校验（transaction 外）
+  // 4. Parameter validation (outside transaction)
   if (!matchId) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -92,15 +92,15 @@ const respondToMatchRequest = functions.https.onCall(async (data, context) => {
   const normalizedRespondMessage = normalizeRespondMessage(respondMessage);
   const completedAt = new Date().toISOString();
 
-  // 5. 使用 transaction 保证原子化（严格 read-before-write）
+  // 5. Use transaction to ensure atomicity (strict read-before-write)
   await db.runTransaction(async (transaction) => {
-    // ========== Phase 1: 所有读取 (必须在 writes 前) ==========
+    // ========== Phase 1: All reads (must be before writes) ==========
 
-    // 5a. 读取当前 matching 文档
+    // 5a. Read current matching document
     const matchingRef = db.collection("matching").doc(matchId);
     const matchingDoc = await transaction.get(matchingRef);
 
-    // 5b. 校验 matching 存在
+    // 5b. Validate matching exists
     if (!matchingDoc.exists) {
       throw new functions.https.HttpsError(
         "not-found",
@@ -109,7 +109,7 @@ const respondToMatchRequest = functions.https.onCall(async (data, context) => {
     }
     const matchingData = matchingDoc.data();
 
-    // 5c. 权限校验：必须是 reciever
+    // 5c. Permission check: must be receiver
     if (matchingData.reciever_id !== callerUid) {
       throw new functions.https.HttpsError(
         "permission-denied",
@@ -117,7 +117,7 @@ const respondToMatchRequest = functions.https.onCall(async (data, context) => {
       );
     }
 
-    // 5d. 状态校验：必须是 pending
+    // 5d. Status check: must be pending
     if (String(matchingData.status || "").toLowerCase() !== "pending") {
       throw new functions.https.HttpsError(
         "failed-precondition",
@@ -125,7 +125,7 @@ const respondToMatchRequest = functions.https.onCall(async (data, context) => {
       );
     }
 
-    // 5e. 如果 accepted，读取 friends 和 pending matching（在 writes 前）
+    // 5e. If accepted, read friends and pending matching (before writes)
     let friendIdsSender = [];
     let friendIdsReceiver = [];
     const pendingToInvalidate = [];
@@ -134,21 +134,21 @@ const respondToMatchRequest = functions.https.onCall(async (data, context) => {
       const senderId = matchingData.sender_id;
       const receiverId = matchingData.reciever_id;
 
-      // 5e1. 读取 sender 的 friends 文档
+      // 5e1. Read sender's friends document
       const senderFriendsRef = db.collection("friends").doc(senderId);
       const senderFriendsDoc = await transaction.get(senderFriendsRef);
       friendIdsSender = [...new Set([...(senderFriendsDoc.data()?.friends_ids || []), receiverId])];
 
-      // 5e2. 读取 receiver 的 friends 文档
+      // 5e2. Read receiver's friends document
       const receiverFriendsRef = db.collection("friends").doc(receiverId);
       const receiverFriendsDoc = await transaction.get(receiverFriendsRef);
       friendIdsReceiver = [...new Set([...(receiverFriendsDoc.data()?.friends_ids || []), senderId])];
 
-      // 5e3. 读取所有 pending matching（用于找同一对用户其他 pending）
+      // 5e3. Read all pending matching (to find other pending for same user pair)
       const pendingQuery = db.collection("matching").where("status", "==", "pending");
       const pendingSnap = await transaction.get(pendingQuery);
 
-      // 找出需要 invalidated 的文档
+      // Find documents that need to be invalidated
       pendingSnap.docs.forEach((doc) => {
         const item = doc.data();
         if (doc.id !== matchId &&
@@ -159,35 +159,35 @@ const respondToMatchRequest = functions.https.onCall(async (data, context) => {
       });
     }
 
-    // ========== Phase 2: 所有写入 (在 reads 后) ==========
+    // ========== Phase 2: All writes (after reads) ==========
 
-    // 5f. 更新当前 matching
+    // 5f. Update current matching
     transaction.update(matchingDoc.ref, {
       status: normalizedStatus,
       respond_message: normalizedRespondMessage,
       completed_at: completedAt,
     });
 
-    // 5g. 如果 accepted，执行 friends 创建和 invalidation
+    // 5g. If accepted, execute friends creation and invalidation
     if (normalizedStatus === "accepted") {
       const senderId = matchingData.sender_id;
       const receiverId = matchingData.reciever_id;
 
-      // 5g1. 更新 sender friends
+      // 5g1. Update sender friends
       transaction.set(
         db.collection("friends").doc(senderId),
         { member_id: senderId, friends_ids: friendIdsSender },
         { merge: true }
       );
 
-      // 5g2. 更新 receiver friends
+      // 5g2. Update receiver friends
       transaction.set(
         db.collection("friends").doc(receiverId),
         { member_id: receiverId, friends_ids: friendIdsReceiver },
         { merge: true }
       );
 
-      // 5g3. invalidated 其他 pending matching
+      // 5g3. Invalidate other pending matching
       pendingToInvalidate.forEach((ref) => {
         transaction.update(ref, {
           status: "invalidated",
@@ -198,7 +198,7 @@ const respondToMatchRequest = functions.https.onCall(async (data, context) => {
     }
   });
 
-  // 6. 返回成功
+  // 6. Return success
   return { success: true };
 });
 

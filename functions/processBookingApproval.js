@@ -1,24 +1,24 @@
 /**
- * processBookingApproval Cloud Function 实现
+ * processBookingApproval Cloud Function Implementation
  *
- * 基于 processBookingApproval_API设计.md 和 processBookingApproval_Implementation_Plan.md
+ * Based on processBookingApproval_API_Design.md and processBookingApproval_Implementation_Plan.md
  *
- * ID 类型：全部使用 string
- * Status 类型：string
- * 错误处理：throw new functions.https.HttpsError
+ * ID type: string (all use string)
+ * Status type: string
+ * Error handling: throw new functions.https.HttpsError
  */
 
-// Firebase Functions v1 写法
+// Firebase Functions v1 implementation
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
 
 const db = admin.firestore();
 
-// ============ 工具函数 ============
+// ============ Utility functions ============
 
 /**
- * 校验必传参数
+ * Assert required parameters
  */
 function assertRequired(data, fields) {
   for (const field of fields) {
@@ -28,38 +28,38 @@ function assertRequired(data, fields) {
   }
 }
 
-// ============ 主函数 ============
+// ============ Main function ============
 
 /**
  * processBookingApproval Cloud Function
  *
- * 业务逻辑：
- * 1. 校验用户已登录
- * 2. 参数读取与归一化
- * 3. Staff 身份校验（从 context.auth.uid 查询 admin_staff）
- * 4. request 读取与状态校验
- * 5. Transaction 中更新 request
- * 6. 条件释放 time_slot（reject/suggest 时）
- * 7. Transaction 外创建 notification
+ * Business logic:
+ * 1. Validate user is logged in
+ * 2. Parameter reading and normalization
+ * 3. Staff identity validation (query admin_staff from context.auth.uid)
+ * 4. Request reading and status validation
+ * 5. Update request in Transaction
+ * 6. Conditional time_slot release (on reject/suggest)
+ * 7. Create notification outside Transaction
  */
 exports.processBookingApproval = functions.https.onCall(async (data, context) => {
-  // 1. 校验用户已登录
+  // 1. Validate user is logged in
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "User must be logged in");
   }
 
   const currentUid = context.auth.uid;
 
-  // 2. 参数读取与归一化
+  // 2. Parameter reading and normalization
   const requestId = data.request_id;
   const statusArray = Array.isArray(data.status) ? data.status : [data.status];
   const normalizedStatus = String(statusArray[0] || "").toLowerCase().trim();
   const staffResponse = String(data.staff_response || "").trim();
 
-  // 2.1 必传参数校验
+  // 2.1 Validate required parameters
   assertRequired(data, ["request_id", "status"]);
 
-  // 2.2 status 归一化校验
+  // 2.2 Validate status normalization
   if (!["accepted", "rejected", "suggested"].includes(normalizedStatus)) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -67,7 +67,7 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
     );
   }
 
-  // 2.3 staff_response 条件必填
+  // 2.3 Validate staff_response is required when needed
   if (["rejected", "suggested"].includes(normalizedStatus) && !staffResponse) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -75,8 +75,8 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
     );
   }
 
-  // 3. Staff 身份校验
-  // 查询 admin_staff 集合确认身份
+  // 3. Staff identity validation
+  // Query admin_staff collection to confirm identity
   const staffDoc = await db.collection("admin_staff").doc(currentUid).get();
 
   if (!staffDoc.exists) {
@@ -86,12 +86,12 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
   const staffData = staffDoc.data();
   const staffRole = String(staffData.role || "staff").toLowerCase();
 
-  // 严格限制：只允许 Staff，不允许 Admin
+  // Strict restriction: only Staff, not Admin
   if (staffRole !== "staff") {
     throw new functions.https.HttpsError("permission-denied", "Staff role required");
   }
 
-  // 4. request 读取与状态校验
+  // 4. Request reading and status validation
   const requestDoc = await db.collection("request").doc(requestId).get();
 
   if (!requestDoc.exists) {
@@ -100,19 +100,19 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
 
   const request = requestDoc.data();
 
-  // 校验 staff_id 匹配（只有负责该场地的 Staff 可以处理）
+  // Validate staff_id match (only Staff managing this facility can process)
   if (request.staff_id !== currentUid) {
     throw new functions.https.HttpsError("permission-denied", "You are not assigned to this facility");
   }
 
-  // 校验当前状态为 pending（并发控制）
+  // Validate current status is pending (concurrency control)
   if (String(request.status || "").toLowerCase() !== "pending") {
     throw new functions.https.HttpsError("aborted", "Request has already been processed");
   }
 
-  // 5. Transaction 中更新 request 和条件释放 time_slot
+  // 5. Update request and conditional time_slot release in Transaction
   await db.runTransaction(async (transaction) => {
-    // 5.1 先读取 request（防止并发）
+    // 5.1 Read request first (prevent concurrency)
     const requestRef = db.collection("request").doc(requestId);
     const requestDocInTx = await transaction.get(requestRef);
 
@@ -125,15 +125,15 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
       throw new functions.https.HttpsError("aborted", "Request status has changed");
     }
 
-    // 5.2 如果是 rejected/suggested，先读取 time_slot（必须在所有写操作之前）
+    // 5.2 If rejected/suggested, read time_slot first (must be before all write operations)
     let slotsSnapshot = null;
     if (["rejected", "suggested"].includes(normalizedStatus)) {
-      // 查询关联的 time_slot
+      // Query related time_slot
       slotsSnapshot = await transaction.get(
         db.collection("time_slot").where("request_id", "==", requestId)
       );
 
-      // 如果找不到关联的 time_slot，抛错
+      // Throw error if related time_slot not found
       if (slotsSnapshot.empty) {
         throw new functions.https.HttpsError(
           "failed-precondition",
@@ -142,10 +142,10 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
       }
     }
 
-    // 5.3 所有读取完成后，再执行写操作（更新 request）
+    // 5.3 After all reads complete, perform write operations (update request)
     const completedAt = normalizedStatus === "accepted"
-      ? ""  // accepted 时保持空字符串
-      : FieldValue.serverTimestamp();  // rejected/suggested 时使用 Firestore Timestamp
+      ? ""  // Keep empty string when accepted
+      : FieldValue.serverTimestamp();  // Use Firestore Timestamp when rejected/suggested
 
     transaction.update(requestRef, {
       status: normalizedStatus,
@@ -154,7 +154,7 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
       updated_at: FieldValue.serverTimestamp()
     });
 
-    // 5.4 如果需要释放 time_slot（在所有读操作之后执行写操作）
+    // 5.4 If time_slot release is needed (perform write operations after all read operations)
     if (["rejected", "suggested"].includes(normalizedStatus) && slotsSnapshot) {
       for (const slotDoc of slotsSnapshot.docs) {
         transaction.update(slotDoc.ref, {
@@ -166,15 +166,15 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
     }
   });
 
-  // 6. Transaction 外创建 notification
-  // 保存 request 数据用于 notification（在 transaction 外重新读取）
+  // 6. Create notification outside Transaction
+  // Save request data for notification (read again outside transaction)
   const requestAfterTx = (await db.collection("request").doc(requestId).get()).data();
 
   try {
     const recipientIds = [requestAfterTx.member_id, ...(requestAfterTx.participant_ids || [])];
     const uniqueRecipients = [...new Set(recipientIds.filter(Boolean))];
 
-    // 通知消息映射
+    // Notification message mapping
     const messages = {
       accepted: "Your booking request has been approved.",
       rejected: `Your booking request has been rejected. ${staffResponse}`.trim(),
@@ -195,11 +195,11 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
     }
     await batch.commit();
   } catch (notifError) {
-    // 只记录错误，不回滚审批事务
+    // Only log error, do not rollback approval transaction
     console.error("Failed to create notifications:", notifError);
   }
 
-  // 返回成功
+  // Return success
   return {
     success: true
   };

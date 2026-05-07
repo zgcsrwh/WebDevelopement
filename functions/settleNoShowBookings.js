@@ -1,9 +1,9 @@
 /**
- * settleNoShowBookings - 未到场 no-show 自动结算
+ * settleNoShowBookings - No-show auto settlement
  *
- * 每小时第 15 分钟运行
- * 扫描已过预约开始时间 15 分钟但未被 check-in 的 accepted booking
- * 自动更新为 no_show 状态
+ * Runs at 15 minutes past every hour
+ * Scans accepted bookings that have passed booking start time by 15 minutes but were not check-in
+ * Automatically updates to no_show status
  */
 
 const functions = require("firebase-functions");
@@ -12,13 +12,13 @@ const { FieldValue } = require("firebase-admin/firestore");
 
 const db = admin.firestore();
 
-// 引入公共时间工具
+// Import common time utilities
 const { getNoShowTarget } = require("./utils/time");
 
 /**
- * no-show 自动结算核心逻辑
+ * No-show auto settlement core logic
  *
- * @param {Date} now - 可选，默认 new Date()
+ * @param {Date} now - Optional, default new Date()
  * @returns {object} { scanned, settled, skipped, notificationFailures }
  */
 async function processNoShowSettlements(now = new Date()) {
@@ -29,12 +29,12 @@ async function processNoShowSettlements(now = new Date()) {
     notificationFailures: 0,
   };
 
-  // 计算 targetDate / targetHour（当前 - 15 分钟后的整点）
+  // Calculate targetDate / targetHour (current hour + 15 minutes)
   const { targetDate, targetHour } = getNoShowTarget(now);
 
   console.log(`[settleNoShowBookings] Processing for ${targetDate} ${targetHour}:00`);
 
-  // 查询匹配 request
+  // Query matching request
   const snapshot = await db
     .collection("request")
     .where("status", "==", "accepted")
@@ -45,12 +45,12 @@ async function processNoShowSettlements(now = new Date()) {
   result.scanned = snapshot.size;
   console.log(`[settleNoShowBookings] Found ${snapshot.size} matching requests`);
 
-  // 处理每个 request
+  // Process each request
   for (const doc of snapshot.docs) {
     const requestId = doc.id;
 
     try {
-      // transaction 返回是否需要创建 notification
+      // Transaction returns whether notification needs to be created
       const shouldNotify = await db.runTransaction(async (transaction) => {
         const requestRef = db.collection("request").doc(requestId);
         const requestDoc = await transaction.get(requestRef);
@@ -61,29 +61,29 @@ async function processNoShowSettlements(now = new Date()) {
 
         const request = requestDoc.data();
 
-        // 检查状态仍然是 accepted（可能被 Staff check-in 了）
+        // Check status is still accepted (may have been check-in by Staff)
         if (String(request.status || "").toLowerCase() !== "accepted") {
           return { action: "skip" };
         }
 
-        // 更新 request 为 no_show
+        // Update request to no_show
         transaction.update(requestRef, {
           status: "no_show",
           completed_at: FieldValue.serverTimestamp(),
           updated_at: FieldValue.serverTimestamp(),
         });
 
-        // 返回 request 数据用于后续创建 notification
+        // Return request data for subsequent notification creation
         return { action: "notify", request };
       });
 
-      // 根据 transaction 返回结果处理
+      // Process based on transaction return result
       if (shouldNotify.action === "skip") {
         result.skipped += 1;
         continue;
       }
 
-      // action === "notify"，创建 notification
+      // action === "notify", create notification
       if (shouldNotify.action === "notify" && shouldNotify.request) {
         try {
           const notifRef = db.collection("notification").doc();
@@ -114,7 +114,7 @@ async function processNoShowSettlements(now = new Date()) {
   return result;
 }
 
-// Cloud Function 入口
+// Cloud Function entry point
 exports.settleNoShowBookings = functions.pubsub
   .schedule("15 * * * *")
   .timeZone("Europe/London")
@@ -128,7 +128,7 @@ exports.settleNoShowBookings = functions.pubsub
     }
   });
 
-// 导出核心逻辑供测试使用
+// Export core logic for testing
 module.exports = {
   settleNoShowBookings: exports.settleNoShowBookings,
   processNoShowSettlements,

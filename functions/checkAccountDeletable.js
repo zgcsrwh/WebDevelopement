@@ -1,19 +1,19 @@
 /**
  * checkAccountDeletable Cloud Function
  *
- * 检查当前 Member 账号是否可以删除
+ * Check if current Member account can be deleted
  *
- * 返回：
+ * Returns:
  * {
  *   isDeletable: boolean,
  *   blockingReasons: string[]
  * }
  *
- * blocking 规则：
- * 1. 自己发起的 request 状态为 pending/accepted/suggested
- * 2. 作为 participant 的 request 状态为 pending/accepted/suggested
+ * Blocking rules:
+ * 1. Requests initiated by self with status pending/accepted/suggested
+ * 2. Requests where self is participant with status pending/accepted/suggested
  *
- * repair 不阻塞删除
+ * Repair does not block deletion
  */
 
 const functions = require("firebase-functions");
@@ -22,13 +22,13 @@ const admin = require("firebase-admin");
 const db = admin.firestore();
 
 const checkAccountDeletable = functions.https.onCall(async (data, context) => {
-  // 1. 校验用户已登录
+  // 1. Validate user is logged in
   const uid = context.auth?.uid;
   if (!uid) {
     throw new functions.https.HttpsError("unauthenticated", "User must be logged in");
   }
 
-  // 2. 读取 member 文档
+  // 2. Read member document
   const memberRef = db.collection("member").doc(uid);
   const memberDoc = await memberRef.get();
 
@@ -42,7 +42,7 @@ const checkAccountDeletable = functions.https.onCall(async (data, context) => {
   const blockingReasons = [];
   const activeStatuses = ["pending", "accepted", "suggested"];
 
-  // 3. 查询自己发起的 request
+  // 3. Query requests initiated by self
   const ownRequestsSnapshot = await db
     .collection("request")
     .where("member_id", "==", uid)
@@ -60,7 +60,7 @@ const checkAccountDeletable = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 4. 查询作为 participant 的 request
+  // 4. Query requests where self is participant
   const participantRequestsSnapshot = await db
     .collection("request")
     .where("participant_ids", "array-contains", uid)
@@ -80,7 +80,7 @@ const checkAccountDeletable = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 5. 返回结果
+  // 5. Return result
   return {
     isDeletable: blockingReasons.length === 0,
     blockingReasons: blockingReasons,

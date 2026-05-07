@@ -6,11 +6,11 @@ const { FieldValue } = require("firebase-admin/firestore");
 const db = admin.firestore();
 
 /**
- * createStaffAccount - Admin 创建 Staff 账号
+ * createStaffAccount - Admin creates Staff account
  *
- * API 8.3: 创建员工账号
+ * API 8.3: Create staff account
  *
- * Payload (Network 实测):
+ * Payload (Network实测):
  * {
  *   name: "rr",
  *   date_of_birth: "2026-05-07T00:00:00.000Z",
@@ -20,14 +20,14 @@ const db = admin.firestore();
  * }
  */
 const createStaffAccount = functions.https.onCall(async (data, context) => {
-  // 1. 权限判断：必须已登录
+  // 1. Permission check: must be logged in
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "Must be signed in.");
   }
 
   const callerUid = context.auth.uid;
 
-  // 2. 权限判断：调用者必须是 active Admin
+  // 2. Permission check: caller must be active Admin
   const callerDoc = await db.doc(`admin_staff/${callerUid}`).get();
   if (!callerDoc.exists) {
     throw new functions.https.HttpsError("permission-denied", "Not a staff account.");
@@ -45,7 +45,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("failed-precondition", "Your account is not active.");
   }
 
-  // 3. 字段校验：name
+  // 3. Field validation: name
   const name = String(data.name || "").trim();
   if (!name) {
     throw new functions.https.HttpsError("invalid-argument", "Please enter a valid name.");
@@ -57,7 +57,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "Name cannot contain '<' or '>'.");
   }
 
-  // 4. 字段校验：email
+  // 4. Field validation: email
   const email = String(data.email || "").trim().toLowerCase();
   if (!email) {
     throw new functions.https.HttpsError("invalid-argument", "Please enter a valid email.");
@@ -66,13 +66,13 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "Invalid email format.");
   }
 
-  // 5. 字段校验：date_of_birth
+  // 5. Field validation: date_of_birth
   const dateOfBirthInput = String(data.date_of_birth || "").trim();
   if (!dateOfBirthInput) {
     throw new functions.https.HttpsError("invalid-argument", "Please enter date of birth.");
   }
 
-  // 兼容 YYYY-MM-DD 和 ISO date string
+  // Compatible with YYYY-MM-DD and ISO date string
   let normalizedDate = "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirthInput)) {
     normalizedDate = dateOfBirthInput;
@@ -84,7 +84,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     normalizedDate = parsed.toISOString().slice(0, 10); // "2026-05-07"
   }
 
-  // 校验日期范围
+  // Validate date range
   const today = new Date();
   today.setHours(23, 59, 59, 999);
   const birthDate = new Date(normalizedDate);
@@ -97,7 +97,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "Date of birth cannot be before 1900-01-01.");
   }
 
-  // 6. 字段校验：address
+  // 6. Field validation: address
   const address = String(data.address || "").trim();
   if (!address) {
     throw new functions.https.HttpsError("invalid-argument", "Please enter an address.");
@@ -109,7 +109,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "Address cannot contain '<' or '>'.");
   }
 
-  // 7. 字段校验：password
+  // 7. Field validation: password
   const password = String(data.password || "");
   if (!password) {
     throw new functions.https.HttpsError("invalid-argument", "Password is required.");
@@ -127,28 +127,28 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("invalid-argument", "Password cannot contain spaces.");
   }
 
-  // 8. email 全局唯一性检查
+  // 8. Email global uniqueness check
 
-  // 8.1 检查 Firebase Auth
+  // 8.1 Check Firebase Auth
   try {
     await getAuth().getUserByEmail(email);
-    // 如果没抛异常，说明用户已存在
+    // If no exception thrown, user already exists
     throw new functions.https.HttpsError("already-exists", "An account already exists for this email address.");
   } catch (authError) {
     if (authError.code === "auth/user-not-found") {
-      // 用户不存在，继续
+      // User does not exist, continue
     } else if (authError.code === "auth/email-already-exists") {
       throw new functions.https.HttpsError("already-exists", "An account already exists for this email address.");
     } else if (authError instanceof functions.https.HttpsError) {
-      throw authError; // 已经是 HttpsError，重新抛
+      throw authError; // Already an HttpsError, re-throw
     } else {
-      // 其他错误，视为内部错误
+      // Other errors, treat as internal error
       console.error("Firebase Auth check error:", authError);
       throw new functions.https.HttpsError("internal", "The request could not be completed.");
     }
   }
 
-  // 8.2 检查 admin_staff collection
+  // 8.2 Check admin_staff collection
   const existingStaff = await db
     .collection("admin_staff")
     .where("email", "==", email)
@@ -158,7 +158,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("already-exists", "An account already exists for this email address.");
   }
 
-  // 8.3 检查 member collection
+  // 8.3 Check member collection
   const existingMember = await db
     .collection("member")
     .where("email", "==", email)
@@ -168,7 +168,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("already-exists", "An account already exists for this email address.");
   }
 
-  // 9. 创建 Auth user
+  // 9. Create Auth user
   let userRecord = null;
   try {
     userRecord = await getAuth().createUser({
@@ -187,7 +187,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
 
   const newUid = userRecord.uid;
 
-  // 10. 创建 admin_staff 文档
+  // 10. Create admin_staff document
   try {
     await db.doc(`admin_staff/${newUid}`).set({
       name,
@@ -202,7 +202,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
   } catch (firestoreError) {
     console.error("Failed to create admin_staff document:", firestoreError);
 
-    // 11. 回滚：删除已创建的 Auth user
+    // 11. Rollback: delete the created Auth user
     try {
       await getAuth().deleteUser(newUid);
     } catch (rollbackError) {
@@ -212,7 +212,7 @@ const createStaffAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("internal", "The request could not be completed.");
   }
 
-  // 12. 返回成功
+  // 12. Return success
   return {
     success: true,
     staff_id: newUid,

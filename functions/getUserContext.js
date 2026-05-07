@@ -1,11 +1,11 @@
 /**
  * getUserContext Cloud Function
  *
- * 登录后返回当前用户的 session context: role, status, profile, isProfileComplete
+ * Returns current user's session context after login: role, status, profile, isProfileComplete
  *
- * ID 类型：全部使用 string
- * Status 类型：string
- * 错误处理：throw new functions.https.HttpsError
+ * ID type: string
+ * Status type: string
+ * Error handling: throw new functions.https.HttpsError
  */
 
 const functions = require("firebase-functions");
@@ -14,9 +14,9 @@ const admin = require("firebase-admin");
 const db = admin.firestore();
 
 /**
- * normalizeRoleValue - 规范化角色值
+ * normalizeRoleValue - Normalize role value
  *
- * @param {string} role - 原始角色值
+ * @param {string} role - Original role value
  * @returns {string} - "Admin" | "Staff" | "Member"
  */
 function normalizeRoleValue(role) {
@@ -31,16 +31,16 @@ function normalizeRoleValue(role) {
 }
 
 /**
- * getUserContext - 获取用户会话上下文
+ * getUserContext - Get user session context
  */
 const getUserContext = functions.https.onCall(async (data, context) => {
-  // 1. 校验登录
+  // 1. Validate authentication
   const userId = context.auth?.uid;
   if (!userId) {
     throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
   }
 
-  // 2. 读取 admin_staff
+  // 2. Read admin_staff
   const staffDoc = await db.collection("admin_staff").doc(userId).get();
   if (staffDoc.exists) {
     const staffData = staffDoc.data();
@@ -61,7 +61,7 @@ const getUserContext = functions.https.onCall(async (data, context) => {
     };
   }
 
-  // 3. 读取 member
+  // 3. Read member
   const memberDoc = await db.collection("member").doc(userId).get();
   if (memberDoc.exists) {
     const memberData = memberDoc.data();
@@ -81,8 +81,8 @@ const getUserContext = functions.https.onCall(async (data, context) => {
     };
   }
 
-  // 4. fallback（新用户）
-  // fallback 展示信息优先级
+  // 4. Fallback (new user)
+  // Fallback display info priority
   const email = context.auth.token?.email || (data && data.email) || "";
   const displayName =
     (data && data.displayName) || context.auth.token?.name || "Member";

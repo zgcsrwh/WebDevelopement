@@ -1,18 +1,18 @@
 /**
  * maintainTimeSlotWindow Scheduled Cloud Function
  *
- * 维护真实的 time_slot 窗口
+ * Maintains real time_slot window
  *
- * 两种模式：
- * - fillWindow: today ~ today+7（8个日期），用于首次部署/手动补齐/测试
- * - daily: today+7（仅窗口末端1天），用于 scheduled daily run
+ * Two modes:
+ * - fillWindow: today ~ today+7 (8 dates), for initial deployment/manual fix/test
+ * - daily: today+7 (only 1 day at window end), for scheduled daily run
  *
- * 业务规则：
+ * Business rules:
  * - only create missing slots, never overwrite existing slots
- * - 只为 status === "normal" 或 "fixing" 的 facility 生成新 slot
- * - 应用 due scheduled_change
- * - 旧 doc id 兼容
- * - batch 写入
+ * - only generate new slots for facility with status === "normal" or "fixing"
+ * - Apply due scheduled_change
+ * - Old doc id compatible
+ * - Batch writes
  */
 
 const functions = require("firebase-functions");
@@ -21,15 +21,15 @@ const { FieldValue } = require("firebase-admin/firestore");
 
 const db = admin.firestore();
 
-// 引入 time.js helper
+// Import time.js helper
 const { getLondonDateOffset } = require("./utils/time");
 
 /**
- * 将 time_slot.start_time/end_time 标准化为 hour number
+ * Standardize time_slot.start_time/end_time to hour number
  *
- * 兼容历史 number/string 混用
+ * Compatible with historical number/string mixed usage
  *
- * @param {number|string} value - 时间值
+ * @param {number|string} value - Time value
  * @returns {number} hour number
  */
 function toHourNumber(value) {
@@ -42,9 +42,9 @@ function toHourNumber(value) {
 }
 
 /**
- * 生成 time_slot doc id
+ * Generate time_slot doc id
  *
- * 格式：facilityId-date-hourString（如 facility001-2026-05-10-09）
+ * Format: facilityId-date-hourString (e.g., facility001-2026-05-10-09)
  *
  * @param {string} facilityId - facility doc ID
  * @param {string} date - YYYY-MM-DD
@@ -57,23 +57,23 @@ function generateSlotId(facilityId, date, hour) {
 }
 
 /**
- * 清理过期的 open time_slot
+ * Clean up expired open time_slot
  *
- * 只删除 date < getLondonDateOffset(0) 且 status === "open" 的 slot
- * 不删除 locked / unavailable 等其他状态
+ * Only delete slots with date < getLondonDateOffset(0) and status === "open"
+ * Do not delete other statuses like locked/unavailable
  *
- * 注意：为了避免 Firestore composite index，查询只用单字段
- * 在代码中过滤 status === "open"
+ * Note: To avoid Firestore composite index, query uses single field only
+ * Filter status === "open" in code
  *
- * @param {object} stats - 统计对象
+ * @param {object} stats - Statistics object
  * @returns {Promise<void>}
  */
 async function cleanupExpiredOpenSlots(stats) {
   const today = getLondonDateOffset(0);
   const DELETE_BATCH_SIZE = 450;
 
-  // 查询：只查询 date < today（单字段查询，避免 composite index）
-  // status === "open" 的过滤在代码中判断
+  // Query: only query date < today (single field query, avoid composite index)
+  // Filter status === "open" in code
   const expiredSlotsSnap = await db
     .collection("time_slot")
     .where("date", "<", today)
@@ -84,7 +84,7 @@ async function cleanupExpiredOpenSlots(stats) {
     return;
   }
 
-  // 分批删除：只删除 status === "open" 的 slot
+  // Batch delete: only delete slots with status === "open"
   let batch = db.batch();
   let batchCount = 0;
   let deletedCount = 0;
@@ -92,7 +92,7 @@ async function cleanupExpiredOpenSlots(stats) {
   for (const slotDoc of expiredSlotsSnap.docs) {
     const slotData = slotDoc.data();
 
-    // 只删除 status === "open" 的 slot
+    // Only delete slots with status === "open"
     if (slotData.status !== "open") {
       continue;
     }
@@ -108,7 +108,7 @@ async function cleanupExpiredOpenSlots(stats) {
     }
   }
 
-  // 提交剩余
+  // Commit remaining
   if (batchCount > 0) {
     await batch.commit();
   }
@@ -117,34 +117,34 @@ async function cleanupExpiredOpenSlots(stats) {
 }
 
 /**
- * 核心处理函数
+ * Core processing function
  *
  * @param {object} options
  * @param {string} options.mode - "fillWindow" | "daily"
- * @param {string} options.targetDate - 可选，指定单个日期（如测试用）
- * @param {string} options.facilityId - 可选，指定单个 facility（如测试用）
- * @param {Date} options.now - 可选，默认 new Date()
- * @param {boolean} options.cleanup - 可选，默认 mode === "daily" 时为 true，fillWindow 时为 false
- * @returns {Promise<object>} 统计结果
+ * @param {string} options.targetDate - Optional, specify single date (for test)
+ * @param {string} options.facilityId - Optional, specify single facility (for test)
+ * @param {Date} options.now - Optional, default new Date()
+ * @param {boolean} options.cleanup - Optional, default true when mode === "daily", false when fillWindow
+ * @returns {Promise<object>} Statistics result
  */
 async function processTimeSlotWindow({ mode, targetDate, facilityId, now = new Date(), cleanup }) {
-  // ========== 0. cleanup 默认值 ==========
+  // ========== 0. cleanup default value ==========
   if (cleanup === undefined) {
     cleanup = mode === "daily";
   }
 
-  // ========== 1. 解析 mode 参数 ==========
+  // ========== 1. Parse mode parameter ==========
   const validModes = ["fillWindow", "daily"];
   if (!mode || !validModes.includes(mode)) {
     throw new Error(`Invalid mode: ${mode}. Must be "fillWindow" or "daily"`);
   }
 
-  // ========== 2. 计算目标日期数组 ==========
+  // ========== 2. Calculate target date array ==========
   const today = getLondonDateOffset(0);
   let targetDates = [];
 
   if (targetDate) {
-    // 指定单个日期（测试用）
+    // Specify single date (for test)
     targetDates = [targetDate];
   } else if (mode === "daily") {
     // daily mode: today+7
@@ -156,7 +156,7 @@ async function processTimeSlotWindow({ mode, targetDate, facilityId, now = new D
     }
   }
 
-  // ========== 3. 初始化统计 ==========
+  // ========== 3. Initialize statistics ==========
   const stats = {
     mode,
     targetDates,
@@ -169,23 +169,23 @@ async function processTimeSlotWindow({ mode, targetDate, facilityId, now = new D
     warnings: [],
   };
 
-  // ========== 4. cleanup（仅 daily mode 默认执行）==========
+  // ========== 4. cleanup (default execute only in daily mode) ==========
   if (cleanup) {
     await cleanupExpiredOpenSlots(stats);
   }
 
-  // ========== 5. 获取 all facilities（全部） ==========
+  // ========== 5. Get all facilities (all) ==========
   let facilityDocs = [];
 
   if (facilityId) {
-    // 指定单个 facility（测试用）
+    // Specify single facility (for test)
     const facilityDoc = await db.collection("facility").doc(facilityId).get();
     if (!facilityDoc.exists) {
       throw new Error(`Facility not found: ${facilityId}`);
     }
     facilityDocs = [facilityDoc];
   } else {
-    // 查询全部 facility
+    // Query all facilities
     const allFacilitiesSnap = await db.collection("facility").get();
     facilityDocs = allFacilitiesSnap.docs;
   }
@@ -196,7 +196,7 @@ async function processTimeSlotWindow({ mode, targetDate, facilityId, now = new D
     return stats;
   }
 
-  // ========== 6. 遍历每个 facility ==========
+  // ========== 6. Iterate each facility ==========
   for (const facilityDoc of facilityDocs) {
     await processFacility({
       facilityDoc,
@@ -209,7 +209,7 @@ async function processTimeSlotWindow({ mode, targetDate, facilityId, now = new D
 }
 
 /**
- * 处理单个 facility
+ * Process single facility
  *
  * @param {object} options
  * @param {FirebaseFirestore.QueryDocumentSnapshot} options.facilityDoc
@@ -221,13 +221,13 @@ async function processFacility({ facilityDoc, targetDates, stats }) {
   const facilityData = facilityDoc.data();
   const facilityId = facilityDoc.id;
 
-  // ========== 5.1 facility.status 过滤 ==========
+  // ========== 5.1 facility.status filter ==========
   if (!["normal", "fixing"].includes(facilityData.status)) {
     stats.skippedNonNormalFacilities++;
     return;
   }
 
-  // ========== 5.2 scheduled_change 处理 ==========
+  // ========== 5.2 scheduled_change processing ==========
   const scheduledChange = facilityData.scheduled_change;
   let localStartTime = facilityData.start_time;
   let localEndTime = facilityData.end_time;
@@ -235,11 +235,11 @@ async function processFacility({ facilityDoc, targetDates, stats }) {
   if (scheduledChange && scheduledChange.type === "update" && scheduledChange.effective_on) {
     const today = getLondonDateOffset(0);
     if (scheduledChange.effective_on <= today) {
-      // 5.2.1 due scheduled_change：先更新本地变量为新时间
+      // 5.2.1 due scheduled_change: Update local variables to new time first
       localStartTime = scheduledChange.payload.start_time;
       localEndTime = scheduledChange.payload.end_time;
 
-      // 5.2.2 写回 Firestore 并清空 scheduled_change
+      // 5.2.2 Write back to Firestore and clear scheduled_change
       await facilityRef.update({
         start_time: localStartTime,
         end_time: localEndTime,
@@ -248,16 +248,16 @@ async function processFacility({ facilityDoc, targetDates, stats }) {
       });
       stats.appliedScheduledChanges++;
 
-      // 5.2.3 后续 slot 生成使用更新后的本地时间
+      // 5.2.3 Subsequent slot generation uses updated local time
     }
   } else if (scheduledChange && scheduledChange.type !== "update") {
-    // 5.2.4 unknown scheduled_change.type：只记录 warning，不应用，不清空，继续用当前时间
+    // 5.2.4 unknown scheduled_change.type: Only record warning, do not apply, do not clear, continue with current time
     stats.warnings.push(
       `Facility ${facilityId}: unknown scheduled_change type "${scheduledChange.type}", skipping`
     );
   }
 
-  // ========== 5.3 获取 facility 的营业时间 ==========
+  // ========== 5.3 Get facility business hours ==========
   const startHour = toHourNumber(localStartTime);
   const endHour = toHourNumber(localEndTime);
 
@@ -268,7 +268,7 @@ async function processFacility({ facilityDoc, targetDates, stats }) {
     return;
   }
 
-  // ========== 5.4 遍历目标日期 ==========
+  // ========== 5.4 Iterate target dates ==========
   for (const targetDate of targetDates) {
     await processTargetDate({
       facilityId,
@@ -282,7 +282,7 @@ async function processFacility({ facilityDoc, targetDates, stats }) {
 }
 
 /**
- * 处理单个日期的 slot 生成
+ * Process single date slot generation
  *
  * @param {object} options
  * @param {string} options.facilityId
@@ -300,14 +300,14 @@ async function processTargetDate({
   endHour,
   stats,
 }) {
-  // ========== 5.4.1 查询该 facility 某天所有已有 time_slot ==========
+  // ========== 5.4.1 Query all existing time_slot for this facility on this day ==========
   const existingSlotsSnap = await db
     .collection("time_slot")
     .where("facility_id", "==", facilityId)
     .where("date", "==", targetDate)
     .get();
 
-  // ========== 5.4.2 用 toHourNumber 标准化小时，建立 existingHours Set ==========
+  // ========== 5.4.2 Standardize hours with toHourNumber, build existingHours Set ==========
   const existingHours = new Set();
   for (const slotDoc of existingSlotsSnap.docs) {
     const slotData = slotDoc.data();
@@ -315,17 +315,17 @@ async function processTargetDate({
     existingHours.add(hourNum);
   }
 
-  // ========== 5.4.3 收集需要创建的 slot ==========
+  // ========== 5.4.3 Collect slots that need to be created ==========
   const pendingSlots = [];
 
   for (let h = startHour; h < endHour; h++) {
     if (existingHours.has(h)) {
-      // 已存在 hour 一律跳过
+      // Existing hours always skip
       stats.skippedExistingSlots++;
       continue;
     }
 
-    // 只创建缺失 hour
+    // Only create missing hours
     const slotId = generateSlotId(facilityId, targetDate, h);
     const hourStr = String(h).padStart(2, "0");
     const endHourStr = String(h + 1).padStart(2, "0");
@@ -333,8 +333,8 @@ async function processTargetDate({
     const slotData = {
       facility_id: facilityId,
       date: targetDate,
-      start_time: hourStr, // string 格式，如 "09"
-      end_time: endHourStr, // string 格式，如 "10"
+      start_time: hourStr, // string format, e.g., "09"
+      end_time: endHourStr, // string format, e.g., "10"
       status: "open",
       request_id: "",
       created_at: FieldValue.serverTimestamp(),
@@ -344,7 +344,7 @@ async function processTargetDate({
     pendingSlots.push({ id: slotId, data: slotData });
   }
 
-  // ========== 5.4.4 batch 写入 ==========
+  // ========== 5.4.4 Batch write ==========
   if (pendingSlots.length > 0) {
     const SLOTS_PER_BATCH = 450;
 
@@ -365,7 +365,7 @@ async function processTargetDate({
       }
     }
 
-    // 提交剩余
+    // Commit remaining
     if (batchCount > 0) {
       await batch.commit();
     }
@@ -377,10 +377,10 @@ async function processTargetDate({
 /**
  * maintainTimeSlotWindow - daily mode
  *
- * 用于 scheduled daily run
+ * For scheduled daily run
  */
 const maintainTimeSlotWindow = functions.pubsub
-  .schedule("0 5 * * *")  // 每天 5:00 London 时间运行
+  .schedule("0 5 * * *")  // Run daily at 5:00 London time
   .timeZone("Europe/London")
   .onRun(async (context) => {
     console.log("Starting maintainTimeSlotWindow in daily mode...");
@@ -389,7 +389,7 @@ const maintainTimeSlotWindow = functions.pubsub
     return null;
   });
 
-// 统一导出
+// Unified export
 module.exports = {
   maintainTimeSlotWindow,
   processTimeSlotWindow,

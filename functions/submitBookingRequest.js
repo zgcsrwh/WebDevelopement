@@ -1,14 +1,14 @@
 /**
- * submitBookingRequest Cloud Function 实现
+ * submitBookingRequest Cloud Function Implementation
  *
- * 基于 submitBookingRequest_API_Implementation_v2.md
+ * Based on submitBookingRequest_API_Implementation_v2.md
  *
- * ID 类型：全部使用 string
- * Status 类型：string
- * 错误处理：throw new functions.https.HttpsError
+ * ID type: string (all use string)
+ * Status type: string
+ * Error handling: throw new functions.https.HttpsError
  */
 
-// Firebase Functions v1 写法
+// Firebase Functions v1 implementation
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
@@ -17,10 +17,10 @@ const { parseBookingStart, getLondonDateOffset } = require("./utils/time");
 
 const db = admin.firestore();
 
-// ============ 工具函数 ============
+// ============ Utility functions ============
 
 /**
- * 将小时数转换为字符串格式 ("09", "10")
+ * Convert hour number to string format ("09", "10")
  */
 function toHourString(value) {
   const num = typeof value === "number" ? value : parseInt(value, 10);
@@ -28,7 +28,7 @@ function toHourString(value) {
 }
 
 /**
- * 将小时字符串/数字转换为数字
+ * Convert hour string/number to number
  */
 function toHourNumber(value) {
   if (typeof value === "number") return value;
@@ -37,7 +37,7 @@ function toHourNumber(value) {
 }
 
 /**
- * 校验必传参数
+ * Assert required parameters
  */
 function assertRequired(data, fields) {
   for (const field of fields) {
@@ -48,7 +48,7 @@ function assertRequired(data, fields) {
 }
 
 /**
- * 时间重叠判断：start1 < end2 && start2 < end1
+ * Time overlap check: start1 < end2 && start2 < end1
  */
 function hasTimeOverlap(start1, end1, start2, end2) {
   const s1 = toHourNumber(start1);
@@ -58,28 +58,28 @@ function hasTimeOverlap(start1, end1, start2, end2) {
   return s1 < e2 && s2 < e1;
 }
 
-// ============ 校验函数 ============
+// ============ Validation functions ============
 
 /**
- * 基础参数校验
+ * Basic parameter validation
  */
 function validateBasicParams(data) {
-  // 日期标准化：支持 ISO string "2026-05-02T00:00:00.000Z" → "2026-05-02"
+  // Date normalization: support ISO string "2026-05-02T00:00:00.000Z" → "2026-05-02"
   if (data.date && typeof data.date === "string" && data.date.includes("T")) {
     data.date = data.date.split("T")[0];
   }
 
-  // 必传参数
+  // Required parameters
   assertRequired(data, ["facility_id", "date", "start_time", "end_time", "attendent", "activity_description"]);
 
-  // 校验时间粒度（整数）
+  // Validate time granularity (integer)
   const startNum = toHourNumber(data.start_time);
   const endNum = toHourNumber(data.end_time);
   if (!Number.isInteger(startNum) || !Number.isInteger(endNum)) {
     throw new functions.https.HttpsError("invalid-argument", "Time must be integer");
   }
 
-  // 校验时间范围
+  // Validate time range
   if (startNum < 0 || startNum > 23 || endNum < 0 || endNum > 23) {
     throw new functions.https.HttpsError("invalid-argument", "Time must be between 0 and 23");
   }
@@ -89,14 +89,14 @@ function validateBasicParams(data) {
     throw new functions.https.HttpsError("invalid-argument", "start_time must be less than end_time");
   }
 
-  // 校验日期范围（今天 ~ 今天+7天）- 使用 London 时区
+  // Validate date range (today ~ today+7 days) - using London timezone
   const today = getLondonDateOffset(0);
   const maxDate = getLondonDateOffset(7);
   if (data.date < today || data.date > maxDate) {
     throw new functions.https.HttpsError("invalid-argument", "Date must be between today and 7 days from now");
   }
 
-  // 校验必须至少提前 2 小时预约
+  // Validate booking must be at least 2 hours in advance
   const normalizedStartTime = toHourString(startNum);
   const bookingStart = parseBookingStart(data.date, normalizedStartTime);
   const now = new Date();
@@ -106,17 +106,17 @@ function validateBasicParams(data) {
     throw new functions.https.HttpsError("invalid-argument", "Bookings must be made at least 2 hours in advance.");
   }
 
-  // 校验时长（≤ 4 小时）
+  // Validate duration (≤ 4 hours)
   if (endNum - startNum > 4) {
     throw new functions.https.HttpsError("invalid-argument", "Maximum booking duration is 4 hours");
   }
 
-  // 校验人数
+  // Validate number of people
   if (typeof data.attendent !== "number" || data.attendent < 1) {
     throw new functions.https.HttpsError("invalid-argument", "attendent must be at least 1");
   }
 
-  // 校验活动描述
+  // Validate activity description
   if (typeof data.activity_description !== "string" || data.activity_description.trim().length === 0) {
     throw new functions.https.HttpsError("invalid-argument", "activity_description is required");
   }
@@ -129,15 +129,15 @@ function validateBasicParams(data) {
 }
 
 /**
- * 校验人数与好友
+ * Validate capacity and friends
  */
 function validateCapacityAndFriends(facility, data) {
-  // 容量校验
+  // Capacity validation
   if (data.attendent > facility.capacity) {
     throw new functions.https.HttpsError("invalid-argument", `Exceeds facility capacity (max ${facility.capacity})`);
   }
 
-  // 好友上限校验
+  // Friends limit validation
   const userIdList = data.user_id_list || [];
   if (userIdList.length > data.attendent - 1) {
     throw new functions.https.HttpsError("invalid-argument", "Too many friends (max attendant - 1)");
@@ -147,23 +147,23 @@ function validateCapacityAndFriends(facility, data) {
 }
 
 /**
- * 校验时间冲突
+ * Validate time conflicts
  */
 async function checkTimeConflicts(facilityId, date, startNum, endNum, excludeRequestId = null) {
-  // 构建小时范围
+  // Build hour range
   const hours = [];
   for (let h = startNum; h < endNum; h++) {
     hours.push(h);
   }
 
-  // 查询该场地该日期的所有 time_slot
+  // Query all time_slot for this facility on this date
   const slotsSnapshot = await db
     .collection("time_slot")
     .where("facility_id", "==", facilityId)
     .where("date", "==", date)
     .get();
 
-  // 筛选出需要的时间段
+  // Filter needed time slots
   const relevantSlots = [];
   for (const slot of slotsSnapshot.docs) {
     const slotHour = toHourNumber(slot.data().start_time);
@@ -172,12 +172,12 @@ async function checkTimeConflicts(facilityId, date, startNum, endNum, excludeReq
     }
   }
 
-  // 校验是否存在
+  // Validate existence
   if (relevantSlots.length !== hours.length) {
     throw new functions.https.HttpsError("resource-exhausted", "Time slot not available");
   }
 
-  // 校验是否被锁定
+  // Validate lock status
   for (const slot of relevantSlots) {
     if (slot.status === "locked") {
       throw new functions.https.HttpsError("resource-exhausted", "Time slot already booked");
@@ -188,10 +188,10 @@ async function checkTimeConflicts(facilityId, date, startNum, endNum, excludeReq
 }
 
 /**
- * 校验用户/好友时间冲突
+ * Validate user/friends time conflicts
  */
 async function checkUserConflicts(memberId, date, startNum, endNum, friendIds = []) {
-  // 构建查询：同一天、同时段、状态为 pending/accepted 的请求
+  // Build query: same day, same time, status pending/accepted
   const requestsSnapshot = await db
     .collection("request")
     .where("date", "==", date)
@@ -203,9 +203,9 @@ async function checkUserConflicts(memberId, date, startNum, endNum, friendIds = 
   for (const doc of requestsSnapshot.docs) {
     const req = doc.data();
 
-    // 排除自己的请求（如果是修改场景）
+    // Exclude own request (if in modify scenario)
     if (req.member_id === memberId && req.status === "pending") {
-      // 检查时间是否重叠
+      // Check time overlap
       if (hasTimeOverlap(req.start_time, req.end_time, toHourString(startNum), toHourString(endNum))) {
         throw new functions.https.HttpsError(
           "failed-precondition",
@@ -214,7 +214,7 @@ async function checkUserConflicts(memberId, date, startNum, endNum, friendIds = 
       }
     }
 
-    // 检查好友冲突
+    // Check friends conflict
     if (req.participant_ids && req.participant_ids.length > 0) {
       for (const friendId of friendIds) {
         if (req.member_id === friendId || req.participant_ids.includes(friendId)) {
@@ -230,31 +230,31 @@ async function checkUserConflicts(memberId, date, startNum, endNum, friendIds = 
   }
 }
 
-// ============ 主函数 ============
+// ============ Main function ============
 
 /**
  * submitBookingRequest Cloud Function
  *
- * 业务逻辑：
- * 1. 基础参数校验
- * 2. 读取 facility 校验场地存在和可用
- * 3. 人数与好友校验
- * 4. 检查时间冲突（在 transaction 外）
- * 5. 检查用户/好友冲突（在 transaction 外）
- * 6. Transaction 中：
- *    - 创建 request
- *    - 锁定 time_slot
- * 7. 创建 notification（在 transaction 外）
+ * Business logic:
+ * 1. Basic parameter validation
+ * 2. Read facility and validate existence and availability
+ * 3. Capacity and friends validation
+ * 4. Check time conflicts (outside transaction)
+ * 5. Check user/friends conflicts (outside transaction)
+ * 6. In Transaction:
+ *    - Create request
+ *    - Lock time_slot
+ * 7. Create notification (outside transaction)
  */
 exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
-  // 校验用户已登录
+  // Validate user is logged in
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "User must be logged in");
   }
 
   const memberId = context.auth.uid;
 
-  // 1.1 校验 member 身份
+  // 1.1 Validate member identity
   const memberDoc = await db.collection("member").doc(memberId).get();
   if (!memberDoc.exists) {
     throw new functions.https.HttpsError("permission-denied", "Only members can submit booking requests");
@@ -264,10 +264,10 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("failed-precondition", "Member account is not active");
   }
 
-  // 1. 基础参数校验
+  // 1. Basic parameter validation
   const { startNum, endNum } = validateBasicParams(data);
 
-  // 2. 读取 facility
+  // 2. Read facility
   const facilityDoc = await db.collection("facility").doc(data.facility_id).get();
   if (!facilityDoc.exists) {
     throw new functions.https.HttpsError("not-found", "Facility not found");
@@ -275,12 +275,12 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
 
   const facility = facilityDoc.data();
 
-  // 校验场地状态
+  // Validate facility status
   if (facility.status !== "normal") {
     throw new functions.https.HttpsError("failed-precondition", "Facility is not available");
   }
 
-  // 校验营业时间
+  // Validate business hours
   if (startNum < facility.start_time || endNum > facility.end_time) {
     throw new functions.https.HttpsError(
       "invalid-argument",
@@ -288,10 +288,10 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 3. 人数与好友校验
+  // 3. Capacity and friends validation
   const userIdList = validateCapacityAndFriends(facility, data);
 
-  // 4. 检查时间冲突（获取需要锁定的时间段）
+  // 4. Check time conflicts (get time slots to lock)
   const slotsToLock = await checkTimeConflicts(
     data.facility_id,
     data.date,
@@ -299,15 +299,15 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
     endNum
   );
 
-  // 5. 检查用户/好友冲突
+  // 5. Check user/friends conflicts
   await checkUserConflicts(memberId, data.date, startNum, endNum, userIdList);
 
-  // 6. Transaction 中写入 request 和锁定 time_slot
+  // 6. Write request and lock time_slot in Transaction
   const requestRef = db.collection("request").doc();
   const involvedIds = new Set([memberId, ...userIdList]);
 
   await db.runTransaction(async (transaction) => {
-    // 再次检查 time_slot 状态（防止并发）
+    // Re-check time_slot status (prevent concurrency)
     for (const slot of slotsToLock) {
       const slotRef = db.collection("time_slot").doc(slot.id);
       const slotDoc = await transaction.get(slotRef);
@@ -316,14 +316,14 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
       }
     }
 
-    // 再次检查用户冲突（防止并发）
+    // Re-check user conflicts (prevent concurrency)
     const requestsSnapshot = await transaction.get(
       db.collection("request").where("date", "==", data.date)
     );
     for (const doc of requestsSnapshot.docs) {
       const req = doc.data();
       if (req.status === "pending" || req.status === "accepted") {
-        // 检查发起人
+        // Check organizer
         if (req.member_id === memberId) {
           if (hasTimeOverlap(req.start_time, req.end_time, toHourString(startNum), toHourString(endNum))) {
             throw new functions.https.HttpsError(
@@ -332,7 +332,7 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
             );
           }
         }
-        // 检查好友
+        // Check friends
         if (req.participant_ids && req.participant_ids.length > 0) {
           for (const friendId of userIdList) {
             if (req.member_id === friendId || req.participant_ids.includes(friendId)) {
@@ -348,7 +348,7 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
       }
     }
 
-    // 创建 request
+    // Create request
     transaction.set(requestRef, {
       member_id: memberId,
       facility_id: data.facility_id,
@@ -365,7 +365,7 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
       completed_at: ""
     });
 
-    // 锁定 time_slot
+    // Lock time_slot
     for (const slot of slotsToLock) {
       const slotRef = db.collection("time_slot").doc(slot.id);
       transaction.update(slotRef, {
@@ -376,15 +376,15 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
     }
   });
 
-  // 7. 创建 notification（在 transaction 外）
-  // 注意：notification 失败不影响主流程（request 和 time_slot 已成功写入）
+  // 7. Create notification (outside transaction)
+  // Note: notification failure does not affect main flow (request and time_slot already written successfully)
 
-  // 调试日志：确认进入 notification 逻辑
+  // Debug log: confirm entering notification logic
   console.log("Creating notifications for involved IDs:", Array.from(involvedIds));
   console.log("Facility staff_id:", facility.staff_id);
 
   try {
-    // 通知会员和好友
+    // Notify member and friends
     const involvedIdList = Array.from(involvedIds);
     const memberNotifications = involvedIdList.map((userId) => ({
       recipient_id: userId,
@@ -395,7 +395,7 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
       created_at: FieldValue.serverTimestamp()
     }));
 
-    // 通知员工
+    // Notify staff
     if (facility.staff_id) {
       memberNotifications.push({
         recipient_id: facility.staff_id,
@@ -409,7 +409,7 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
 
     console.log("Total notifications to create:", memberNotifications.length);
 
-    // 批量写入 notification
+    // Batch write notification
     if (memberNotifications.length === 0) {
       console.log("No notifications to create.");
     } else {
@@ -422,11 +422,11 @@ exports.submitBookingRequest = functions.https.onCall(async (data, context) => {
       console.log("Notifications created successfully.");
     }
   } catch (notifError) {
-    // notification 失败不影响主流程，只记录完整错误
+    // Notification failure does not affect main flow, only log complete error
     console.error("Failed to create notifications:", notifError);
   }
 
-  // 返回成功
+  // Return success
   return {
     success: true,
     request_id: requestRef.id

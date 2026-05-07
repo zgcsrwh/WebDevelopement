@@ -1,11 +1,11 @@
 /**
  * updateTicketStatus Cloud Function
  *
- * Staff 将报修单标记为已解决，并触发 facility.status 恢复逻辑
+ * Staff marks repair ticket as resolved and triggers facility.status recovery logic
  *
- * ID 类型：全部使用 string
- * Status 类型：string
- * 错误处理：throw new functions.https.HttpsError
+ * ID type: string
+ * Status type: string
+ * Error handling: throw new functions.https.HttpsError
  */
 
 const functions = require("firebase-functions");
@@ -15,10 +15,10 @@ const { FieldValue } = require("firebase-admin/firestore");
 const db = admin.firestore();
 
 /**
- * updateTicketStatus - Staff 标记报修单为已解决
+ * updateTicketStatus - Staff marks repair ticket as resolved
  */
 const updateTicketStatus = functions.https.onCall(async (data, context) => {
-  // ========== 1. 参数校验 ==========
+  // ========== 1. Parameter validation ==========
   const repairId = (data.repairt_id || data.repair_id || "").trim();
   if (!repairId) {
     throw new functions.https.HttpsError("invalid-argument", "repairt_id is required");
@@ -36,7 +36,7 @@ const updateTicketStatus = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // ========== 2. Staff 认证 ==========
+  // ========== 2. Staff authentication ==========
   const userId = context.auth?.uid;
   if (!userId) {
     throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
@@ -51,7 +51,7 @@ const updateTicketStatus = functions.https.onCall(async (data, context) => {
   const role = String(staffData.role || "").toLowerCase();
   const staffStatus = String(staffData.status || "").toLowerCase();
 
-  // 校验 role（只允许 Staff）
+  // Validate role (Staff only)
   if (role !== "staff") {
     throw new functions.https.HttpsError(
       "permission-denied",
@@ -59,7 +59,7 @@ const updateTicketStatus = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 校验 status
+  // Validate status
   if (staffStatus !== "active") {
     throw new functions.https.HttpsError(
       "permission-denied",
@@ -67,7 +67,7 @@ const updateTicketStatus = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // ========== 3. Transaction 内主要逻辑 ==========
+  // ========== 3. Main logic within Transaction ==========
   let facilityRestored = false;
   const finalFacilityStatus = await db.runTransaction(async (transaction) => {
     // 1) read repair
@@ -101,7 +101,7 @@ const updateTicketStatus = functions.https.onCall(async (data, context) => {
 
     const facilityData = facilitySnapshot.data();
 
-    // 检查 facility.status === "deleted"
+    // Check facility.status === "deleted"
     if (facilityData.status === "deleted") {
       throw new functions.https.HttpsError(
         "failed-precondition",
@@ -109,7 +109,7 @@ const updateTicketStatus = functions.https.onCall(async (data, context) => {
       );
     }
 
-    // 3) Staff 权限校验：facility.staff_id 或 repair.staff_id 任意一个匹配 userId
+    // 3) Staff permission check: either facility.staff_id or repair.staff_id matches userId
     const facilityStaffId = facilityData.staff_id || "";
     const repairStaffId = repairData.staff_id || "";
     const staffIds = [facilityStaffId, repairStaffId].filter(Boolean);
@@ -139,7 +139,7 @@ const updateTicketStatus = functions.https.onCall(async (data, context) => {
       updated_at: FieldValue.serverTimestamp(),
     });
 
-    // 6) write facility（如果没有其他 pending 且 facility 未 deleted）
+    // 6) write facility (if no other pending and facility is not deleted)
     if (otherPendingCount === 0 && facilityData.status !== "deleted") {
       transaction.update(facilityRef, {
         status: "normal",
@@ -148,11 +148,11 @@ const updateTicketStatus = functions.https.onCall(async (data, context) => {
       facilityRestored = true;
     }
 
-    // 返回最终的 facility status
+    // Return final facility status
     return otherPendingCount === 0 ? "normal" : facilityData.status;
   });
 
-  // ========== 4. 返回 ==========
+  // ========== 4. Return ==========
   return {
     success: true,
     repairt_id: repairId,

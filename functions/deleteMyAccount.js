@@ -1,22 +1,22 @@
 /**
  * deleteMyAccount Cloud Function
  *
- * 用于 Member 删除账号
+ * Used for Member to delete account
  *
- * 返回：
+ * Returns:
  * {
  *   success: true
  * }
  *
- * 删除前 blocking 检查：
- * - 自己发起的 request 状态为 pending/accepted/suggested
- * - 作为 participant 的 request 状态为 pending/accepted/suggested
+ * Pre-deletion blocking checks:
+ * - Requests initiated by self with status pending/accepted/suggested
+ * - Requests where self is participant with status pending/accepted/suggested
  *
- * 清理：
- * - 删除 profile、notification
- * - 更新 matching、friends
- * - 匿名化 repair
- * - 删除 member、Auth 用户
+ * Cleanup:
+ * - Delete profile, notification
+ * - Update matching, friends
+ * - Anonymize repair
+ * - Delete member, Auth user
  */
 
 const functions = require("firebase-functions");
@@ -26,11 +26,11 @@ const { FieldValue } = require("firebase-admin/firestore");
 
 const db = admin.firestore();
 
-// ============ Helper: 分批提交 ============
+// ============ Helper: Commit in chunks ============
 
 async function commitBatchInChunks(batch, maxChunks = 10) {
-  // batch 现在可能是 WriteBatch 或包含多个 batch 的数组
-  // 单个 batch 最大操作数约 500，分多个 chunk 防止超限
+  // batch can be WriteBatch or array containing multiple batches
+  // Single batch max operations ~500, split into chunks to prevent exceeding limit
   if (batch && batch.commit) {
     await batch.commit();
   } else if (Array.isArray(batch)) {
@@ -42,16 +42,16 @@ async function commitBatchInChunks(batch, maxChunks = 10) {
   }
 }
 
-// ============ 主函数 ============
+// ============ Main function ============
 
 const deleteMyAccount = functions.https.onCall(async (data, context) => {
-  // 1. 校验用户已登录
+  // 1. Validate user is logged in
   const uid = context.auth?.uid;
   if (!uid) {
     throw new functions.https.HttpsError("unauthenticated", "User must be logged in");
   }
 
-  // 2. 读取 member 文档
+  // 2. Read member document
   const memberRef = db.collection("member").doc(uid);
   const memberDoc = await memberRef.get();
 
@@ -62,10 +62,10 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 3. Blocking 检查：重新执行和 checkAccountDeletable 一致的规则
+  // 3. Blocking check: Re-run rules consistent with checkAccountDeletable
   const activeStatuses = ["pending", "accepted", "suggested"];
 
-  // 检查自己发起的 request
+  // Check requests initiated by self
   const ownRequestsSnapshot = await db
     .collection("request")
     .where("member_id", "==", uid)
@@ -83,7 +83,7 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // 检查作为 participant 的 request
+  // Check requests where self is participant
   const participantRequestsSnapshot = await db
     .collection("request")
     .where("participant_ids", "array-contains", uid)
@@ -101,13 +101,13 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // ============ Firestore 清理 ============
+  // ============ Firestore cleanup ============
 
-  // 准备 batch
+  // Prepare batch
   const delBatch = db.batch();
   const updBatch = db.batch();
 
-  // A. 删除 profile
+  // A. Delete profile
   const profilesSnapshot = await db
     .collection("profile")
     .where("member_id", "==", uid)
@@ -116,7 +116,7 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     delBatch.delete(doc.ref);
   });
 
-  // B. 删除 notification
+  // B. Delete notification
   const notifsSnapshot = await db
     .collection("notification")
     .where("member_id", "==", uid)
@@ -125,7 +125,7 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     delBatch.delete(doc.ref);
   });
 
-  // C. 更新 matching (sender_id)
+  // C. Update matching (sender_id)
   const matchingSenderSnapshot = await db
     .collection("matching")
     .where("sender_id", "==", uid)
@@ -139,7 +139,7 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     });
   });
 
-  // C. 更新 matching (reciever_id，注意拼写)
+  // C. Update matching (reciever_id, note spelling)
   const matchingRecieverSnapshot = await db
     .collection("matching")
     .where("reciever_id", "==", uid)
@@ -153,7 +153,7 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     });
   });
 
-  // D. 更新 friends（移除当前用户）
+  // D. Update friends (remove current user)
   const friendsSnapshot = await db
     .collection("friends")
     .where("friends_ids", "array-contains", uid)
@@ -167,18 +167,18 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     });
   });
 
-  // E. 删除 friends/{uid}
+  // E. Delete friends/{uid}
   const friendsDocRef = db.collection("friends").doc(uid);
   delBatch.delete(friendsDocRef);
 
-  // F. 匿名化 repair
+  // F. Anonymize repair
   const repairSnapshot = await db
     .collection("repair")
     .where("member_id", "==", uid)
     .get();
   repairSnapshot.docs.forEach((doc) => {
     const repairData = doc.data();
-    // 收集需要匿名化的字段
+    // Collect fields that need to be anonymized
     const updateData = {
       member_id: "",
       reporter_deleted: true,
@@ -186,7 +186,7 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
       updated_at: FieldValue.serverTimestamp(),
     };
 
-    // 如果存在其他用户身份字段，一并清空
+    // If other user identity fields exist, clear them too
     if (repairData.member_name !== undefined) {
       updateData.member_name = "";
     }
@@ -206,14 +206,14 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     updBatch.update(doc.ref, updateData);
   });
 
-  // G. 删除 member/{uid}
+  // G. Delete member/{uid}
   delBatch.delete(memberRef);
 
-  // 提交 Firestore 清理
+  // Commit Firestore cleanup
   await delBatch.commit();
   await updBatch.commit();
 
-  // ============ 删除 Firebase Auth 用户 ============
+  // ============ Delete Firebase Auth user ============
 
   try {
     const auth = getAuth();
@@ -226,7 +226,7 @@ const deleteMyAccount = functions.https.onCall(async (data, context) => {
     );
   }
 
-  // ============ 返回成功 ============
+  // ============ Return success ============
 
   return { success: true };
 });

@@ -1,8 +1,8 @@
 /**
- * sendBookingReminders - 预约前 2 小时自动提醒
+ * sendBookingReminders - Automatic reminder 2 hours before booking
  *
- * 每小时整点运行
- * 扫描即将在 2 小时后开始的 accepted booking，给 member 发送提醒
+ * Runs on the hour every hour
+ * Scans accepted bookings starting in 2 hours and sends reminder to member
  */
 
 const functions = require("firebase-functions");
@@ -11,13 +11,13 @@ const { FieldValue } = require("firebase-admin/firestore");
 
 const db = admin.firestore();
 
-// 引入公共时间工具
+// Import common time utilities
 const { getReminderTarget } = require("./utils/time");
 
 /**
- * 预约前 2 小时提醒核心逻辑
+ * Core reminder logic 2 hours before booking
  *
- * @param {Date} now - 可选，默认 new Date()
+ * @param {Date} now - Optional, default new Date()
  * @returns {object} { scanned, reminded, skipped, notificationFailures }
  */
 async function processBookingReminders(now = new Date()) {
@@ -28,12 +28,12 @@ async function processBookingReminders(now = new Date()) {
     notificationFailures: 0,
   };
 
-  // 计算 targetDate / targetHour（当前 + 2 小时）
+  // Calculate targetDate / targetHour (current + 2 hours)
   const { targetDate, targetHour } = getReminderTarget(now);
 
   console.log(`[sendBookingReminders] Processing for ${targetDate} ${targetHour}:00`);
 
-  // 查询匹配 request
+  // Query matching request
   const snapshot = await db
     .collection("request")
     .where("status", "==", "accepted")
@@ -44,12 +44,12 @@ async function processBookingReminders(now = new Date()) {
   result.scanned = snapshot.size;
   console.log(`[sendBookingReminders] Found ${snapshot.size} matching requests`);
 
-  // 处理每个 request
+  // Process each request
   for (const doc of snapshot.docs) {
     const requestId = doc.id;
 
     try {
-      // transaction 返回是否需要创建 notification
+      // Transaction returns whether notification needs to be created
       const shouldNotify = await db.runTransaction(async (transaction) => {
         const requestRef = db.collection("request").doc(requestId);
         const requestDoc = await transaction.get(requestRef);
@@ -60,32 +60,32 @@ async function processBookingReminders(now = new Date()) {
 
         const request = requestDoc.data();
 
-        // 检查状态仍然是 accepted
+        // Check status is still accepted
         if (String(request.status || "").toLowerCase() !== "accepted") {
           return { action: "skip" };
         }
 
-        // 检查 reminder 未发送
+        // Check reminder not sent
         if (request.reminder_sent_at) {
           return { action: "skip" };
         }
 
-        // 写入 reminder_sent_at
+        // Write reminder_sent_at
         transaction.update(requestRef, {
           reminder_sent_at: FieldValue.serverTimestamp(),
         });
 
-        // 返回 request 数据用于后续创建 notification
+        // Return request data for subsequent notification creation
         return { action: "notify", request };
       });
 
-      // 根据 transaction 返回结果处理
+      // Process based on transaction return result
       if (shouldNotify.action === "skip") {
         result.skipped += 1;
         continue;
       }
 
-      // action === "notify"，创建 notification
+      // action === "notify", create notification
       if (shouldNotify.action === "notify" && shouldNotify.request) {
         try {
           const notifRef = db.collection("notification").doc();
@@ -116,7 +116,7 @@ async function processBookingReminders(now = new Date()) {
   return result;
 }
 
-// Cloud Function 入口
+// Cloud Function entry point
 exports.sendBookingReminders = functions.pubsub
   .schedule("0 * * * *")
   .timeZone("Europe/London")
@@ -130,7 +130,7 @@ exports.sendBookingReminders = functions.pubsub
     }
   });
 
-// 导出核心逻辑供测试使用
+// Export core logic for testing
 module.exports = {
   sendBookingReminders: exports.sendBookingReminders,
   processBookingReminders,

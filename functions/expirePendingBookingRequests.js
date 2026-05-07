@@ -1,14 +1,14 @@
 /**
  * expirePendingBookingRequests Cloud Function
  *
- * 自动取消 2 小时锁定期内未被审批的 pending request
+ * Automatically cancel pending requests that were not approved within 2 hour lock period
  *
- * 业务逻辑：
- * 1. 每小时运行一次（5 分钟时）
- * 2. 查询 now + 2h 对应 date/hour 的 pending request
- * 3. transaction 内校验并取消 request
- * 4. 释放关联的 time_slot
- * 5. transaction 外创建 notification
+ * Business logic:
+ * 1. Run every hour (at 5 minutes)
+ * 2. Query pending request for date/hour corresponding to now + 2h
+ * 3. Validate and cancel request in transaction
+ * 4. Release related time_slot
+ * 5. Create notification outside transaction
  */
 
 const functions = require("firebase-functions");
@@ -21,9 +21,9 @@ const db = admin.firestore();
 // ============ Core Function ============
 
 /**
- * 处理进入 2 小时锁定期但仍未被审批的 pending request
+ * Process pending requests that entered 2 hour lock period but were still not approved
  *
- * @param {Date} now - 可选，默认 new Date()
+ * @param {Date} now - Optional, default new Date()
  * @returns {Promise<{scanned, expired, skipped, slotMissing, notificationFailures, failures}>}
  */
 async function processExpiredPendingBookings(now = new Date()) {
@@ -37,10 +37,10 @@ async function processExpiredPendingBookings(now = new Date()) {
   };
 
   try {
-    // 1. 计算 target 时间
+    // 1. Calculate target time
     const { targetDate, targetHour } = getReminderTarget(now);
 
-    // 2. 查询 pending request
+    // 2. Query pending request
     const snapshot = await db.collection("request")
       .where("status", "==", "pending")
       .where("date", "==", targetDate)
@@ -49,11 +49,11 @@ async function processExpiredPendingBookings(now = new Date()) {
 
     stats.scanned = snapshot.size;
 
-    // 3. 遍历每个 request
+    // 3. Iterate each request
     for (const doc of snapshot.docs) {
       const result = await processSingleRequest(doc.id, now);
 
-      // 统一更新 stats
+      // Unified stats update
       if (result.expired) {
         stats.expired++;
         if (result.slotMissing) {
@@ -76,7 +76,7 @@ async function processExpiredPendingBookings(now = new Date()) {
 }
 
 /**
- * 处理单个 request
+ * Process single request
  *
  * @param {string} requestId
  * @param {Date} now
@@ -92,9 +92,9 @@ async function processSingleRequest(requestId, now) {
   };
 
   try {
-    // 1. Transaction 执行
+    // 1. Execute transaction
     const transactionResult = await db.runTransaction(async (transaction) => {
-      // 1. 读取 request
+      // 1. Read request
       const requestRef = db.collection("request").doc(requestId);
       const requestDoc = await transaction.get(requestRef);
 
@@ -104,12 +104,12 @@ async function processSingleRequest(requestId, now) {
 
       const requestData = requestDoc.data();
 
-      // 2. 确认 status
+      // 2. Confirm status
       if (requestData.status !== "pending") {
         return { requestData: null, slotMissing: false };
       }
 
-      // 3. 确认时间（parseBookingStart 防御）
+      // 3. Confirm time (parseBookingStart defensive check)
       const bookingStart = parseBookingStart(requestData.date, requestData.start_time);
       if (!bookingStart) {
         return { requestData: null, slotMissing: false };
@@ -119,21 +119,21 @@ async function processSingleRequest(requestId, now) {
         return { requestData: null, slotMissing: false };
       }
 
-      // 4. 查询 time_slot
+      // 4. Query time_slot
       const slotsSnapshot = await transaction.get(
         db.collection("time_slot").where("request_id", "==", requestId)
       );
 
       const slotMissing = slotsSnapshot.empty;
 
-      // 5. 更新 request
+      // 5. Update request
       transaction.update(requestRef, {
         status: "cancelled",
         completed_at: FieldValue.serverTimestamp(),
         updated_at: FieldValue.serverTimestamp()
       });
 
-      // 6. 释放 time_slot
+      // 6. Release time_slot
       if (!slotMissing) {
         for (const slotDoc of slotsSnapshot.docs) {
           transaction.update(slotDoc.ref, {
@@ -147,13 +147,13 @@ async function processSingleRequest(requestId, now) {
       return { requestData, slotMissing };
     });
 
-    // 2. Transaction 结果处理
+    // 2. Transaction result processing
     if (transactionResult.requestData) {
-      // 成功 expired
+      // Successfully expired
       result.expired = true;
       result.slotMissing = transactionResult.slotMissing;
 
-      // 3. 创建 notification（失败不回滚）
+      // 3. Create notification (failure does not rollback)
       try {
         await createNotificationForExpiredRequest(transactionResult.requestData, requestId);
       } catch (error) {
@@ -161,7 +161,7 @@ async function processSingleRequest(requestId, now) {
         console.error("[expirePendingBookingRequests] Failed to create notifications:", error);
       }
     } else {
-      // 被跳过
+      // Skipped
       result.skipped = true;
     }
   } catch (error) {
@@ -173,10 +173,10 @@ async function processSingleRequest(requestId, now) {
 }
 
 /**
- * 创建 notification（失败不回滚）
+ * Create notification (failure does not rollback)
  */
 async function createNotificationForExpiredRequest(requestData, requestId) {
-  // 通知对象：member_id + participant_ids + user_id_list + staff_id
+  // Notification recipients: member_id + participant_ids + user_id_list + staff_id
   const recipientIds = [
     requestData.member_id,
     ...(requestData.participant_ids || []),
@@ -225,7 +225,7 @@ const expirePendingBookingRequests = functions.pubsub
     return null;
   });
 
-// ============ 导出 ============
+// ============ Export ============
 
 module.exports = {
   expirePendingBookingRequests,
