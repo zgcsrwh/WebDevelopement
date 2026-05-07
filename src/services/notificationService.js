@@ -2,6 +2,8 @@
 import { getCurrentActor } from "./centreService";
 import { getCollectionDocs, normalizeTimestamp, subscribeToCollection, updateCollectionDoc, where } from "./firestoreService";
 
+const BOOKING_STATUS_FALLBACKS = new Set(["accepted", "rejected", "suggested", "cancelled"]);
+
 async function resolveActor(actor) {
   return actor || getCurrentActor();
 }
@@ -24,9 +26,20 @@ function getNotificationSortValue(value) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function canDisplayWithoutTimestamp(item) {
+  const statusContext = String(item.status_context || item.status || "").trim().toLowerCase();
+  const type = String(item.type || "").trim().toLowerCase();
+  const referenceId = item.reference_id || item.related_id || "";
+  const message = item.message || item.information || "";
+
+  return type === "facility_request" && BOOKING_STATUS_FALLBACKS.has(statusContext) && Boolean(referenceId) && Boolean(message);
+}
+
 // Support both old and new notification field names from the database.
 function mapNotification(item) {
-  const createdAt = normalizeTimestamp(item.created_at);
+  const rawCreatedAt = item.created_at || item.createdAt || "";
+  const usesTimestampFallback = !rawCreatedAt && canDisplayWithoutTimestamp(item);
+  const createdAt = normalizeTimestamp(rawCreatedAt);
   const isRead = Boolean(item.isRead ?? item.is_read ?? false);
 
   return {
@@ -38,7 +51,8 @@ function mapNotification(item) {
     referenceId: item.reference_id || item.related_id || "",
     isRead,
     createdAt,
-    sortValue: getNotificationSortValue(item.created_at),
+    sortValue: getNotificationSortValue(rawCreatedAt) || (usesTimestampFallback ? 1 : 0),
+    usesTimestampFallback,
     rawDocument: {
       ...item,
       id: item.id,
@@ -47,11 +61,12 @@ function mapNotification(item) {
   };
 }
 
-// Do not show temporary or broken notification rows with no real created_at value.
+// Most rows need created_at. Keep a narrow compatibility path for old backend
+// booking-status notifications that were written without that field.
 function getDisplayableNotifications(docs = []) {
   return docs
     .map(mapNotification)
-    .filter((item) => item.createdAt && item.sortValue > 0)
+    .filter((item) => (item.createdAt && item.sortValue > 0) || item.usesTimestampFallback)
     .sort((left, right) => {
       const timeDifference = right.sortValue - left.sortValue;
       if (timeDifference !== 0) {

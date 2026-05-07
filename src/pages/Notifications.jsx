@@ -136,10 +136,12 @@ function renderNotificationDetail(item, detail, group) {
             <span>Status</span>
             <strong>{getStatusLabel(item.statusContext)}</strong>
           </div>
-          <div>
-            <span>Received At</span>
-            <strong>{item.createdAt || "Not available"}</strong>
-          </div>
+          {item.createdAt ? (
+            <div>
+              <span>Received At</span>
+              <strong>{item.createdAt}</strong>
+            </div>
+          ) : null}
         </div>
         <div className="notification-bell__applicationBox">
           <span>Message</span>
@@ -433,7 +435,7 @@ export default function Notifications() {
                   {!item.isRead ? <span className="notification-bell__unreadDot" aria-label="Unread notification" /> : null}
                 </div>
                 <strong>{item.message}</strong>
-                <span className="notification-bell__time">{item.createdAt}</span>
+                {item.createdAt ? <span className="notification-bell__time">{item.createdAt}</span> : null}
                 <div className="notification-bell__itemActions">
                   <button className="btn-secondary" type="button" onClick={() => openDetails(item)}>
                     View Details

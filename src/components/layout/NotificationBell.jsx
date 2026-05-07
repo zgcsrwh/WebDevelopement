@@ -586,10 +586,12 @@ function NotificationSummaryModal({ item, onClose }) {
             <span>Status</span>
             <strong>{item.statusContext ? getStatusLabel(item.statusContext) : "Not available"}</strong>
           </div>
-          <div>
-            <span>Received At</span>
-            <strong>{item.createdAt || "Not available"}</strong>
-          </div>
+          {item.createdAt ? (
+            <div>
+              <span>Received At</span>
+              <strong>{item.createdAt}</strong>
+            </div>
+          ) : null}
         </div>
         <div className="notification-bell__applicationBox">
           <span>Message</span>
@@ -618,10 +620,12 @@ function StaffNotificationModal({ item, onClose }) {
           <p>{item.message || "No additional message was provided."}</p>
         </div>
 
-        <div className="notification-bell__applicationBox">
-          <span>Received At</span>
-          <p>{item.createdAt || "Not available"}</p>
+        {item.createdAt ? (
+          <div className="notification-bell__applicationBox">
+            <span>Received At</span>
+            <p>{item.createdAt}</p>
           </div>
+        ) : null}
 
           {item.referenceId ? (
             <div  className="notification-bell__applicationBox">
