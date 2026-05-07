@@ -1,7 +1,7 @@
 // This member page shows historica bookings content.
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, or } from "firebase/firestore";
 import { db } from "../../provider/FirebaseConfig";
 import "../pageStyles.css";
 import "./memberWorkspace.css";
@@ -243,7 +243,13 @@ export default function MyBookings() {
 
     // Real-time listener for requests
     // When the status of reqests changed, the page needs re-resering
-    const q = query(collection(db, "request"), where("member_id", "==", sessionProfile.id));
+    const q = query(
+      collection(db, "request"),
+      or(
+        where("member_id", "==", sessionProfile.id),
+        where("participant_ids", "array-contains", sessionProfile.id)
+      )
+    );
     unsubscribe = onSnapshot(q, () => {
       loadItems(); 
     }, (err) => {
