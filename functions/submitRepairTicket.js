@@ -1,11 +1,11 @@
 /**
  * submitRepairTicket Cloud Function
  *
- * 会员提交报修
+ * Member submits repair request
  *
- * ID 类型：全部使用 string
- * Status 类型：string
- * 错误处理：throw new functions.https.HttpsError
+ * ID type: string
+ * Status type: string
+ * Error handling: throw new functions.https.HttpsError
  */
 
 const functions = require("firebase-functions");
@@ -15,7 +15,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const db = admin.firestore();
 
 /**
- * 校验必传参数
+ * Assert required fields
  */
 function assertRequired(data, fields) {
   for (const field of fields) {
@@ -26,15 +26,15 @@ function assertRequired(data, fields) {
 }
 
 /**
- * 格式化 hour 为两位字符串（兼容 "9" / "09" / "9:00" / "09:00" / number 9）
- * 无效输入返回空字符串
+ * Normalize hour to two-digit string (compatible with "9" / "09" / "9:00" / "09:00" / number 9)
+ * Returns empty string for invalid input
  */
 function normalizeHour(value) {
   if (value === undefined || value === null || value === "") {
     return "";
   }
 
-  // 处理 number
+  // Handle number
   if (typeof value === "number") {
     if (isNaN(value) || value < 0 || value > 23) {
       return "";
@@ -47,7 +47,7 @@ function normalizeHour(value) {
     return "";
   }
 
-  // 提取数字部分（去掉 :00 等）
+  // Extract numeric part (strip :00 etc)
   const numStr = str.replace(/^0+(\d)/, "$1").replace(/(\d).*/, "$1");
   if (!/^\d+$/.test(numStr)) {
     return "";
@@ -62,11 +62,11 @@ function normalizeHour(value) {
 }
 
 /**
- * 分批处理 batch 操作
- * 注意：每个 item 只适合一次 write
- * @param {Array} items - 文档数组或 ref 数组
- * @param {Function} operation - 操作函数 (batch, item) => void
- * @returns {Promise<number>} 处理的 item 数量
+ * Batch process items in groups
+ * Note: each item should only be written once
+ * @param {Array} items - Array of documents or refs
+ * @param {Function} operation - Operation function (batch, item) => void
+ * @returns {Promise<number>} Number of items processed
  */
 async function batchProcess(docs, operation) {
   if (docs.length === 0) return 0;
@@ -88,7 +88,7 @@ async function batchProcess(docs, operation) {
     }
   }
 
-  // 提交剩余
+  // Commit remaining
   if (writeCount > 0) {
     await batch.commit();
   }
@@ -97,17 +97,17 @@ async function batchProcess(docs, operation) {
 }
 
 /**
- * submitRepairTicket - 会员提交报修
+ * submitRepairTicket - Member submits repair request
  */
 const submitRepairTicket = functions.https.onCall(async (data, context) => {
-  // ========== 1. 参数校验 ==========
+  // ========== 1. Parameter validation ==========
   assertRequired(data, ["facility_id", "repair_description", "type"]);
 
   if (data.repair_description.trim().length > 500) {
     throw new functions.https.HttpsError("invalid-argument", "repair_description must not exceed 500 characters");
   }
 
-  // ========== 2. Member 认证 ==========
+  // ========== 2. Member authentication ==========
   const userId = context.auth?.uid;
   if (!userId) {
     throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
@@ -123,7 +123,7 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("permission-denied", "Member is not active");
   }
 
-  // ========== 3. Facility 初步校验 ==========
+  // ========== 3. Facility initial validation ==========
   const facilityId = data.facility_id.trim();
   const facilityDoc = await db.collection("facility").doc(facilityId).get();
 
@@ -136,12 +136,12 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError("failed-precondition", "Cannot report repair for deleted facility");
   }
 
-  // ========== 4. Transaction: 创建 repair + 更新 facility.status ==========
+  // ========== 4. Transaction: Create repair + update facility.status ==========
   let repairId;
   let facilityName = facilityData.name || "";
 
   await db.runTransaction(async (transaction) => {
-    // 4.1 重新读取 facility，确认仍存在且不是 deleted
+    // 4.1 Re-read facility to confirm it exists and is not deleted
     const facilityRef = db.collection("facility").doc(facilityId);
     const facilitySnapshot = await transaction.get(facilityRef);
 
@@ -154,7 +154,7 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError("failed-precondition", "Cannot report repair for deleted facility");
     }
 
-    // 4.2 创建 repair 文档
+    // 4.2 Create repair document
     const repairRef = db.collection("repair").doc();
     transaction.set(repairRef, {
       member_id: userId,
@@ -170,10 +170,10 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
 
     repairId = repairRef.id;
 
-    // 4.3 更新 facilityName（使用 transaction 内确认的值）
+    // 4.3 Update facilityName (using value confirmed within transaction)
     facilityName = currentFacility.name || facilityId;
 
-    // 4.4 更新 facility.status = "fixing"
+    // 4.4 Update facility.status = "fixing"
     transaction.update(facilityRef, {
       status: "fixing",
       updated_at: FieldValue.serverTimestamp(),
@@ -182,7 +182,7 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
 
   console.log(`[submitRepairTicket] Created repair ${repairId} for facility ${facilityId}`);
 
-  // ========== 5. 查询并取消 active request ==========
+  // ========== 5. Query and cancel active requests ==========
   const requestSnapshot = await db.collection("request")
     .where("facility_id", "==", facilityId)
     .get();
@@ -201,7 +201,7 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
     }
   });
 
-  // ========== 6. 初始化 stats ==========
+  // ========== 6. Initialize stats ==========
   const stats = {
     cancelledRequests: 0,
     releasedTimeSlots: 0,
@@ -209,15 +209,15 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
     notificationFailures: 0
   };
 
-  // ========== 7. Batch: 取消 request + 释放 time_slot ==========
+  // ========== 7. Batch: Cancel requests + release time_slots ==========
   if (requestsToCancel.length > 0) {
-    // 使用 Set 记录 slot ref path，避免重复释放
+    // Use Set to record slot ref paths to avoid duplicate releases
     const slotsToRelease = new Set();
 
     for (const req of requestsToCancel) {
       const reqId = req.id;
 
-      // 7.1 优先通过 request_id 查询
+      // 7.1 Priority: query by request_id first
       const slotsByRequestId = await db.collection("time_slot")
         .where("request_id", "==", reqId)
         .get();
@@ -225,13 +225,13 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
       if (slotsByRequestId.size > 0) {
         slotsByRequestId.docs.forEach(doc => {
           const slotData = doc.data();
-          // 必须确认 request_id 匹配且状态为 locked
+          // Must confirm request_id matches and status is locked
           if (slotData.status === "locked" && slotData.request_id === reqId) {
             slotsToRelease.add(doc.ref.path);
           }
         });
       } else {
-        // 7.2 fallback: 通过 facility_id + date 查询，但必须检查 request_id 匹配
+        // 7.2 Fallback: query by facility_id + date, but must check request_id matches
         const normalizedHour = normalizeHour(req.data.start_time);
         if (!normalizedHour) {
           console.warn(`[submitRepairTicket] Skipping fallback for request ${reqId}: invalid start_time`);
@@ -247,18 +247,18 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
           const slotData = doc.data();
           const slotHour = normalizeHour(slotData.start_time);
 
-          // 必须确认 slot.request_id === req.id，避免误释放其他 request 的 slot
+          // Must confirm slot.request_id === req.id to avoid releasing other request's slot
           if (slotHour === normalizedHour && slotData.status === "locked" && slotData.request_id === reqId) {
             slotsToRelease.add(doc.ref.path);
           } else if (slotData.status === "locked" && slotData.request_id && slotData.request_id !== reqId) {
-            // 如果 slot 已被其他 request 绑定，跳过并警告
+            // If slot is already bound to another request, skip and warn
             console.warn(`[submitRepairTicket] Slot ${doc.id} is locked by request ${slotData.request_id}, skip for request ${reqId}`);
           }
         });
       }
     }
 
-    // 7.3 使用 batch 取消 request
+    // 7.3 Use batch to cancel requests
     stats.cancelledRequests = await batchProcess(requestsToCancel, (batch, item) => {
       batch.update(item.ref, {
         status: "cancelled",
@@ -267,7 +267,7 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
       });
     });
 
-    // 7.4 使用 batch 释放 time_slot（按 ref path 去重后）
+    // 7.4 Use batch to release time_slots (after dedup by ref path)
     if (slotsToRelease.size > 0) {
       const slotRefs = Array.from(slotsToRelease).map(path => db.doc(path));
       stats.releasedTimeSlots = await batchProcess(slotRefs, (batch, ref) => {
@@ -286,7 +286,7 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
   for (const req of requestsToCancel) {
     const reqData = req.data;
 
-    // 8.1 收集收件人（只收集 member 相关用户，不通知 staff）
+    // 8.1 Collect recipients (only member-related users, not staff)
     const recipientIds = new Set();
     if (reqData.member_id) recipientIds.add(reqData.member_id);
     if (reqData.participant_ids && Array.isArray(reqData.participant_ids)) {
@@ -295,17 +295,17 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
     if (reqData.user_id_list && Array.isArray(reqData.user_id_list)) {
       reqData.user_id_list.forEach(id => recipientIds.add(id));
     }
-    // 不通知 staff：staff 收到 member-facing cancellation message 不合适
+    // Do not notify staff: staff receiving member-facing cancellation message is inappropriate
 
-    // 过滤空值
+    // Filter empty values
     const uniqueRecipients = Array.from(recipientIds).filter(id => id && id.trim());
 
-    // 8.2 格式化时间
+    // 8.2 Format time
     const startTime = normalizeHour(reqData.start_time);
     const endTime = normalizeHour(reqData.end_time);
     const timeRange = startTime && endTime ? `${startTime}-${endTime}` : "";
 
-    // 8.3 为每个收件人创建 notification
+    // 8.3 Create notification for each recipient
     for (const recipientId of uniqueRecipients) {
       try {
         await db.collection("notification").add({
@@ -325,7 +325,7 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
     }
   }
 
-  // ========== 9. 返回 ==========
+  // ========== 9. Return ==========
   return {
     success: true,
     repairt_id: repairId,
