@@ -5,7 +5,7 @@
 // 
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "../pageStyles.css";
@@ -19,58 +19,6 @@ import { getFrontendBookableSlotStatus, getLocalDateKey } from "../../utils/book
 // Southampton center coordinates
 const SOUTHAMPTON_CENTER = [50.9097, -1.4044];
 const DEFAULT_ZOOM = 13;
-
-// Map Icon parameters
-const ICON_SIZE = [25, 41];
-const SHADOW_URL = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png"
-const SHWDOW_SIZE = [41, 41];
-const ICON_ANCHOR = [12, 41];
-
-// Assign sport type icons using different colored markers
-const SPORT_ICONS = {
-  Soccer: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-    iconSize: ICON_SIZE,
-    shadowUrl: SHADOW_URL,
-    shadowSize: SHWDOW_SIZE,
-    iconAnchor: ICON_ANCHOR,
-  }),
-  Basketball: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png",
-    iconSize: ICON_SIZE,
-    shadowUrl: SHADOW_URL,
-    shadowSize: SHWDOW_SIZE,
-    iconAnchor: ICON_ANCHOR,
-  }),
-  Tennis: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-yellow.png",
-    iconSize: ICON_SIZE,
-    shadowUrl: SHADOW_URL,
-    shadowSize: SHWDOW_SIZE,
-    iconAnchor: ICON_ANCHOR,
-  }),
-  Swimming: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-    iconSize: ICON_SIZE,
-    shadowUrl: SHADOW_URL,
-    shadowSize: SHWDOW_SIZE,
-    iconAnchor: ICON_ANCHOR,
-  }),
-  Badminton: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-    iconSize: ICON_SIZE,
-    shadowUrl: SHADOW_URL,
-    shadowSize: SHWDOW_SIZE,
-    iconAnchor: ICON_ANCHOR,
-  }),
-  default: new L.Icon({
-    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png",
-    iconSize: ICON_SIZE,
-    shadowUrl: SHADOW_URL,
-    shadowSize: SHWDOW_SIZE,
-    iconAnchor: ICON_ANCHOR,
-  }),
-};
 
 
 // Extract venue name from facility name
@@ -95,8 +43,8 @@ function extractVenueName(facilityName) {
 // Using google map api to fetch location
 async function geocodeVenue(venueName) {
 
-  //const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY; 
-  const API_KEY = "AIzaSyDHgQZxEqq2qNAOvMjJtkJ4fGYIZkvPIwY";
+  const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY; 
+  //const API_KEY = "AIzaSyDHgQZxEqq2qNAOvMjJtkJ4fGYIZkvPIwY";
   const searchQuery = `${venueName}, Southampton, UK`;
   
   // Google query url
@@ -191,7 +139,7 @@ export default function FacilitiesMap() {
   const [loading, setLoading] = useState(true);
   const [geocodingStatus, setGeocodingStatus] = useState("");
   const [error, setError] = useState("");
-  const [selectedTypes, setSelectedTypes] = useState(new Set());
+  const [selectedType, setSelectedType] = useState("All");
   const [clockTick, setClockTick] = useState(Date.now());
 
   // Get unique sport types from facilities
@@ -199,13 +147,6 @@ export default function FacilitiesMap() {
     const types = new Set(allFacilities.map(f => f.sportType));
     return [...types].sort();
   }, [allFacilities]);
-
-  // Initialize selected types when sport types are loaded
-  useEffect(() => {
-    if (sportTypes.length > 0 && selectedTypes.size === 0) {
-      setSelectedTypes(new Set(sportTypes));
-    }
-  }, [sportTypes, selectedTypes.size]);
 
   // Load real data when this part opens or changes.
   useEffect(() => {
@@ -265,42 +206,32 @@ export default function FacilitiesMap() {
 
   // Build the list that the user can see.
   const filteredVenueLocations = useMemo(() => {
-    if (selectedTypes.size === 0) return venueLocations;
+    if (selectedType === "All") return venueLocations;
     
     return venueLocations
       .map(venue => ({
         ...venue,
-        facilities: venue.facilities.filter(f => selectedTypes.has(f.sportType)),
-        sportTypes: venue.sportTypes.filter(t => selectedTypes.has(t)),
+        facilities: venue.facilities.filter(f => f.sportType === selectedType),
+        sportTypes: venue.sportTypes.filter(t => t === selectedType),
       }))
       .filter(venue => venue.facilities.length > 0);
-  }, [venueLocations, selectedTypes]);
+  }, [venueLocations, selectedType]);
 
   const totalFacilitiesCount = useMemo(() => {
     return filteredVenueLocations.reduce((sum, venue) => sum + venue.facilities.length, 0);
   }, [filteredVenueLocations]);
 
-  function toggleSportType(type) {
-    setSelectedTypes(prev => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
-  }
-
   
-// Get the display icon based on type
+// Get the display icon based on type using modern pure CSS L.divIcon
 function getIconForSportTypes(sportTypes) {
-  for (const type of sportTypes) {
-    if (SPORT_ICONS[type]) {
-      return SPORT_ICONS[type];
-    }
-  }
-  return SPORT_ICONS.default;
+  const type = sportTypes.find(t => ["Soccer", "Basketball", "Tennis", "Swimming", "Badminton", "Gym"].includes(t)) || "default";
+  return L.divIcon({
+    className: "custom-leaflet-marker",
+    html: `<div class="marker-pin marker-pin--${type.toLowerCase()}"></div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+    popupAnchor: [0, -32]
+  });
 }
 
   function hasBookableSlotsToday(facility) {
@@ -332,22 +263,19 @@ function getIconForSportTypes(sportTypes) {
       {sportTypes.length > 0 && (
         <FilterPanel
           className="facilities-map-filters"
-          onClear={() => setSelectedTypes(new Set(sportTypes))}
+          onClear={() => setSelectedType("All")}
         >
           <FilterField id="facilities-map-sport-types" label="Sport Type">
-            <div id="facilities-map-sport-types" className="facilities-map-filters__chips" role="group">
+            <select
+              id="facilities-map-sport-types"
+              value={selectedType}
+              onChange={(event) => setSelectedType(event.target.value)}
+            >
+              <option value="All">All Types</option>
               {sportTypes.map(type => (
-                <button
-                  key={type}
-                  className={`facilities-map-filter-chip ${selectedTypes.has(type) ? "is-active" : ""}`}
-                  type="button"
-                  onClick={() => toggleSportType(type)}
-                >
-                  <span className={`facilities-map-filter-chip__dot facilities-map-filter-chip__dot--${type.toLowerCase()}`} />
-                  {type}
-                </button>
+                <option key={type} value={type}>{type}</option>
               ))}
-            </div>
+            </select>
           </FilterField>
         </FilterPanel>
       )}
@@ -373,7 +301,9 @@ function getIconForSportTypes(sportTypes) {
             zoom={DEFAULT_ZOOM}
             className="facilities-map"
             scrollWheelZoom={true}
+            zoomControl={false}
           >
+            <ZoomControl position="bottomright" />
             <TileLayer
               url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
               attribution='&copy; Google Maps'
