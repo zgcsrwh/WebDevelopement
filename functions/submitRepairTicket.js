@@ -286,7 +286,7 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
   for (const req of requestsToCancel) {
     const reqData = req.data;
 
-    // 8.1 收集收件人
+    // 8.1 收集收件人（只收集 member 相关用户，不通知 staff）
     const recipientIds = new Set();
     if (reqData.member_id) recipientIds.add(reqData.member_id);
     if (reqData.participant_ids && Array.isArray(reqData.participant_ids)) {
@@ -295,7 +295,7 @@ const submitRepairTicket = functions.https.onCall(async (data, context) => {
     if (reqData.user_id_list && Array.isArray(reqData.user_id_list)) {
       reqData.user_id_list.forEach(id => recipientIds.add(id));
     }
-    if (reqData.staff_id) recipientIds.add(reqData.staff_id);
+    // 不通知 staff：staff 收到 member-facing cancellation message 不合适
 
     // 过滤空值
     const uniqueRecipients = Array.from(recipientIds).filter(id => id && id.trim());
