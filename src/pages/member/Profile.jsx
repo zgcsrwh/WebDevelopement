@@ -4,11 +4,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import "../pageStyles.css";
 import "./PartnerDetail.css";
 import "./Profile.css";
-import {
-  checkAccountDeletable,
-  deleteMyAccount,
-  updateUserProfile,
-} from "../../services/profileService";
+import { checkAccountDeletable, deleteMyAccount, updateUserProfile} from "../../services/profileService";
 import { getDocById } from "../../services/firestoreService";
 import { getFriendProfiles, removeFriend } from "../../services/partnerService";
 import { useAuth } from "../../provider/AuthContext";
@@ -22,6 +18,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Toast from "../../components/common/Toast";
 import PasswordChangePanel from "../../components/profile/PasswordChangePanel";
 
+// Format a raw availability string into an array containing [day, time]
 function formatAvailabilityParts(value = "") {
   const [day = "", time = ""] = String(value)
     .split("_")
@@ -30,16 +27,19 @@ function formatAvailabilityParts(value = "") {
   return [day, time];
 }
 
+// Sort an array of friends alphabetically by their nickname or name
 function sortFriends(items = []) {
   return [...items].sort((left, right) =>
     String(left.nickname || left.name || "").localeCompare(String(right.nickname || right.name || "")),
   );
 }
 
+// Helper to construct a standardized alert configuration object
 function buildAlert(title, body, tone = "success") {
   return { title, body, tone };
 }
 
+// Normalize the profile record from the database, applying fallbacks and standardizing date formats
 function normalizeProfileRecord(record = {}, fallback = {}) {
   const rawDateOfBirth =
     record.date_of_birth ??
@@ -64,6 +64,7 @@ function normalizeProfileRecord(record = {}, fallback = {}) {
   };
 }
 
+// Render a formatted alert message block
 function renderAlert(alert, className = "") {
   if (!alert) {
     return null;
@@ -77,6 +78,7 @@ function renderAlert(alert, className = "") {
   );
 }
 
+// Render an inline field-level error message
 function renderFieldError(error) {
   if (!error) {
     return null;
@@ -90,6 +92,7 @@ export default function Profile() {
   const { logout, sessionProfile, sessionRole } = useAuth();
   const passwordPanelRef = useRef(null);
 
+  // Hooks
   const [profileView, setProfileView] = useState({
     name: "",
     dateOfBirth: "",
@@ -127,7 +130,8 @@ export default function Profile() {
   const [deleteModalError, setDeleteModalError] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
 
-  // Load real data when this part opens or changes.
+  // --- Lifecycle Hooks ---
+  // Fetch the user's basic profile details from Firestore when the component mounts
   useEffect(() => {
     let cancelled = false;
 
@@ -172,6 +176,7 @@ export default function Profile() {
     };
   }, [sessionProfile]);
 
+  // Fetch the user's list of matched friends/partners
   const loadFriends = useCallback(async () => {
     if (!sessionProfile) {
       setFriends([]);
@@ -197,6 +202,7 @@ export default function Profile() {
     loadFriends();
   }, [loadFriends]);
 
+  // --- Derived Data ---
   const friendCountLabel = useMemo(
     () => `${friends.length} friend${friends.length === 1 ? "" : "s"}`,
     [friends.length],
@@ -206,6 +212,8 @@ export default function Profile() {
     [profileView.status],
   );
 
+  // --- Form Validation & Handlers ---
+  // Validate the basic profile information form
   function validateBasicForm(nextForm = form) {
     const errors = {};
     if (!hasMeaningfulText(nextForm.name)) {
@@ -220,6 +228,7 @@ export default function Profile() {
     return errors;
   }
 
+  // Merge current form edits with original profile data
   function buildMergedProfileForm() {
     const source = originalProfile || profileView;
     return {
@@ -229,6 +238,7 @@ export default function Profile() {
     };
   }
 
+  // Handle toggling edit mode and saving profile changes
   async function handleProfileAction() {
     setProfileAlert(null);
     setFieldErrors({});
@@ -288,6 +298,7 @@ export default function Profile() {
     }
   }
 
+  // Handle the intent to save a new password (triggers validation and confirmation dialog)
   function handlePasswordSaveIntent() {
     if (!passwordPanelRef.current?.isExpanded()) {
       passwordPanelRef.current?.open();
@@ -302,6 +313,7 @@ export default function Profile() {
     setPasswordConfirmOpen(true);
   }
 
+  // Execute the confirmed password update
   async function handleConfirmPasswordSave() {
     setSavingPassword(true);
 
@@ -326,6 +338,7 @@ export default function Profile() {
     }
   }
 
+  // Handle the intent to delete the account, first checking if there are blocking reasons (like active bookings)
   async function handleDeleteIntent() {
     setDangerAlert(null);
     setBlockingReasons([]);
@@ -353,6 +366,7 @@ export default function Profile() {
     }
   }
 
+  // Execute the confirmed account deletion
   async function handleConfirmDeleteAccount() {
     setDeletingAccount(true);
     setDeleteModalError("");
@@ -369,6 +383,7 @@ export default function Profile() {
     }
   }
 
+  // Execute the removal of a friend from the partner list
   async function handleDeleteFriend() {
     if (!selectedFriend) {
       return;
@@ -400,6 +415,7 @@ export default function Profile() {
     }
   }
 
+  // Handle user sign out
   async function handleSignOut() {
     await logout();
     navigate(ROUTE_PATHS.LOGIN, { replace: true });
@@ -415,11 +431,14 @@ export default function Profile() {
     );
   }
 
+  /************************************************************************************ */
+  // Main Redering
   return (
     <div className="profile-page">
       <Toast toast={toast} onClose={() => setToast(null)} />
 
       <aside className="profile-sidebar">
+        {/* Sidebar: Branding and Navigation */}
         <Link className="profile-sidebar__brand" to={ROUTE_PATHS.FACILITIES}>
           <span>Sports Center</span>
           <span>Booking System</span>
@@ -440,6 +459,7 @@ export default function Profile() {
           </NavLink>
         </nav>
 
+        {/* Sidebar: Friends List */}
         <section className="profile-sidebar__friends">
           <div className="profile-sidebar__friendsHead">
             <span>My Partners</span>
@@ -478,6 +498,7 @@ export default function Profile() {
           </div>
           </section>
 
+          {/* Add a custumer contact */}
           <div className="profile-sidebar__footer">
             <div className="profile-sidebar__support" aria-label="Customer support phone">
               <span>Customer Support</span>
@@ -495,6 +516,7 @@ export default function Profile() {
           <p>Manage your personal details and account security.</p>
         </header>
 
+        {/* Basic Information Editor */}
         <section className="profile-card">
           <div className="profile-card__head">
             <div>
@@ -573,6 +595,7 @@ export default function Profile() {
           </div>
         </section>
 
+        {/* Password Management */}
         <section className="profile-card profile-card--password">
           <PasswordChangePanel
             ref={passwordPanelRef}
@@ -601,6 +624,7 @@ export default function Profile() {
           </div>
         </section>
 
+        {/* Account Information */}
         <section className="profile-card">
           <div className="profile-card__head">
             <div>
@@ -631,6 +655,7 @@ export default function Profile() {
           </div>
         </section>
 
+        {/*Account Delete*/}
         <section className="profile-card profile-card--danger">
           <div className="profile-card__head">
             <div>
@@ -663,6 +688,7 @@ export default function Profile() {
         </section>
       </main>
 
+      {/* Friend Profile Detail and Removal */}
       {selectedFriend ? (
         <div className="profile-modalOverlay" role="presentation">
           <div
@@ -761,6 +787,8 @@ export default function Profile() {
         </div>
       ) : null}
 
+      {/* Dialogs */}
+      {/* Confirm Account Deletion */}
       {deleteModalOpen ? (
         <ConfirmDialog
           open={deleteModalOpen}
@@ -782,6 +810,7 @@ export default function Profile() {
         </ConfirmDialog>
       ) : null}
 
+      {/* Confirm Password Change */}
       <ConfirmDialog
         open={passwordConfirmOpen}
         title="Confirm password update?"
@@ -797,6 +826,7 @@ export default function Profile() {
         onConfirm={handleConfirmPasswordSave}
       />
 
+      {/* Confirm Friend Removal */}
       <ConfirmDialog
         open={friendDeleteConfirmOpen && Boolean(selectedFriend)}
         title="Remove friend?"

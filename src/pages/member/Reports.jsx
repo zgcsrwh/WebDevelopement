@@ -1,5 +1,7 @@
 // This member page shows Reports content.
 import { useEffect, useMemo, useState } from "react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "../../provider/FirebaseConfig";
 import "../pageStyles.css";
 import "./memberWorkspace.css";
 import "./Reports.css";
@@ -12,6 +14,7 @@ import PageLayout from "../../components/common/PageLayout";
 
 const FAULT_PART_OPTIONS = ["light", "equipment", "surface", "electricity", "other"];
 
+// Initialize form state for a new repair ticket
 function getInitialForm() {
   return {
     facilityId: "",
@@ -20,6 +23,7 @@ function getInitialForm() {
   };
 }
 
+// Normalize various date formats
 function normalizeDateValue(value) {
   if (!value) {
     return 0;
@@ -38,6 +42,7 @@ function normalizeDateValue(value) {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
 
+// Error messages
 function mapReportSubmitError(error) {
   const code = String(getErrorCode(error) || "").toLowerCase();
   if (code.includes("invalid-argument")) {
@@ -47,13 +52,17 @@ function mapReportSubmitError(error) {
   return getActionErrorMessage(error, "repair.submit", "Unable to submit the repair ticket right now.");
 }
 
+// Format the string 
 function formatFaultyPart(type) {
   const raw = Array.isArray(type) ? type[0] : type;
   return toTitleText(String(raw || ""));
 }
 
 export default function Reports() {
+  // User authentication context
   const { sessionProfile } = useAuth();
+
+  // Hooks
   const [items, setItems] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [form, setForm] = useState(getInitialForm());
@@ -62,13 +71,15 @@ export default function Reports() {
     type: "",
     description: "",
   });
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Load real data when this part opens or changes.
+  // Fetch repair tickets and facilities data on component mount or when user changes
   useEffect(() => {
     let cancelled = false;
+    let unsubscribe = () => {};
 
     async function loadPage() {
       try {
@@ -90,16 +101,34 @@ export default function Reports() {
       }
     }
 
-    loadPage();
+    if (!sessionProfile?.id) {
+      setItems([]);
+      return;
+    }
+
+    // Mount Firebase real-time listener for current user's repair tickets
+    // That will happened when staff claim resolved facility repair, the page need re-redering
+    const q = query(collection(db, "repair"), where("member_id", "==", sessionProfile.id));
+    unsubscribe = onSnapshot(q, () => {
+      loadPage();
+    }, (err) => {
+      if (!cancelled) {
+        console.error("Real-time listener error:", err);
+        loadPage(); 
+      }
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe(); // Safely clean up the listener when the component unmounts
     };
   }, [sessionProfile]);
 
+  // Check if the current issue description exceeds the character limit
   const descriptionLength = countMeaningfulCharacters(form.description);
   const isDescriptionTooLong = descriptionLength > 500;
 
-  // Build the list that the user can see.
+  // Sort the repair items by creation date (newest first)
   const sortedItems = useMemo(() => {
     return [...items].sort((left, right) => {
       const leftTime = normalizeDateValue(left.raw?.created_at || left.createdAt);
@@ -108,6 +137,7 @@ export default function Reports() {
     });
   }, [items]);
 
+  // Handle individual field updates and clear associated validation errors
   function updateField(key, value) {
     if (key === "description" && countMeaningfulCharacters(value) > 500) {
       setFieldErrors((previous) => ({
@@ -131,10 +161,7 @@ export default function Reports() {
     setMessage("");
   }
 
-  async function refreshTickets() {
-    setItems(await getRepairTickets(sessionProfile));
-  }
-
+  // Handle the final form submission with validation checks
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
@@ -186,7 +213,6 @@ export default function Reports() {
         type: "",
         description: "",
       });
-      await refreshTickets();
       setMessage("Repair ticket submitted.");
     } catch (submitError) {
       setError(mapReportSubmitError(submitError));
@@ -195,6 +221,8 @@ export default function Reports() {
     }
   }
 
+  /**************************************************************************************** */
+  // Main Rendering */
   return (
     <PageLayout
       className="reports-page"

@@ -6,12 +6,7 @@ import "./memberWorkspace.css";
 import "./PartnerDetail.css";
 import PageLayout from "../../components/common/PageLayout";
 import { useAuth } from "../../provider/AuthContext";
-import {
-  getMatchRequests,
-  getPartnerProfiles,
-  respondToMatchRequest,
-  sendMatchRequest,
-} from "../../services/partnerService";
+import { getMatchRequests, getPartnerProfiles, respondToMatchRequest, sendMatchRequest, } from "../../services/partnerService";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getAvatarForActor } from "../../utils/avatar";
 import { getActionErrorMessage } from "../../utils/errors";
@@ -27,10 +22,13 @@ function formatAvailabilityEntry(value = "") {
     .join(" - ");
 }
 
+// This fucntion can only accessed from Partner Recmmendation page
 export default function PartnerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { sessionProfile } = useAuth();
+
+  // Hooks
   const [profile, setProfile] = useState(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [message, setMessage] = useState("");

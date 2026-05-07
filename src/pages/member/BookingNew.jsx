@@ -5,26 +5,18 @@ import "../pageStyles.css";
 import "./BookingNew.css";
 import PageLayout from "../../components/common/PageLayout";
 import { useAuth } from "../../provider/AuthContext";
-import {
-  getFacilityById,
-  getFacilityDateBounds,
-  getTimeSlotsByFacility,
-  submitBookingRequest,
-} from "../../services/bookingService";
+import { getFacilityById,getFacilityDateBounds,getTimeSlotsByFacility,submitBookingRequest,} from "../../services/bookingService";
 import { isFacilityBookable } from "../../services/centreService";
 import { getCurrentMatchProfile, getFriendProfiles } from "../../services/partnerService";
 import { ROUTE_PATHS, getFacilityDetailRoute } from "../../constants/routes";
 import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../../utils/text";
-import {
-  getFrontendBookableSlotStatus,
-  getLocalDateKey,
-  normalizeSlotClock,
-} from "../../utils/bookingSlotRules";
+import { getFrontendBookableSlotStatus, getLocalDateKey, normalizeSlotClock} from "../../utils/bookingSlotRules";
 
 const ACTIVITY_DESCRIPTION_MAX_LENGTH = 100;
 
+// Restrict the selected date within[minDate, maxDate]
 function clampDateToBounds(date, bounds) {
   if (!date) {
     return bounds.defaultDate || "";
@@ -38,6 +30,7 @@ function clampDateToBounds(date, bounds) {
   return date;
 }
 
+// Generate a summary label for the selected friends in the custom dropdown button
 function summarizeSelectedFriends(items = []) {
   if (!items.length) {
     return "Select partners...";
@@ -51,6 +44,7 @@ function summarizeSelectedFriends(items = []) {
   return `${items[0].nickname || items[0].name}, ${items[1].nickname || items[1].name} +${items.length - 2} more`;
 }
 
+// Error messages generation
 function mapBookingSubmitError(error) {
   const code = getErrorCode(error);
   if (code === "invalid-argument") {
@@ -65,6 +59,7 @@ function mapBookingSubmitError(error) {
   return getActionErrorMessage(error, "booking.submit", "Unable to submit the booking request.");
 }
 
+// Parse facility usage guidelines into an array of list items
 function parseGuidelines(value = "") {
   if (Array.isArray(value)) {
     return value.map((entry) => String(entry || "").trim()).filter(Boolean);
@@ -76,26 +71,32 @@ function parseGuidelines(value = "") {
     .filter(Boolean);
 }
 
+// Extract and format metadata for a friend
 function getFriendMeta(friend) {
   const sport = friend.sport || "Sports";
   const firstAvailability = Array.isArray(friend.availability) ? friend.availability[0] : "";
   return firstAvailability ? `${sport} - ${firstAvailability}` : sport;
 }
 
+// This function only can access from BookingDetail page's new booking button
 export default function BookingNew() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { sessionProfile } = useAuth();
   const inviteRef = useRef(null);
 
+  // Extract the pre-selected facility ID and date from URL query parameters
   const requestedFacilityId = params.get("facility") || "";
   const requestedDate = params.get("date") || "";
 
+  // Define component states for date boundaries, facility details, friends, form inputs, and validation errors
   const [dateBounds, setDateBounds] = useState({
     minDate: "",
     maxDate: "",
     defaultDate: "",
   });
+
+  // Hooks
   const [facility, setFacility] = useState(null);
   const [facilitySlots, setFacilitySlots] = useState([]);
   const [friends, setFriends] = useState([]);
@@ -113,7 +114,7 @@ export default function BookingNew() {
   const [descriptionError, setDescriptionError] = useState("");
   const [clockTick, setClockTick] = useState(Date.now());
 
-  // Load real data when this part opens or changes.
+  // Fetch the globally allowed booking date boundaries when the component mounts
   useEffect(() => {
     let cancelled = false;
 
@@ -153,14 +154,16 @@ export default function BookingNew() {
     };
   }, [requestedDate]);
 
+  // Setup a clock ticker to continuously refresh time slot availability
   useEffect(() => {
     const timer = window.setInterval(() => {
       setClockTick(Date.now());
-    }, 60 * 1000);
+    }, 60 * 1000); // every minute
 
     return () => window.clearInterval(timer);
   }, []);
 
+  // Fetch the facility details and available time slots whenever the date or facility ID changes
   useEffect(() => {
     if (!requestedFacilityId || !form.date) {
       setFacility(null);
@@ -215,6 +218,7 @@ export default function BookingNew() {
     };
   }, [form.date, requestedFacilityId]);
 
+  // Fetch the user's match profile and active friends list for partner invitations
   useEffect(() => {
     let cancelled = false;
 
@@ -235,6 +239,7 @@ export default function BookingNew() {
     };
   }, [sessionProfile]);
 
+  // Handle outside clicks and Escape key to close the custom invite dropdown
   useEffect(() => {
     if (!inviteOpen) {
       return undefined;
@@ -260,6 +265,9 @@ export default function BookingNew() {
     };
   }, [inviteOpen]);
 
+  // --- Use useMemo to cache derived data and optimize rendering performance ---
+  
+  // 1. Calculate bookable slot options based on real-time availability
   const slotOptions = useMemo(() => {
     if (!facility || !isFacilityBookable(facility.status)) {
       return [];
@@ -283,6 +291,7 @@ export default function BookingNew() {
     return slotOptions.find((slot) => slot.start === normalizedStartTime)?.end || "";
   }, [normalizedStartTime, slotOptions]);
 
+  // Limitation for attendees and friend invitations
   const attendeeCount = Math.max(Number(form.attendees) || 0, 0);
   const maxInvites = Math.max(attendeeCount - 1, 0);
   const remainingFriendSlots = Math.max(maxInvites - form.invitedPartners.length, 0);
@@ -295,12 +304,16 @@ export default function BookingNew() {
         ? "Increase total attendees above 1 to invite partners."
         : "";
 
+  // Open a dialog to invite friends
   const selectedFriends = useMemo(() => {
     const selectedIds = new Set(form.invitedPartners);
     return friends.filter((friend) => selectedIds.has(friend.id));
   }, [form.invitedPartners, friends]);
+
+  // Calc attendees
   const descriptionCount = countMeaningfulCharacters(form.activityDescription);
 
+  // Combine base booking rules with specific facility guidelines
   const ruleItems = useMemo(() => {
     const baseRules = ["Booking duration is fixed to 1 hour."];
     if (facility?.capacity) {
@@ -320,6 +333,7 @@ export default function BookingNew() {
     }
   }
 
+  // Handle changes to the activity description, enforcing the character limit
   function handleDescriptionChange(nextValue) {
     if (countMeaningfulCharacters(nextValue) > ACTIVITY_DESCRIPTION_MAX_LENGTH) {
       setDescriptionError(`Activity description cannot exceed ${ACTIVITY_DESCRIPTION_MAX_LENGTH} characters.`);
@@ -330,6 +344,7 @@ export default function BookingNew() {
     setFormValue("activityDescription", nextValue);
   }
 
+  // Toggle the selection state of a friend, ensuring the maximum invite limit is respected
   function handleFriendToggle(friendId) {
     const active = form.invitedPartners.includes(friendId);
     if (!active && form.invitedPartners.length >= maxInvites) {
@@ -346,6 +361,7 @@ export default function BookingNew() {
     }));
   }
 
+  // Form submission with validation checks
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
@@ -428,6 +444,8 @@ export default function BookingNew() {
     }
   }
 
+  // Main Redering
+  /********************************************************************************************** */
   return (
     <PageLayout
       className="booking-new-page"
@@ -444,8 +462,10 @@ export default function BookingNew() {
       ) : null}
 
       <div className="booking-new__layout">
+        {/* Left column: Main booking request form */}
         <form className="booking-new__card booking-new__card--form" onSubmit={handleSubmit}>
           <div className="booking-new__summary">
+            {/* Facility summary heading */}
             <div className="booking-new__summaryText">
               <h2>{facility?.name || "Selected Facility"}</h2>
               <p>{facility?.sportType || "Facility type will appear here"}</p>
@@ -465,6 +485,7 @@ export default function BookingNew() {
             </div>
           ) : null}
 
+          {/* Form grid: Date, Attendees, Time slots, Invitations, and Description */}
           <div className="booking-new__grid">
             <div className="booking-new__field">
               <label htmlFor="booking-date">
@@ -562,6 +583,7 @@ export default function BookingNew() {
               />
             </div>
 
+            {/* Custom dropdown for inviting matched friends */}
             <div className="booking-new__field booking-new__field--full" ref={inviteRef}>
               <label htmlFor="booking-invite-button">
                 Invite Partners <span className="booking-new__labelNote">(They will receive a notification)</span>
@@ -673,6 +695,7 @@ export default function BookingNew() {
           </div>
         </form>
 
+        {/* A Booking rules sidebar on the right panel*/}
         <aside className="booking-new__card booking-new__card--rules">
           <h2>Booking Rules</h2>
           <ul className="booking-new__rulesList">

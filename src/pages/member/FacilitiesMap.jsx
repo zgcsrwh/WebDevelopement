@@ -1,4 +1,8 @@
 // This member page shows FacilitiesMap content.
+// It will displat the facilities on map based on Google Map returned location data
+
+// Referecne https://leafletjs.cn/examples/quick-start/example.html
+// 
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -69,7 +73,8 @@ const SPORT_ICONS = {
 };
 
 
-// Extract venue name from facility name:"Jubilee Sport and Recreation Centre-Basketball Court A" -> "Jubilee Sport and Recreation Centre"
+// Extract venue name from facility name
+// "Jubilee Sport and Recreation Centre-Basketball Court A" -> "Jubilee Sport and Recreation Centre"
 function extractVenueName(facilityName) {
   if (!facilityName) return "";
   
@@ -126,9 +131,7 @@ async function geocodeVenue(venueName) {
   }
 }
 
-/**
- * Process facilities and group by venue location
- */
+// Group facilities that locate in the same place
 async function processAndGroupFacilities(facilities) {
   // Group facilities by venue name
   const venueGroups = new Map();
@@ -225,20 +228,14 @@ export default function FacilitiesMap() {
         // Load facilities from Firebase
         const today = getLocalDateKey();
         const facilities = await getFacilities(today);
-        const facilitiesWithSlots = await Promise.all(
-          facilities.map(async (facility) => ({
-            ...facility,
-            memberTimeSlots: await getTimeSlotsByFacility(facility.id, today),
-          })),
-        );
-        
+
         if (!isActive) return;
         
-        setAllFacilities(facilitiesWithSlots);
+        setAllFacilities(facilities);
         setGeocodingStatus("Loading map data, please wait...");
         
         // Try to geocode venues
-        const locations = await processAndGroupFacilities(facilitiesWithSlots);
+        const locations = await processAndGroupFacilities(facilities);
         
         if (!isActive) return;
         
@@ -296,7 +293,7 @@ export default function FacilitiesMap() {
   }
 
   
-// Return icon for the first sport type found in the list
+// Get the display icon based on type
 function getIconForSportTypes(sportTypes) {
   for (const type of sportTypes) {
     if (SPORT_ICONS[type]) {
@@ -321,6 +318,8 @@ function getIconForSportTypes(sportTypes) {
     navigate(getBookingNewRoute({ facilityId: facility.id, date: today }));
   }
 
+  /********************************************************************************************** */
+  // 
   return (
     <PageLayout
       className="facilities-map-page"

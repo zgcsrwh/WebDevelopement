@@ -11,6 +11,7 @@ import { ROUTE_PATHS } from "../../constants/routes";
 import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus } from "../../utils/presentation";
 
+// The facility statuses list
 const BOOKING_DETAIL_VISIBLE_STATUSES = new Set([
   "pending",
   "rejected",
@@ -21,6 +22,7 @@ const BOOKING_DETAIL_VISIBLE_STATUSES = new Set([
   "no_show",
 ]);
 
+// Format the date and time to YYYY-MM-DD HH:mm
 function formatDateTime(value) {
   if (!value) {
     return "Not available";
@@ -39,6 +41,8 @@ function formatDateTime(value) {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
+// Normalize Status parameter
+// Staff approve function will changed the request status as accepted
 function normalizeStatus(value = "") {
   const normalized = String(value || "")
     .trim()
@@ -66,6 +70,7 @@ function normalizeStatus(value = "") {
   return normalized;
 }
 
+// Get status pill class
 function getStatusPillClass(status) {
   if (status === "upcoming") {
     return "booking-detail-card__status booking-detail-card__status--success";
@@ -79,11 +84,13 @@ function getStatusPillClass(status) {
   return "booking-detail-card__status booking-detail-card__status--neutral";
 }
 
+// Extract and format the staff feedback, providing a fallback message if empty
 function getStaffFeedback(feedback = "") {
   const text = String(feedback || "").trim();
   return text || "No staff response available.";
 }
 
+// Generate the configuration for the status notice panel (tone, title, body, and action visibility) based on booking status
 function getStatusNotice(status) {
   if (status === "alternative suggested") {
     return {
@@ -156,18 +163,24 @@ function getStatusNotice(status) {
   };
 }
 
+// Core function : This page is only accesed through Facilities.jsx
 export default function BookingDetail() {
+
+  // Extract the booking record ID from the URL routing parameters
   const { id } = useParams();
+
+  // Retrieve the current authenticated user's session profile
   const { sessionProfile } = useAuth();
+
+  // Define component states for booking data, errors, and loading status
   const [booking, setBooking] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Load real data when this part opens or changes.
+  // Fetch the booking details from the database
   useEffect(() => {
     let cancelled = false;
-
-    setLoading(true);
+    setLoading(true); 
     getBookingById(id, sessionProfile)
       .then((nextBooking) => {
         if (!cancelled) {
@@ -192,7 +205,10 @@ export default function BookingDetail() {
     };
   }, [id, sessionProfile]);
 
+
+  // Normalize the booking status text
   const normalizedStatus = useMemo(() => normalizeStatus(booking?.status), [booking?.status]);
+  // Format the facility name (combining with sport type if available)
   const facilityLabel = useMemo(() => {
     if (!booking) {
       return "Not available";
@@ -208,8 +224,14 @@ export default function BookingDetail() {
 
     return booking.facilityName || "Not available";
   }, [booking]);
+
+  // Generate the status notice configuration based on the current status
   const statusNotice = useMemo(() => getStatusNotice(normalizedStatus), [normalizedStatus]);
+
+  // Extract the staff approval feedback
   const staffFeedback = useMemo(() => getStaffFeedback(booking?.feedback), [booking?.feedback]);
+
+  // Filter and extract invited participants (removing duplicates and the applicant)
   const invitedFriendNames = useMemo(() => {
     const applicantName = String(booking?.memberName || "").trim().toLowerCase();
     const names = Array.isArray(booking?.participantNames) ? booking.participantNames : [];
@@ -221,6 +243,7 @@ export default function BookingDetail() {
       .filter((name) => name.toLowerCase() !== applicantName);
   }, [booking?.memberName, booking?.participantNames]);
 
+  // Page Rendering Implementation
   if (loading) {
     return (
       <PageLayout className="booking-detail-page">
@@ -252,6 +275,7 @@ export default function BookingDetail() {
     );
   }
 
+  // Prevent rendering if the status is invalid or no longer visible to the user
   if (!BOOKING_DETAIL_VISIBLE_STATUSES.has(normalizedStatus)) {
     return (
       <PageLayout className="booking-detail-page" backTo={ROUTE_PATHS.BOOKINGS} backLabel="Back to my bookings">
@@ -263,6 +287,7 @@ export default function BookingDetail() {
     );
   }
 
+  // Main Rendering
   return (
     <PageLayout
       className="booking-detail-page"
@@ -270,6 +295,8 @@ export default function BookingDetail() {
       backLabel="Back to my bookings"
       title="Booking Details"
     >
+
+      {/* List Heading */}
       <article className="booking-detail-card">
         <section className="booking-detail-card__section booking-detail-card__section--heading">
           <div>
@@ -278,6 +305,7 @@ export default function BookingDetail() {
           <span className={getStatusPillClass(normalizedStatus)}>{displayStatus(normalizedStatus || "unknown")}</span>
         </section>
 
+        {/* Booking Cards */}
         <section className="booking-detail-card__section booking-detail-card__section--grid">
           <div className="booking-detail-card__infoItem">
             <label>Booking ID</label>
@@ -309,11 +337,13 @@ export default function BookingDetail() {
           </div>
         </section>
 
+        {/* Activity description area */}
         <section className="booking-detail-card__section booking-detail-card__section--description">
           <label>Activity Description</label>
           <p>{booking.activityDescription || "No activity description was provided for this booking request."}</p>
         </section>
 
+        {/* Display articipants */}
         <section className="booking-detail-card__section booking-detail-card__section--participants">
           <label>Participants</label>
           <div className="booking-detail-card__participantsGrid">
@@ -337,6 +367,7 @@ export default function BookingDetail() {
           </div>
         </section>
 
+        {/* Staff feedback */}
         <section className="booking-detail-card__section booking-detail-card__section--statusNote">
           <div className={`booking-detail-card__notice booking-detail-card__notice--${statusNotice.tone}`}>
             <strong>{statusNotice.title}</strong>
@@ -348,6 +379,7 @@ export default function BookingDetail() {
             <p>{staffFeedback}</p>
           </div>
 
+          {/* Only when response status is altered suggested, this button will display */}
           {statusNotice.showAction ? (
             <div className="booking-detail-card__actions">
               <Link className="btn booking-detail-card__actionButton" to={ROUTE_PATHS.FACILITIES}>

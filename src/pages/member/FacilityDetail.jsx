@@ -1,6 +1,6 @@
-// This member page shows FacilityDetail content.
+// This member page shows facility detail content.
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import "../pageStyles.css";
 import "./FacilityDetail.css";
 import PageLayout from "../../components/common/PageLayout";
@@ -10,6 +10,7 @@ import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
 import { getFrontendBookableSlotStatus, getLocalDateKey } from "../../utils/bookingSlotRules";
 
+// Parse and format the facility heading, separating the court number or sport type if necessary
 function buildFacilityHeading(name = "", sportType = "") {
   const normalizedName = String(name || "").trim();
   const normalizedSportType = String(sportType || "").trim();
@@ -35,6 +36,7 @@ function buildFacilityHeading(name = "", sportType = "") {
   };
 }
 
+// Extract and format the usage guidelines into an array of list items
 function buildGuidelineItems(text = "") {
   const source = String(text || "").trim();
   if (!source) {
@@ -47,6 +49,7 @@ function buildGuidelineItems(text = "") {
     .filter(Boolean);
 }
 
+// Format the selected date for display (e.g., "01 Jan 2024")
 function formatDateLabel(value = "") {
   if (!value) {
     return "";
@@ -65,20 +68,25 @@ function formatDateLabel(value = "") {
 }
 
 export default function FacilityDetail() {
+  // Extract the facility ID from the URL routing parameters
   const { id } = useParams();
+  // Retrieve the pre-selected date from the URL query parameters, if available
+  const [searchParams, setSearchParams] = useSearchParams();
+  const passedDate = searchParams.get("date");
+  // Define component states for date boundaries, selected date, facility data, time slots, and status
   const [dateBounds, setDateBounds] = useState({
     minDate: "",
     maxDate: "",
     defaultDate: "",
   });
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(passedDate || "");
   const [facility, setFacility] = useState(null);
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [clockTick, setClockTick] = useState(Date.now());
 
-  // Load real data when this part opens or changes.
+  // Fetch the globally allowed date boundaries when the component mounts
   useEffect(() => {
     let isActive = true;
 
@@ -108,6 +116,7 @@ export default function FacilityDetail() {
     };
   }, []);
 
+  // Setup a clock ticker to refresh slot availability continuously (every minute)
   useEffect(() => {
     const timer = window.setInterval(() => {
       setClockTick(Date.now());
@@ -116,6 +125,7 @@ export default function FacilityDetail() {
     return () => window.clearInterval(timer);
   }, []);
 
+  // Action when selecting a facility
   useEffect(() => {
     if (!selectedDate) {
       return undefined;
@@ -168,6 +178,7 @@ export default function FacilityDetail() {
     };
   }, [id, selectedDate]);
 
+  // Calculate currently bookable slots based on facility status and real-time clock
   const bookableSlots = useMemo(() => {
     if (facility?.status !== "normal") {
       return [];
@@ -176,6 +187,7 @@ export default function FacilityDetail() {
     return slots.filter((slot) => getFrontendBookableSlotStatus(slot, selectedDate, now).bookable);
   }, [clockTick, facility?.status, selectedDate, slots]);
 
+  // Display loading state while fetching initial data
   if (loading) {
     return (
       <PageLayout className="facility-detail-page">
@@ -187,6 +199,7 @@ export default function FacilityDetail() {
     );
   }
 
+  // Display error message or empty state if the facility cannot be loaded
   if (error || !facility) {
     return (
       <PageLayout className="facility-detail-page" backTo={ROUTE_PATHS.FACILITIES} backLabel="Back to Facilities">
@@ -198,10 +211,14 @@ export default function FacilityDetail() {
     );
   }
 
+  // Prepare structured layout properties
   const facilityHeading = buildFacilityHeading(facility.name, facility.sportType);
   const guidelineItems = buildGuidelineItems(facility.usageGuidelines);
+  
+  // Determine if the facility can be booked based on status and slot availability
   const canBook = facility.status === "normal" && bookableSlots.length > 0;
 
+  // Main Rendering
   return (
     <PageLayout
       className="facility-detail-page"
@@ -216,6 +233,7 @@ export default function FacilityDetail() {
       }
     >
       <article className="facility-detail-card">
+        {/* Basic information grid (Sport type, Capacity, Operating hours, Location) */}
         <section className="facility-detail-card__section facility-detail-card__section--info">
           <div className="facility-detail-card__infoItem facility-detail-card__infoItem--blue">
             <span className="facility-detail-card__infoLabel">Sport type</span>
@@ -237,6 +255,7 @@ export default function FacilityDetail() {
           </div>
         </section>
 
+        {/* Description and usage guidelines */}
         <section className="facility-detail-card__section facility-detail-card__section--text">
           <div className="facility-detail-card__textBlock">
             <h2>Description</h2>
@@ -257,6 +276,7 @@ export default function FacilityDetail() {
           </div>
         </section>
 
+        {/* Date and time slot */}
         <section className="facility-detail-card__section facility-detail-card__section--availability">
           <div className="facility-detail-card__availabilityHead">
             <h2>Booking Availability</h2>
@@ -269,7 +289,11 @@ export default function FacilityDetail() {
                 value={selectedDate}
                 min={dateBounds.minDate}
                 max={dateBounds.maxDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
+                onChange={(event) => {
+                  const newDate = event.target.value;
+                  setSelectedDate(newDate);
+                  setSearchParams({ date: newDate }, { replace: true });
+                }}
               />
             </div>
           </div>
@@ -310,6 +334,7 @@ export default function FacilityDetail() {
           </div>
         </section>
 
+        {/* Booking button */}
         <section className="facility-detail-card__section facility-detail-card__section--footer">
           {canBook && (
             <Link className="btn" to={getBookingNewRoute({ facilityId: facility.id, date: selectedDate })}>

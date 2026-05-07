@@ -1,15 +1,12 @@
-// This member page shows MyBookings content.
+// This member page shows historica bookings content.
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "../../provider/FirebaseConfig";
 import "../pageStyles.css";
 import "./memberWorkspace.css";
 import "./MyBookings.css";
-import {
-  cancelConfirmedBooking,
-  getBookings,
-  isBookingCancellationAllowed,
-  withdrawPendingBooking,
-} from "../../services/bookingService";
+import { cancelConfirmedBooking, getBookings, isBookingCancellationAllowed, withdrawPendingBooking,} from "../../services/bookingService";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS, getBookingDetailRoute } from "../../constants/routes";
 import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
@@ -21,6 +18,8 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Toast from "../../components/common/Toast";
 
 const ALL_STATUS_VALUE = "all";
+
+// Request status
 const BOOKING_STATUS_OPTIONS = [
   "pending",
   "rejected",
@@ -32,6 +31,7 @@ const BOOKING_STATUS_OPTIONS = [
 ];
 const BOOKING_VISIBLE_STATUS_SET = new Set(BOOKING_STATUS_OPTIONS);
 
+// Generate a date string (YYYY-MM-DD) offset by a specific number of days from today
 function getDateInputKey(daysFromToday = 0) {
   const date = new Date();
   date.setDate(date.getDate() + daysFromToday);
@@ -41,8 +41,10 @@ function getDateInputKey(daysFromToday = 0) {
   return `${year}-${month}-${day}`;
 }
 
+// The maximum allowed date for booking activity filtering (7 days from today)
 const MAX_ACTIVITY_DATE_KEY = getDateInputKey(7);
 
+// Normalize the booking status string to match backend values
 function normalizeBookingStatus(value = "") {
   const source = Array.isArray(value) ? value.find(Boolean) : value;
   const normalized = String(source || "")
@@ -71,6 +73,7 @@ function normalizeBookingStatus(value = "") {
   return normalized;
 }
 
+// Standardize the date format to YYYY-MM-DD
 function normalizeDateKey(value = "") {
   const source = String(value || "").trim();
   if (!source) {
@@ -89,6 +92,7 @@ function normalizeDateKey(value = "") {
   return parsed.toISOString().slice(0, 10);
 }
 
+// Standardize the time format to HH:MM
 function normalizeTimeValue(value = "") {
   const source = String(value || "").trim();
   if (!source) {
@@ -106,12 +110,14 @@ function normalizeTimeValue(value = "") {
   return source.slice(0, 5);
 }
 
+// Convert a time string into minutes from midnight for sorting
 function toSortableHour(value = "") {
   const normalized = normalizeTimeValue(value);
   const [hours = "0", minutes = "0"] = normalized.split(":");
   return Number(hours) * 60 + Number(minutes);
 }
 
+// Sort bookings by date (newest first), then by time, then by creation time
 function sortBookingsNewestFirst(items) {
   return [...items].sort((left, right) => {
     const leftDate = normalizeDateKey(left.date);
@@ -132,6 +138,7 @@ function sortBookingsNewestFirst(items) {
   });
 }
 
+// Format the booking title, combining facility name and sport type
 function formatTitle(booking) {
   const facilityName = String(booking.facilityName || "Facility").trim();
   const sportType = String(booking.sportType || "").trim();
@@ -147,12 +154,14 @@ function formatTitle(booking) {
   return `${facilityName} - ${sportType}`;
 }
 
+// Format the combined date and time string for display
 function formatDateTimeLine(booking) {
   const date = normalizeDateKey(booking.date) || "Unknown date";
   const time = booking.time || `${normalizeTimeValue(booking.startTime || booking.raw?.start_time)} - ${normalizeTimeValue(booking.endTime || booking.raw?.end_time)}`;
   return `${date} | ${time}`;
 }
 
+// Map backend action errors to user-friendly messages for withdraw/cancel actions
 function mapBookingActionError(action, error) {
   const code = getErrorCode(error);
 
@@ -184,7 +193,10 @@ function mapBookingActionError(action, error) {
 }
 
 export default function MyBookings() {
+  // User authentication context
   const { sessionProfile } = useAuth();
+  
+  // Hooks
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -196,15 +208,14 @@ export default function MyBookings() {
   // Load real data when this part opens or changes.
   useEffect(() => {
     let cancelled = false;
+    let unsubscribe = () => {};
+    let isInitialLoad = true;
 
     async function loadItems() {
-      if (!sessionProfile?.id) {
-        setItems([]);
-        setLoading(false);
-        return;
+      // To prevent screen flickering on every background data change, only show loading state on the initial load
+      if (isInitialLoad) {
+        setLoading(true);
       }
-
-      setLoading(true);
       try {
         const nextItems = await getBookings(sessionProfile);
         if (!cancelled) {
@@ -219,13 +230,32 @@ export default function MyBookings() {
       } finally {
         if (!cancelled) {
           setLoading(false);
+          isInitialLoad = false;
         }
       }
     }
 
-    loadItems();
+    if (!sessionProfile?.id) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
+    // Real-time listener for requests
+    // When the status of reqests changed, the page needs re-resering
+    const q = query(collection(db, "request"), where("member_id", "==", sessionProfile.id));
+    unsubscribe = onSnapshot(q, () => {
+      loadItems(); 
+    }, (err) => {
+      if (!cancelled) {
+        console.error("Real-time listener error:", err);
+        loadItems(); 
+      }
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [sessionProfile]);
 
@@ -251,34 +281,22 @@ export default function MyBookings() {
     });
   }, [filters, items]);
 
-  async function refreshBookings(successMessage = "") {
-    setLoading(true);
-    try {
-      const nextItems = await getBookings(sessionProfile);
-      setItems(sortBookingsNewestFirst(nextItems));
-      if (successMessage) {
-        setToast({ tone: "success", title: "Updated", message: successMessage });
-      }
-      setError("");
-    } catch (loadError) {
-      setError(getActionErrorMessage(loadError, "booking.load", "Unable to refresh your booking list right now."));
-    } finally {
-      setLoading(false);
-    }
-  }
 
+  // Reset the status and date filters to their default values
   function handleClearFilters() {
     const nextFilters = { status: ALL_STATUS_VALUE, date: "" };
     setFilters(nextFilters);
     setToast(null);
   }
 
+  // Open the confirmation dialog for a specific action (withdraw/cancel)
   function handleRequestAction(type, booking) {
     setError("");
     setToast(null);
     setPendingAction({ type, booking });
   }
 
+  // Execute the confirmed action (withdraw/cancel) on the selected booking
   async function handleConfirmAction() {
     if (!pendingAction?.booking) {
       return;
@@ -291,7 +309,8 @@ export default function MyBookings() {
       if (type === "withdraw") {
         await withdrawPendingBooking(booking.id, sessionProfile);
         setPendingAction(null);
-        await refreshBookings("The booking request was withdrawn successfully.");
+        // Since onSnapshot is active, Firestore changes will automatically trigger a data refresh; no need to manually call refreshBookings
+        setToast({ tone: "success", title: "Updated", message: "The booking request was withdrawn successfully." });
         return;
       }
 
@@ -302,7 +321,7 @@ export default function MyBookings() {
 
         await cancelConfirmedBooking(booking.id, sessionProfile);
         setPendingAction(null);
-        await refreshBookings("The booking was cancelled successfully.");
+        setToast({ tone: "success", title: "Updated", message: "The booking was cancelled successfully." });
       }
     } catch (actionError) {
       setToast({
@@ -316,6 +335,8 @@ export default function MyBookings() {
     }
   }
 
+  /****************************************************************************************88 */
+  // Main Rendering
   return (
     <PageLayout
       className="my-bookings-page"
@@ -336,6 +357,7 @@ export default function MyBookings() {
         </div>
       ) : null}
 
+      {/* Filters section */}
       <FilterPanel
         className="my-bookings__filters"
         columns={2}
@@ -373,6 +395,7 @@ export default function MyBookings() {
           </FilterField>
       </FilterPanel>
 
+      {/* Booking records list */}
       <section className="my-bookings__list" aria-live="polite">
         {loading ? (
           <article className="member-empty my-bookings__empty">
@@ -387,6 +410,7 @@ export default function MyBookings() {
             return (
               <article key={booking.id} className="my-bookings__item">
                 <div className="my-bookings__itemMain">
+                  {/* Basic info displaying Title, Date, and Created time */}
                   <div className="my-bookings__itemTop">
                     <div className="my-bookings__itemHeading">
                       <h3>{formatTitle(booking)}</h3>
@@ -399,6 +423,7 @@ export default function MyBookings() {
                 </div>
 
                 <div className="my-bookings__itemControls">
+                  {/* Booking status pill and action buttons */}
                   <span className={`status-pill ${statusTone(status)}`}>{displayStatus(status)}</span>
 
                   <div className="my-bookings__itemActions">
@@ -437,6 +462,7 @@ export default function MyBookings() {
         )}
       </section>
 
+      {/* Action confirmation dialog */}
       <ConfirmDialog
         open={Boolean(pendingAction)}
         title={

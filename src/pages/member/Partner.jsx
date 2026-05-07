@@ -28,6 +28,7 @@ const PARTNER_PAGE_TITLE = "Match Profile";
 const PARTNER_PAGE_SUBTITLE =
   "Create your public profile to find sports partners. Your real name and contact details will remain strictly confidential.";
 
+// Initialize an empty form state for a new partner profile
 function createEmptyForm() {
   return {
     nickname: "",
@@ -37,6 +38,7 @@ function createEmptyForm() {
   };
 }
 
+// Map a saved partner profile from the database into the local form state structure
 function createFormFromProfile(profile) {
   if (!profile) {
     return createEmptyForm();
@@ -50,6 +52,7 @@ function createFormFromProfile(profile) {
   };
 }
 
+// Generate the default draft state for a new availability entry
 function createAvailabilityDraft() {
   return {
     day: DAY_OPTIONS[0],
@@ -57,12 +60,14 @@ function createAvailabilityDraft() {
   };
 }
 
+// Format a raw availability string (e.g., "monday_morning") into a display label (e.g., "Monday - Morning")
 function formatAvailabilityLabel(value = "") {
   const [day = "", ...periodParts] = String(value).split("_");
   const period = periodParts.join("_");
   return `${toTitleText(day)} - ${toTitleText(period)}`;
 }
 
+// Validate the partner profile form, returning an object of field-specific error messages
 function validatePartnerForm(form) {
   const errors = {};
 
@@ -95,6 +100,7 @@ function validatePartnerForm(form) {
   return errors;
 }
 
+// Check if a persisted profile contains all required fields to enable matching
 function isPersistedProfileComplete(profile) {
   if (!profile) {
     return false;
@@ -110,6 +116,7 @@ function isPersistedProfileComplete(profile) {
   );
 }
 
+// Retrieve the source URL for the currently selected avatar
 function getPreviewAvatar(avatarOptions, selectedAvatarId) {
   return (
     avatarOptions.find((option) => option.id === selectedAvatarId)?.src ||
@@ -122,6 +129,8 @@ export default function Partner() {
   const { sessionProfile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Component states and hooks
   const avatarOptions = useMemo(() => getAvatarOptions(), []);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
@@ -137,7 +146,7 @@ export default function Partner() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Load real data when this part opens or changes.
+  // Fetch the user's match profile and available sport types on component mount
   useEffect(() => {
     let cancelled = false;
 
@@ -189,6 +198,7 @@ export default function Partner() {
     };
   }, [avatarOptions, sessionProfile]);
 
+  // Check for redirected error messages (e.g., if the user tried to access Discover without an active profile)
   useEffect(() => {
     if (!location.state?.partnerError) {
       return;
@@ -199,11 +209,14 @@ export default function Partner() {
     navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
 
+  // --- Derived Data & Computed States ---
   const previewAvatar = getPreviewAvatar(avatarOptions, selectedAvatarId);
   const bioLength = countMeaningfulCharacters(form.selfDescription);
   const previewInterests = form.interests;
   const previewAvailability = form.availableTime.map((value) => formatAvailabilityLabel(value));
 
+  // --- Event Handlers ---
+  // Generic field update handler with specific length validation for the bio
   function updateField(key, value) {
     if (key === "selfDescription" && countMeaningfulCharacters(value) > 150) {
       setFieldErrors((previous) => ({
@@ -221,6 +234,7 @@ export default function Partner() {
     setForm((previous) => ({ ...previous, [key]: value }));
   }
 
+  // Toggle a sport interest on or off in the form state
   function toggleInterest(value) {
     setFieldErrors((previous) => ({ ...previous, interests: "" }));
     setError("");
@@ -236,6 +250,7 @@ export default function Partner() {
     });
   }
 
+  // Add the currently drafted availability option to the form, validating against duplicates and limits
   function addAvailabilityOption() {
     const nextValue = `${availabilityDraft.day}_${availabilityDraft.period}`;
     const hasExactDuplicate = form.availableTime.includes(nextValue);
@@ -266,6 +281,7 @@ export default function Partner() {
     }));
   }
 
+  // Remove a specific availability option from the form
   function removeAvailabilityOption(value) {
     setFieldErrors((previous) => ({ ...previous, availableTime: "" }));
     setError("");
@@ -276,6 +292,7 @@ export default function Partner() {
     }));
   }
 
+  // Merge the current form state with the original profile to create the final payload
   function buildMergedMatchForm() {
     return {
       nickname: form.nickname ?? originalMatchProfile.nickname ?? "",
@@ -285,6 +302,7 @@ export default function Partner() {
     };
   }
 
+  // Save the updated profile to the database
   async function handleSave() {
     const mergedForm = buildMergedMatchForm();
     const validationErrors = validatePartnerForm(mergedForm);
@@ -323,6 +341,7 @@ export default function Partner() {
     }
   }
 
+  // Toggle the "Enable Partner Matching" status, ensuring the profile is complete first
   async function handleToggleMatching() {
     setError("");
     setMessage("");
@@ -351,6 +370,7 @@ export default function Partner() {
     }
   }
 
+  // Navigate to the Discover page to view partner recommendations
   function handleViewRecommendations() {
     if (!enabled) {
       setError("Please complete your profile and enable matching first.");
@@ -360,6 +380,7 @@ export default function Partner() {
 
     navigate(ROUTE_PATHS.PARTNER_DISCOVER);
   }
+
 
   if (loading) {
     return (
@@ -389,6 +410,8 @@ export default function Partner() {
     );
   }
 
+  /*********************************************************************************** */
+  // Main Rendering-
   return (
     <PageLayout
       className="partner-page"
@@ -396,7 +419,9 @@ export default function Partner() {
       subtitle={PARTNER_PAGE_SUBTITLE}
     >
       <div className="partner-page__layout">
+        {/* Left column: Profile Editor */}
         <article className="partner-card partner-card--editor">
+          {/* Toggle switch for enabling/disabling partner matching */}
           <div className="partner-card__toggleRow">
             <div>
               <h2>Enable Partner Matching</h2>
@@ -418,6 +443,7 @@ export default function Partner() {
           {error ? <div className="errorMessage partner-card__message">{error}</div> : null}
           {message ? <div className="successMessage partner-card__message">{message}</div> : null}
 
+          {/* Avatar selection section */}
           <div className="partner-avatarSection">
             <div className="partner-avatarSection__circle">
               {previewAvatar ? <img alt={form.nickname || "Profile avatar"} src={previewAvatar} /> : null}
@@ -449,6 +475,7 @@ export default function Partner() {
             ) : null}
           </div>
 
+          {/* Basic information fields (Nickname, Bio) */}
           <div className="partner-formField">
             <label htmlFor="partner-nickname">Display Nickname</label>
             <input
@@ -478,6 +505,7 @@ export default function Partner() {
             ) : null}
           </div>
 
+          {/* Sports interests multi-select */}
           <div className="partner-formField">
             <label>Sports Interests</label>
             <div className="partner-interestList">
@@ -495,6 +523,7 @@ export default function Partner() {
             {fieldErrors.interests ? <p className="partner-formField__error">{fieldErrors.interests}</p> : null}
           </div>
 
+          {/* Availability time slot builder */}
           <div className="partner-formField">
             <div className="partner-formField__head">
               <label>Availability</label>
@@ -557,6 +586,7 @@ export default function Partner() {
           </div>
         </article>
 
+        {/*  Live Preview Sidebar in the right panel*/}
         <aside className="partner-sidebar">
           <div className="partner-previewHeader">
             <button

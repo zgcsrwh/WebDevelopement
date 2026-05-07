@@ -1,14 +1,11 @@
 // This member page shows Facilities content.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "../../provider/FirebaseConfig";
 import "../pageStyles.css";
 import "./Facilities.css";
-import {
-  getFacilities,
-  getFacilityDateBounds,
-  getFacilitySportTypes,
-  getTimeSlotsByFacility,
-} from "../../services/bookingService";
+import { getFacilities, getFacilityDateBounds, getFacilitySportTypes, getTimeSlotsByFacility} from "../../services/bookingService";
 import { getBookingNewRoute, getFacilityDetailRoute, ROUTE_PATHS } from "../../constants/routes";
 import { getActionErrorMessage } from "../../utils/errors";
 import { displayStatus, statusTone } from "../../utils/presentation";
@@ -30,18 +27,22 @@ const AVAILABILITY_OPTIONS = [
   { value: "fixing", label: "Fixing" },
 ];
 
+// Sort an array of strings alphabetically
 function sortAlphabetically(values) {
   return [...values].sort((left, right) => left.localeCompare(right));
 }
 
+// Normalize a facility type string for comparison (lowercase, trimmed)
 function normalizeFacilityType(value = "") {
   return String(value || "").trim().toLowerCase();
 }
 
+// Format a facility type string for display
 function formatFacilityType(value = "") {
   return String(value || "").trim();
 }
 
+// Sort time slot strings chronologically based on the starting hour
 function sortTimeSlots(slots = []) {
   return [...slots].sort((left, right) => {
     const leftStart = Number(String(left).slice(0, 2));
@@ -50,6 +51,7 @@ function sortTimeSlots(slots = []) {
   });
 }
 
+// Extract and format the labels of currently bookable time slots
 function getBookableTimeSlotLabels(slots = [], selectedDate = "", now = new Date()) {
   const labels = slots
     .filter((slot) => getFrontendBookableSlotStatus(slot, selectedDate, now).bookable)
@@ -63,6 +65,7 @@ function getBookableTimeSlotLabels(slots = [], selectedDate = "", now = new Date
   return sortTimeSlots([...new Set(labels)]);
 }
 
+// Generate a unique list of available time slots across all facilities matching the selected type
 function getTimeOptions(items = [], selectedType = "All") {
   const normalizedSelectedType = normalizeFacilityType(selectedType);
   const scopedItems =
@@ -78,6 +81,7 @@ function getTimeOptions(items = [], selectedType = "All") {
   return ["All", ...sortTimeSlots([...timeSlots])];
 }
 
+// Format a date string  into a readable label
 function formatDateLabel(value = "") {
   if (!value) {
     return "";
@@ -97,11 +101,15 @@ function formatDateLabel(value = "") {
 
 export default function Facilities() {
   const navigate = useNavigate();
+  
+  // Define component states for date boundaries, filter options, facility data, and UI feedback
   const [dateBounds, setDateBounds] = useState({
     minDate: "",
     maxDate: "",
     defaultDate: "",
   });
+
+  // Hooks
   const [sportTypeOptions, setSportTypeOptions] = useState(["All"]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,15 +117,16 @@ export default function Facilities() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [clockTick, setClockTick] = useState(Date.now());
 
-  // Load real data when this part opens or changes.
+  // Setup a clock ticker to continuously refresh time slot availability 
   useEffect(() => {
     const timer = window.setInterval(() => {
       setClockTick(Date.now());
-    }, 60 * 1000);
+    }, 60 * 1000); // every minute
 
     return () => window.clearInterval(timer);
   }, []);
 
+  // Fetch the globally allowed date boundaries and facility sport types when the component mounts
   useEffect(() => {
     let isActive = true;
 
@@ -165,15 +174,21 @@ export default function Facilities() {
     };
   }, []);
 
+  // Listen for status changes for facility status
+  
   useEffect(() => {
     if (!filters.date) {
       return undefined;
     }
 
     let isActive = true;
+    let unsubscribeFacilities = () => {};
+    let isInitialLoad = true;
 
     async function loadFacilities() {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       setError("");
 
       try {
@@ -197,17 +212,28 @@ export default function Facilities() {
       } finally {
         if (isActive) {
           setLoading(false);
+          isInitialLoad = false;
         }
       }
     }
 
-    loadFacilities();
+    // Mount a real-time listener for facility collection changes
+    // That is when the status of facilires changed
+    // The listing for timeslot changing is over burden
+    unsubscribeFacilities = onSnapshot(collection(db, "facility"), () => {
+      loadFacilities();}, (err) => {
+      if (isActive) console.error("Facility listener error:", err);
+      loadFacilities();
+    });
 
     return () => {
       isActive = false;
+      unsubscribeFacilities();
     };
   }, [filters.date]);
 
+
+  // Append the currently bookable time slot labels to each facility item
   const displayItems = useMemo(() => {
     const now = new Date(clockTick);
     return items.map((item) => ({
@@ -216,8 +242,11 @@ export default function Facilities() {
         item.status === "normal" ? getBookableTimeSlotLabels(item.memberTimeSlots || [], filters.date, now) : [],
     }));
   }, [clockTick, filters.date, items]);
+
+  // Calculate the available time slot options for the time filter dropdown
   const timeOptions = useMemo(() => getTimeOptions(displayItems, filters.type), [displayItems, filters.type]);
 
+  // Reset the selected time filter to "All" if the current selection is no longer available
   useEffect(() => {
     if (!timeOptions.includes(filters.time)) {
       setFilters((previous) => ({
@@ -227,7 +256,7 @@ export default function Facilities() {
     }
   }, [filters.time, timeOptions]);
 
-  // Build the list that the user can see.
+  // Filter the facilities list based on the active type, availability, and time selections
   const filteredItems = useMemo(() => {
     return displayItems.filter((item) => {
       const normalizedFilterType = normalizeFacilityType(filters.type);
@@ -239,6 +268,8 @@ export default function Facilities() {
     });
   }, [displayItems, filters]);
 
+
+  // Update a specific filter field, resetting the time filter if the facility type changes
   function updateFilter(field, value) {
     setFilters((previous) => ({
       ...previous,
@@ -247,6 +278,7 @@ export default function Facilities() {
     }));
   }
 
+  // Reset all filters back to their default states
   function clearFilters() {
     const resetFilters = {
       date: dateBounds.defaultDate,
@@ -258,6 +290,8 @@ export default function Facilities() {
     setFilters(resetFilters);
   }
 
+  /*****************************************************************************8 */
+  // Main Rendering
   return (
     <PageLayout
       className="member-facilities-page"
@@ -285,6 +319,7 @@ export default function Facilities() {
       }
     >
 
+      {/* Filters for selecting facilities */}
       <FilterPanel
         className="member-facilities-toolbar"
         columns={4}
@@ -349,6 +384,7 @@ export default function Facilities() {
           </FilterField>
       </FilterPanel>
 
+      {/* Loading state feedback */}
       {loading && (
         <section className="member-facilities-feedback">
           <h2>Loading facilities</h2>
@@ -356,6 +392,7 @@ export default function Facilities() {
         </section>
       )}
 
+      {/* Error state feedback */}
       {!loading && error && (
         <section className="member-facilities-feedback member-facilities-feedback--error">
           <h2>Facilities could not be loaded</h2>
@@ -363,6 +400,7 @@ export default function Facilities() {
         </section>
       )}
 
+      {/* Empty state feedback when no facilities match the current filters */}
       {!loading && !error && filteredItems.length === 0 && (
         <section className="member-facilities-feedback">
           <h2>No facilities match the current filters</h2>
@@ -370,6 +408,7 @@ export default function Facilities() {
         </section>
       )}
 
+      {/* Display facility cards */}
       {!loading && !error && filteredItems.length > 0 && (
         <section className="member-facilities-grid">
           {filteredItems.map((facility) => {
@@ -380,6 +419,7 @@ export default function Facilities() {
 
             return (
               <article key={facility.id} className="member-facility-card">
+
                 <div className="member-facility-card__header">
                   <div className="member-facility-card__titleGroup">
                     <h2>{facility.name || "Facility"}</h2>
@@ -396,6 +436,7 @@ export default function Facilities() {
                   <p>Capacity: {facility.capacity}</p>
                 </div>
 
+                {/* time slots display */}
                 <div className="member-facility-card__slots">
                   <p className="member-facility-card__slotsLabel">Available Times:</p>
 
@@ -417,8 +458,9 @@ export default function Facilities() {
                   )}
                 </div>
 
+                {/* View details button and Book button */}
                 <div className="member-facility-card__actions">
-                  <Link className="btn-secondary" to={getFacilityDetailRoute(facility.id)}>
+                  <Link className="btn-secondary" to={`${getFacilityDetailRoute(facility.id)}?date=${filters.date}`}>
                     View Details
                   </Link>
                   {isBookable && (

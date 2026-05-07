@@ -1,4 +1,4 @@
-// This member page shows Discover content.
+// This member page shows Discover content, which used to find other matching members.
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Dumbbell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -8,11 +8,7 @@ import "./Discover.css";
 import { useAuth } from "../../provider/AuthContext";
 import { ROUTE_PATHS } from "../../constants/routes";
 import { getFacilitySportTypes } from "../../services/bookingService";
-import {
-  getCurrentMatchProfile,
-  getPartnerProfiles,
-  sendMatchRequest,
-} from "../../services/partnerService";
+import { getCurrentMatchProfile, getPartnerProfiles, sendMatchRequest,} from "../../services/partnerService";
 import { getAvatarForActor } from "../../utils/avatar";
 import { getActionErrorMessage } from "../../utils/errors";
 import { countMeaningfulCharacters } from "../../utils/text";
@@ -20,6 +16,7 @@ import MatchRequestModal from "../../components/member/MatchRequestModal";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import PageLayout from "../../components/common/PageLayout";
 
+// Day option, it will comboung by "value_label"
 const DAY_OPTIONS = [
   { value: "any", label: "Any Day" },
   { value: "monday", label: "Monday" },
@@ -38,6 +35,7 @@ const TIME_OPTIONS = [
   { value: "evening", label: "Evening" },
 ];
 
+// Format a string to Title Case
 function toTitleText(value) {
   return String(value || "")
     .split(/[_\s]+/)
@@ -46,15 +44,15 @@ function toTitleText(value) {
     .join(" ");
 }
 
+// Parse a raw availability string
 function parseAvailabilityEntry(entry) {
   const [day = "", time = ""] = String(entry || "").split("_");
-  return {
-    day,
-    time,
+  return { day, time,
     label: [toTitleText(day), toTitleText(time)].filter(Boolean).join(" - "),
   };
 }
 
+// Evaluate whether a partner profile matches the currently selected filter criteria
 function applyProfileFilters(profile, filters) {
   const sportMatch =
     filters.sport === "all" || (profile.interests || []).includes(filters.sport);
@@ -67,9 +65,13 @@ function applyProfileFilters(profile, filters) {
   return sportMatch && dayMatch && timeMatch;
 }
 
+// This page can only be accessed thourgh Partner page and click View Recommendation button
 export default function Discover() {
+  // Extract navigation and authentication context
   const navigate = useNavigate();
   const { sessionProfile } = useAuth();
+  
+  // Hooks
   const [profiles, setProfiles] = useState([]);
   const [sportOptions, setSportOptions] = useState([]);
   const [currentProfile, setCurrentProfile] = useState(null);
@@ -82,7 +84,7 @@ export default function Discover() {
   const [requestDraft, setRequestDraft] = useState("");
   const [requestBusy, setRequestBusy] = useState(false);
 
-  // Load real data when this part opens or changes.
+  // Fetch the current user's profile, available partner profiles, and sport types when the component mounts
   useEffect(() => {
     let cancelled = false;
     async function loadData() {
@@ -99,6 +101,7 @@ export default function Discover() {
           getFacilitySportTypes(),
         ]);
         if (cancelled) return;
+        // Redirect the user to the Partner page if their match profile is incomplete or inactive
         if (!selfProfile?.openMatch) {
           navigate(ROUTE_PATHS.PARTNER, {
               replace: true,
@@ -125,7 +128,8 @@ export default function Discover() {
     };
   }, [navigate, sessionProfile]);
 
-  // Build the list that the user can see.
+
+  // Filter the raw profiles list based on the active sport, day, and time selections
   const filteredProfiles = useMemo(
     () => profiles.filter((profile) => applyProfileFilters(profile, filters)),
     [profiles, filters],
@@ -133,6 +137,7 @@ export default function Discover() {
 
   const requestCount = countMeaningfulCharacters(requestDraft);
 
+  // Handle sending a match request
   async function handleSendRequest() {
     if (!requestTarget) return;
     if (!currentProfile?.openMatch) {
@@ -169,6 +174,8 @@ export default function Discover() {
     }
   }
 
+  /***************************************************************************8 */
+  // Main Rendering
   return (
     <PageLayout
       className="discover-page"
@@ -191,6 +198,7 @@ export default function Discover() {
         </section>
       ) : null}
 
+      {/* Filter controls for narrowing down partner recommendations */}
       <FilterPanel
         className="discover-page__filters"
         columns={3}
@@ -241,6 +249,7 @@ export default function Discover() {
       </FilterPanel>
 
       {loading ? (
+        /* Loading and Empty States */
         <div className="member-card member-empty-state">Loading partner recommendations...</div>
       ) : filteredProfiles.length === 0 ? (
         <div className="member-card member-empty-state">
@@ -248,6 +257,7 @@ export default function Discover() {
           <p>Try adjusting your filters to see more active partners.</p>
         </div>
       ) : (
+        /* Partner cards */
         <section className="discover-page__grid">
           {filteredProfiles.map((profile) => {
             const shownInterests = (profile.interests || []).slice(0, 2);
@@ -328,6 +338,7 @@ export default function Discover() {
         </section>
       )}
 
+      {/* Match request */}
       <MatchRequestModal
         error={error}
         open={Boolean(requestTarget)}
@@ -344,6 +355,7 @@ export default function Discover() {
         onConfirm={handleSendRequest}
       />
 
+      {/* Detailed partner profile */}
       {detailTarget ? (
         <div className="member-modal-overlay" role="presentation" onClick={() => setDetailTarget(null)}>
           <div
