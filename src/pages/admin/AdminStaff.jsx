@@ -1,4 +1,6 @@
-// This admin page shows AdminStaff content.
+// Admin page for staff accounts.
+// The screen has a search box, staff cards, and modals for create or deactivate actions.
+// It shows real staff names and the facilities each staff member manages.
 import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import "../pageStyles.css";
@@ -15,6 +17,8 @@ import { Button } from "../../components/common/Button";
 
 const DEFAULT_PASSWORD = "Staff1234";
 
+// Make the empty form for the create staff modal.
+// The temporary password is filled in so admin does not need to type it each time.
 function getEmptyCreateForm() {
   return {
     name: "",
@@ -25,14 +29,20 @@ function getEmptyCreateForm() {
   };
 }
 
+// Check whether the email looks valid before submit.
+// It catches common typing mistakes in the modal.
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+// Check the temporary password rule for a new staff account.
+// It must have enough characters and include letters and numbers.
 function isValidPassword(value) {
   return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(String(value || ""));
 }
 
+// Make the joined date text shown on a staff card.
+// Missing or broken dates become a simple fallback message.
 function formatJoinedDate(value) {
   if (!value) {
     return "Not available";
@@ -50,6 +60,8 @@ function formatJoinedDate(value) {
   }).format(parsed);
 }
 
+// Split the managed facility text into separate names.
+// Empty names are removed so the card does not show blank items.
 function getManagedFacilityNames(item) {
   if (!item?.managedFacilityCount) {
     return [];
@@ -61,14 +73,21 @@ function getManagedFacilityNames(item) {
     .filter(Boolean);
 }
 
+// Make the error message for failed staff creation.
+// The shared helper turns backend errors into text admin can understand.
 function getCreateErrorMessage(error) {
   return getActionErrorMessage(error, "staff.create", "Unable to create this staff account.");
 }
 
+// Make the error message for a failed deactivate action.
+// The text is shown inside the confirm dialog.
 function getDeactivateErrorMessage(error) {
   return getActionErrorMessage(error, "staff.disable", "Unable to deactivate this staff account.");
 }
 
+// Main staff management page for admins.
+// It shows staff account cards with status and managed facility names.
+// The page also opens the create modal and deactivate dialog.
 export default function AdminStaff() {
   const { sessionProfile } = useAuth();
   const [items, setItems] = useState([]);
@@ -85,6 +104,9 @@ export default function AdminStaff() {
   const [deactivateError, setDeactivateError] = useState("");
   const [deactivateSubmitting, setDeactivateSubmitting] = useState(false);
 
+  // Reload staff rows after create or deactivate actions.
+  // The loader is only shown when a full page refresh is needed.
+  // The page keeps only accounts with the staff role.
   async function refreshStaff({ showLoader = false } = {}) {
     if (showLoader) {
       setLoading(true);
@@ -103,11 +125,15 @@ export default function AdminStaff() {
     }
   }
 
-  // Load real data when this part opens or changes.
+  // Start the live staff listener when the admin profile is ready.
+  // Staff status and facility assignments may change somewhere else.
+  // The listener keeps the cards lined up with the database.
   useEffect(() => {
     let active = true;
     let unsubscribe = () => {};
 
+    // Listen to staff account changes and place the rows into this page.
+    // Admin can see active, inactive, and unassigned staff records.
     async function startSubscription() {
       setLoading(true);
 
@@ -148,7 +174,8 @@ export default function AdminStaff() {
     };
   }, [sessionProfile]);
 
-  // Build the list that the user can see.
+  // Build the staff list after search is applied.
+  // The search checks real names because this is an admin identity page.
   const filteredItems = useMemo(() => {
     const normalizedQuery = searchInput.trim().toLowerCase();
     if (!normalizedQuery) {
@@ -158,12 +185,16 @@ export default function AdminStaff() {
     return items.filter((item) => String(item.name || "").toLowerCase().includes(normalizedQuery));
   }, [searchInput, items]);
 
+  // Clear the search box and old page messages.
+  // Open modals stay open because filtering is separate from account actions.
   function clearFilters() {
     setSearchInput("");
     setPageError("");
     setPageMessage("");
   }
 
+  // Open the create staff modal with a fresh form.
+  // Old field errors are cleared before admin starts a new account.
   function openCreateModal() {
     setCreateForm(getEmptyCreateForm());
     setCreateErrors({});
@@ -171,6 +202,8 @@ export default function AdminStaff() {
     setCreateOpen(true);
   }
 
+  // Close the create staff modal and reset the form.
+  // Old values will not appear when admin opens it again.
   function closeCreateModal() {
     setCreateOpen(false);
     setCreateForm(getEmptyCreateForm());
@@ -178,11 +211,15 @@ export default function AdminStaff() {
     setCreateError("");
   }
 
+  // Open the deactivate dialog for one staff account.
+  // The selected row is saved so the confirm button knows who to update.
   function openDeactivateModal(item) {
     setDeactivateTarget(item);
     setDeactivateError("");
   }
 
+  // Close the deactivate dialog when no request is running.
+  // While submitting, it stays open so admin cannot double click the action.
   function closeDeactivateModal() {
     if (deactivateSubmitting) {
       return;
@@ -191,6 +228,9 @@ export default function AdminStaff() {
     setDeactivateError("");
   }
 
+  // Check the create staff form before calling the backend.
+  // It returns field errors for the modal inputs.
+  // It only checks the form and does not submit data.
   function validateCreateForm() {
     const nextErrors = {};
 
@@ -219,6 +259,9 @@ export default function AdminStaff() {
     return nextErrors;
   }
 
+  // Submit a new staff account from the modal.
+  // The form is checked first and then sent to the backend.
+  // After success, the modal closes and the staff cards reload.
   async function handleCreateSubmit() {
     setCreateError("");
     setPageError("");
@@ -249,6 +292,9 @@ export default function AdminStaff() {
     }
   }
 
+  // Deactivate the selected staff account after admin confirms.
+  // The backend changes the real account status.
+  // The page reloads so the staff card shows the new state.
   async function handleDeactivateConfirm() {
     if (!deactivateTarget) {
       return;

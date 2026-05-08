@@ -1,4 +1,6 @@
-// This staff page shows Repair content.
+// Staff use this page to work on repair reports from members.
+// The screen has filters, ticket cards, and a detail panel for the open ticket.
+// Pending tickets can be resolved here and finished tickets are only for checking.
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import "../pageStyles.css";
@@ -13,10 +15,16 @@ import { FilterField, FilterPanel } from "../../components/common/FilterControls
 import PageLayout from "../../components/common/PageLayout";
 import StaffListCard from "../../components/staff/StaffListCard";
 
+// Put the newest repair reports at the top.
+// Staff usually need to see the latest problem first.
+// Empty times are treated like blank text so the page does not break.
 function sortRepairItems(items = []) {
   return [...items].sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
 }
 
+// Make the repair status text shown in the staff list.
+// Stored values are lowercase.
+// The list shows cleaner words that are easier to read.
 function getRepairStatusLabel(status = "") {
   const normalized = String(status || "").toLowerCase();
   if (normalized === "pending") {
@@ -34,10 +42,16 @@ function getRepairStatusLabel(status = "") {
   return normalized || "unknown";
 }
 
+// Make the completed time text in the ticket details.
+// Pending tickets do not have a completed time yet.
+// The detail panel shows a dash when there is no finished time.
 function getResolvedAtLabel(item) {
   return item.completedAt ? formatStaffDateTime(item.completedAt) : "-";
 }
 
+// Main repair ticket page for staff.
+// It looks like a filter bar above ticket cards with one detail panel.
+// Staff use it to read reports and resolve pending tickets.
 export default function Repair() {
   const { sessionProfile } = useAuth();
   const [items, setItems] = useState([]);
@@ -61,13 +75,20 @@ export default function Repair() {
   );
   const maxFilterDate = useMemo(() => getDateInputMaxValue(0), []);
 
+  // Reload tickets after staff resolve one or need fresh data.
+  // Facility options are loaded at the same time for the filter.
+  // The same ticket stays open if it is still in the list.
   async function refresh(preferredId = "") {
     setLoading(true);
     try {
+      // Load tickets and facility names together.
+      // The ticket list and facility filter both need fresh data.
       const [ticketItems, facilityItems] = await Promise.all([
         getRepairTickets(sessionProfile),
         getAllFacilityFilterOptions(),
       ]);
+      // Staff can still read resolved and terminated tickets.
+      // Only pending tickets can show the resolve action.
       const nextItems = sortRepairItems(
         ticketItems.filter((item) => ["pending", "resolved", "terminated"].includes(item.status)),
       );
@@ -75,6 +96,8 @@ export default function Repair() {
       setItems(nextItems);
       setFacilityOptions(facilityItems);
       setSelectedId((current) => {
+        // Keep the same ticket open after refresh when it still exists.
+        // Close the panel when the ticket leaves the list.
         const candidate = preferredId || current;
         if (candidate && nextItems.some((item) => item.id === candidate)) {
           return candidate;
@@ -89,11 +112,15 @@ export default function Repair() {
     }
   }
 
-  // Load real data when this part opens or changes.
+  // Start live updates for repair tickets.
+  // Repair changes update status and description.
+  // Facility and member changes update the names in the cards.
   useEffect(() => {
     let active = true;
     let unsubscribe = () => {};
 
+    // Load facility names for the dropdown.
+    // If this fails, the tickets can still be shown without filter options.
     async function updateFacilityOptions() {
       try {
         const facilityItems = await getAllFacilityFilterOptions();
@@ -107,11 +134,16 @@ export default function Repair() {
       }
     }
 
+    // Start the repair ticket listener.
+    // Each update is filtered to the ticket states shown on this page.
     async function startSubscription() {
       setLoading(true);
       await updateFacilityOptions();
 
       try {
+        // The service watches repairs, facilities, and members.
+        // Staff see real member names so they know who reported the problem.
+        // Facility changes can also change what appears in this list.
         unsubscribe = await subscribeToRepairTickets(
           sessionProfile,
           (ticketItems) => {
@@ -122,6 +154,8 @@ export default function Repair() {
             const nextItems = sortRepairItems(
               ticketItems.filter((item) => ["pending", "resolved", "terminated"].includes(item.status)),
             );
+            // Close the detail panel when the selected ticket no longer belongs here.
+            // This can happen after another update changes its status.
             setItems(nextItems);
             setSelectedId((current) => (current && nextItems.some((item) => item.id === current) ? current : ""));
             setPageError("");
@@ -154,13 +188,19 @@ export default function Repair() {
     };
   }, [sessionProfile]);
 
-  // Build the list that the user can see.
+  // Apply ticket id, facility, date, and status filters.
+  // Empty fields do not hide anything.
+  // Matching tickets are sorted with the newest one first.
   const visibleItems = useMemo(() => {
     const normalizedTicketId = filters.ticketId.trim().toLowerCase();
 
     return sortRepairItems(
       items.filter((item) => {
+        // Ticket id search works with partial ids.
+        // Staff do not need to type the full database id.
         const ticketIdMatch = !normalizedTicketId || item.id.toLowerCase().includes(normalizedTicketId);
+        // Facility can match by id or display name.
+        // Older rows may have either value.
         const facilityMatch =
           !filters.facility ||
           item.facilityId === filters.facility ||
@@ -183,6 +223,8 @@ export default function Repair() {
     [selectedId, visibleItems],
   );
 
+  // Clear all filters and old messages.
+  // Detail errors are cleared too because the selected ticket may change.
   function clearFilters() {
     setFilters({
       ticketId: "",
@@ -195,22 +237,32 @@ export default function Repair() {
     setDetailError("");
   }
 
+  // Open or close a repair ticket detail panel.
+  // Clicking a new card selects that ticket.
+  // Clicking the same card again hides the panel.
   function toggleSelection(id) {
     setSelectedId((current) => (current === id ? "" : id));
     setDetailError("");
   }
 
+  // Resolve the selected pending repair ticket.
+  // The backend action changes the real ticket status.
+  // After success, the ticket stays open as a read only record.
   async function handleResolve() {
     if (!selectedItem || selectedItem.status !== "pending") {
       return;
     }
 
+    // Save the selected id so only this ticket shows loading.
+    // Other ticket cards stay readable while the action runs.
     setResolvingId(selectedItem.id);
     setDetailError("");
     setPageError("");
     setPageMessage("");
 
     try {
+      // Ask the backend to mark this repair as resolved.
+      // The facility status may also change after the repair is finished.
       await updateTicketStatus(
         {
           repairt_id: selectedItem.id,

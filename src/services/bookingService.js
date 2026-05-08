@@ -1,4 +1,4 @@
-// Booking service reads and prepares real booking, facility, member, and time_slot data.
+// Booking service prepares booking, facility, member, and time slot data for the pages.
 import { doc, getCollectionRef, runDbTransaction, serverTimestamp } from "./firestoreService";
 import {
   assertRole,
@@ -49,7 +49,7 @@ function getMaxBookingDate() {
   return getMaxLocalBookingDate(7);
 }
 
-// Build one-hour labels like "09:00 - 10:00" for filter options.
+// Build full hour labels for time filter options.
 function buildHourSlotRange(startHour, endHour) {
   const safeStart = Number(startHour);
   const safeEnd = Number(endHour);
@@ -65,7 +65,9 @@ function buildHourSlotRange(startHour, endHour) {
   });
 }
 
-// Staff and member pages should show time slots from early to late.
+// Sort time slot labels from early to late.
+// Member pages and staff pages both use this order.
+// Dropdowns look more natural when morning times come first.
 function sortTimeSlots(slots = []) {
   return [...slots].sort((left, right) => {
     const leftStart = Number(String(left).slice(0, 2));
@@ -78,7 +80,7 @@ function sortTimeSlotDocs(slots = []) {
   return [...slots].sort((left, right) => toHourNumber(left.start_time) - toHourNumber(right.start_time));
 }
 
-// Read the real time_slot records for one facility and one date.
+// Read the real time slot records for one facility and one date.
 async function getStoredTimeSlotsForFacilityDate(facilityId, selectedDate = getTodayDate()) {
   const safeDate = toStoredDateString(selectedDate).slice(0, 10);
   const slots = await getCollectionDocs("time_slot", [
@@ -309,11 +311,17 @@ function isMemberBookingVisibleToActor(item = {}) {
   return true;
 }
 
+// Make the request status used on staff request pages.
+// The stored suggested state is shown as alternative suggested.
+// Other statuses are cleaned up and returned with the same meaning.
 export function getStaffRequestPageStatus(value = "") {
   const normalizedStatus = normalizeBookingStatusValue(value);
   return normalizedStatus === "suggested" ? "alternative suggested" : normalizedStatus;
 }
 
+// Work out the status shown on the staff check in page.
+// Accepted bookings turn into no show on screen after the start time passes.
+// This only changes the page display and does not write to the database.
 export function getStaffCheckInPageStatus(item = {}, now = new Date()) {
   const source = item?.raw && typeof item.raw === "object" ? item.raw : item;
   const rawStatus = normalizeBookingStatusValue(source.status || item.status);
@@ -371,6 +379,9 @@ function mapFacility(item, slotItems = []) {
   };
 }
 
+// Turn one raw request document into the booking object used by the UI.
+// It adds facility names, staff names, member names, and time text.
+// Staff pages ask for real member names while social member pages can use display names.
 function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "", options = {}) {
   const facility = facilityLookup.get(item.facility_id);
   const member = memberLookup.get(item.member_id);
@@ -410,6 +421,9 @@ function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "
   };
 }
 
+// Load the lookup maps used to fill booking rows.
+// Request records mostly store ids.
+// These maps let the UI show readable member, facility, and staff names.
 async function getLookups() {
   const [memberLookup, facilityLookup, staffLookup] = await Promise.all([
     getMemberLookup(),
@@ -419,6 +433,8 @@ async function getLookups() {
   return { memberLookup, facilityLookup, staffLookup };
 }
 
+// Read one request by id and throw a normal app error if it is missing.
+// Staff actions use this before checking permission or slot state.
 async function getRequestByIdOrThrow(requestId) {
   const request = await getDocById("request", requestId);
   if (!request) {
@@ -526,6 +542,9 @@ async function validateParticipantConflicts(actor, payload, selectedHours, curre
   }
 }
 
+// Add page friendly fields to raw request records.
+// Member pages, staff request pages, and check in pages all use this mapper.
+// Options decide which kind of member name should be shown.
 async function decorateRequests(items, actorId = "", options = {}) {
   const { memberLookup, facilityLookup, staffLookup } = await getLookups();
   return sortBookings(items).map((item) => mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId, options));
@@ -913,20 +932,32 @@ export async function modifyPendingBooking(payload, actor) {
   );
 }
 
+// Load booking requests that this staff member can review.
+// Staff only see their assigned requests and admins see all requests.
+// Rows use real member names because approval work needs real identity.
 export async function getStaffRequests(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
+  // Read request rows first and then filter by staff assignment.
+  // This keeps staff and admin loading on the same path.
   const allRequests = await getCollectionDocs("request");
   const relevantRequests = filterRequestsForStaff(allRequests, resolvedActor);
 
+  // Staff pages show real member names instead of profile nicknames.
+  // Booking approval and check in are staff work, not social matching.
   return decorateRequests(relevantRequests, resolvedActor.id, { memberNameMode: "real" });
 }
 
+// Keep only requests assigned to this staff member.
+// Admin users skip this because they manage all staff work.
 function filterRequestsForStaff(items = [], actor = {}) {
   return items.filter((item) => (actor.role === "Admin" ? true : item.staff_id === actor.id));
 }
 
+// Keep bookings that belong on the staff check in page.
+// Accepted and finished rows live here.
+// Pending requests stay on the approval page.
 function filterCheckInRequestsForStaff(items = [], actor = {}) {
   return filterRequestsForStaff(items, actor).filter((item) => {
     const status = normalizeBookingStatusValue(item.status);
@@ -934,6 +965,9 @@ function filterCheckInRequestsForStaff(items = [], actor = {}) {
   });
 }
 
+// Listen for live changes used by the staff request page.
+// Request changes update status and buttons.
+// Facility and member changes refresh names on the cards.
 export async function subscribeToStaffRequests(actor, onNext, onError) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
@@ -943,6 +977,9 @@ export async function subscribeToStaffRequests(actor, onNext, onError) {
   let active = true;
   let version = 0;
 
+  // Rebuild request rows from the newest snapshot.
+  // The version number skips older async results that finish late.
+  // This keeps old data from replacing fresh data.
   async function emit() {
     if (!hasRequestSnapshot) {
       return;
@@ -951,6 +988,8 @@ export async function subscribeToStaffRequests(actor, onNext, onError) {
     const currentVersion = ++version;
 
     try {
+      // Refresh member and facility lookups while mapping rows.
+      // The callback receives rows ready for the staff page.
       const decorated = await decorateRequests(
         filterRequestsForStaff(latestRequests, resolvedActor),
         resolvedActor.id,
@@ -969,6 +1008,8 @@ export async function subscribeToStaffRequests(actor, onNext, onError) {
 
   const requestConstraints = resolvedActor.role === "Admin" ? [] : [where("staff_id", "==", resolvedActor.id)];
   const unsubscribers = [
+    // Request changes update status, feedback, and buttons.
+    // Staff users only subscribe to their own assigned requests.
     subscribeToCollection(
       "request",
       requestConstraints,
@@ -979,6 +1020,8 @@ export async function subscribeToStaffRequests(actor, onNext, onError) {
       },
       onError,
     ),
+    // Facility and member changes update names in the same rows.
+    // This matters when names change while staff keep the page open.
     subscribeToCollection("facility", [], () => void emit(), onError),
     subscribeToCollection("member", [], () => void emit(), onError),
   ];
@@ -989,6 +1032,9 @@ export async function subscribeToStaffRequests(actor, onNext, onError) {
   };
 }
 
+// Load facilities assigned to the current staff member.
+// Admin users get the full list.
+// Staff pages use this for filters and facility views.
 export async function getStaffManagedFacilities(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
@@ -1007,10 +1053,15 @@ export async function getStaffManagedFacilities(actor) {
     }));
 }
 
+// Check whether a request still owns the slots it needs.
+// Staff pages use this before approval.
+// The returned message helps staff choose approve, reject, or suggest.
 export async function getStaffRequestConflictSummary(requestOrId, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
+  // The page may pass a raw request or just an id.
+  // Both forms are shaped the same way before checks run.
   const request =
     typeof requestOrId === "object" && requestOrId !== null
       ? requestOrId.raw && typeof requestOrId.raw === "object"
@@ -1028,6 +1079,8 @@ export async function getStaffRequestConflictSummary(requestOrId, actor) {
 
   const pageStatus = getStaffRequestPageStatus(request.status);
 
+  // Already processed requests return a read only summary.
+  // Staff cannot process them again, so no slot lookup is needed.
   if (pageStatus === "accepted") {
     return {
       state: "available",
@@ -1062,6 +1115,8 @@ export async function getStaffRequestConflictSummary(requestOrId, actor) {
     };
   }
 
+  // Pending requests must still own every slot in their selected time range.
+  // Missing slots mean staff should suggest another option or reject.
   const requiredHours = buildHourRange(request.start_time, request.end_time);
   const facilitySlots = await getCollectionDocs("time_slot", [where("facility_id", "==", request.facility_id)]);
   const slotsForDate = facilitySlots.filter((slot) => slot.date === request.date);
@@ -1076,6 +1131,8 @@ export async function getStaffRequestConflictSummary(requestOrId, actor) {
     };
   }
 
+  // A conflict means another request now owns at least one needed slot.
+  // This stops staff from approving two bookings for the same time.
   const hasConflict = selectedSlots.some((slot) => String(slot.request_id || "") !== String(request.id || ""));
   if (hasConflict) {
     return {
@@ -1092,6 +1149,9 @@ export async function getStaffRequestConflictSummary(requestOrId, actor) {
   };
 }
 
+// Give simple starter text for reject and suggest actions.
+// Staff can use it as a base message.
+// They can still edit the final response before submitting.
 export async function getRequestFeedbackTemplate(status) {
   const normalizedStatus = String(status || "").toLowerCase();
   if (normalizedStatus === "rejected") {
@@ -1103,16 +1163,26 @@ export async function getRequestFeedbackTemplate(status) {
   return "";
 }
 
+// Load bookings used by the staff check in page.
+// It keeps accepted and finished rows for this staff member.
+// Returned rows use real names for members and invited participants.
 export async function getStaffCheckIns(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
+  // The check in page only needs accepted and finished requests.
+  // Pending requests are still waiting for approval.
   const allRequests = await getCollectionDocs("request");
   const checkInRequests = filterCheckInRequestsForStaff(allRequests, resolvedActor);
 
+  // Staff view keeps real names for members and participants.
+  // Check in is staff work, not a social matching feature.
   return decorateRequests(checkInRequests, resolvedActor.id, { memberNameMode: "real" });
 }
 
+// Listen for live changes used by the staff check in page.
+// Booking changes update status and buttons.
+// Facility and member changes update row labels.
 export async function subscribeToStaffCheckIns(actor, onNext, onError) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
@@ -1123,6 +1193,9 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
   let active = true;
   let version = 0;
 
+  // Rebuild check in rows from the newest snapshot.
+  // The version number skips older async results that finish late.
+  // This keeps stale check in data off the page.
   async function emit() {
     if (!hasRequestSnapshot) {
       return;
@@ -1131,6 +1204,8 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
     const currentVersion = ++version;
 
     try {
+      // Map again with current facility and member data.
+      // Staff should see updated real names without refreshing the page.
       const decorated = await decorateRequests(
         filterCheckInRequestsForStaff(latestRequests, resolvedActor),
         resolvedActor.id,
@@ -1147,6 +1222,8 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
   }
 
   const unsubscribers = [
+    // Request changes control status and buttons in the check in list.
+    // Staff users only listen to bookings assigned to them.
     subscribeToCollection(
       "request",
       constraints,
@@ -1157,6 +1234,8 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
       },
       onError,
     ),
+    // Facility and member changes update row labels.
+    // This keeps facility names and real member names current.
     subscribeToCollection("facility", [], () => void emit(), onError),
     subscribeToCollection("member", [], () => void emit(), onError),
   ];
@@ -1167,6 +1246,9 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
   };
 }
 
+// Send the check in action when staff confirm a member arrival.
+// This function only builds the payload.
+// The backend decides if the booking is allowed to be checked in.
 export async function checkInBooking(idOrPayload, actor) {
   const payload =
     typeof idOrPayload === "object" && idOrPayload !== null
@@ -1231,10 +1313,15 @@ export async function cancelConfirmedBooking(idOrPayload, actor) {
   return callSubmitAction("cancelConfirmedBooking", payload);
 }
 
+// Local backup for staff approval actions if the callable is unavailable.
+// It follows the same rules as the staff request page.
+// Normal frontend flow still calls the backend callable first.
 async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted", staffResponse = "", actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
+  // The page can pass a payload object or a request id with separate values.
+  // Shape that input first so the rest of the function is simpler.
   const payload =
     typeof idOrPayload === "object" && idOrPayload !== null
       ? idOrPayload
@@ -1243,6 +1330,9 @@ async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted"
   const statusSource = Array.isArray(payload.status) ? payload.status[0] : payload.status;
   const responseText = String(payload.staff_response || payload.staffResponse || "").trim();
   const normalizedStatus = String(statusSource || "").toLowerCase();
+
+  // Staff can only approve, reject, or suggest from this page.
+  // Other statuses are not part of this workflow.
   if (!["accepted", "rejected", "suggested"].includes(normalizedStatus)) {
     throw createAppError("invalid-argument");
   }
@@ -1253,6 +1343,8 @@ async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted"
 
   let request = null;
   await runDbTransaction(async (transaction) => {
+    // The transaction stops two staff actions from processing the same pending request.
+    // The request is read again inside the transaction before status changes.
     const requestRef = getDocumentRef("request", id);
     const requestSnapshot = await transaction.get(requestRef);
 
@@ -1280,6 +1372,8 @@ async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted"
       updated_at: serverTimestamp(),
     });
 
+    // Rejected and suggested requests release their locked slots.
+    // Accepted requests keep their slots because the booking is confirmed.
     if (["rejected", "suggested"].includes(normalizedStatus)) {
       const slotQuery = buildCollectionQuery("time_slot", [where("request_id", "==", id)]);
       const slotSnapshots = await transaction.get(slotQuery);
@@ -1296,6 +1390,9 @@ async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted"
   return { success: true };
 }
 
+// Send approve, reject, or suggest actions to the booking callable.
+// The callable writes the real status and any notifications.
+// The frontend only prepares the request id, status, and staff response.
 export async function processBookingApproval(idOrPayload, nextStatus = "accepted", staffResponse = "", actor) {
   const payload =
     typeof idOrPayload === "object" && idOrPayload !== null

@@ -12,6 +12,7 @@ const ERROR_MESSAGES = {
   "already-processed": "This record has already been processed by someone else. Please refresh before trying again.",
   unavailable: "The service is temporarily unavailable. Please check your connection and try again.",
   internal: "The request could not be completed right now. Please try again later.",
+  "email-not-verified": "Email not verified",
 };
 
 // Page actions can override the default message with a more useful one.
@@ -23,6 +24,7 @@ const ACTION_ERROR_MESSAGES = {
     "invalid-email": "Please enter a valid email address.",
     "too-many-requests": "Too many sign-in attempts were made just now. Please wait a moment and try again.",
     "network-request-failed": "The sign-in request could not reach the service. Please check your connection and try again.",
+    "email-not-verified": "Email not verified",
     "permission-denied": "This account cannot sign in with the selected identity or current account status.",
     unavailable: "Sign-in is temporarily unavailable. Please try again later.",
     internal: "Sign-in could not be completed right now. Please try again later.",
@@ -35,6 +37,7 @@ const ACTION_ERROR_MESSAGES = {
     "weak-password": "Password must be at least 8 characters with letters and numbers.",
     "too-many-requests": "Too many verification attempts were made just now. Please wait a moment and try again.",
     "network-request-failed": "The registration request could not reach the service. Please check your connection and try again.",
+    "email-not-verified": "Email not verified",
     "permission-denied": "This email cannot be used for member registration.",
     unavailable: "Registration is temporarily unavailable. Please try again later.",
     internal: "Registration could not be completed right now. Please try again later.",
@@ -267,6 +270,7 @@ const CODE_EQUIVALENTS = {
   "auth/email-already-in-use": "email-already-in-use",
   "auth/too-many-requests": "too-many-requests",
   "auth/network-request-failed": "network-request-failed",
+  "auth/email-not-verified": "email-not-verified",
   "functions/internal": "internal",
   "functions/not-found": "not-found",
   "functions/unavailable": "unavailable",
@@ -276,6 +280,7 @@ const CODE_EQUIVALENTS = {
 const MESSAGE_PATTERNS = [
   { pattern: /invalid-credential|user-not-found|wrong-password/i, message: "The email address or password is incorrect." },
   { pattern: /invalid-email/i, message: "Please enter a valid email address." },
+  { pattern: /email not verified|verify your email/i, message: "Email not verified" },
   { pattern: /email-already-in-use/i, message: "This email address is already registered. Please sign in instead." },
   { pattern: /too-many-requests|quota-exceeded/i, message: "Too many attempts were made just now. Please wait a moment and try again." },
   { pattern: /network-request-failed|failed to fetch|network/i, message: "The network request failed. Please check your connection and try again." },

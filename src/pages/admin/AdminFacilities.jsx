@@ -1,4 +1,6 @@
-// This admin page shows AdminFacilities content.
+// Admin page for facility management.
+// The screen has filters, facility cards, and a drawer for create or edit work.
+// It shows the real staff name for the person assigned to each facility.
 import { useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import "../pageStyles.css";
@@ -26,6 +28,8 @@ const SPORT_TYPE_OPTIONS = ["Badminton", "Basketball", "Swimming", "Soccer", "Te
 const FACILITY_DESCRIPTION_MAX_LENGTH = 500;
 const FACILITY_GUIDELINES_MAX_LENGTH = 500;
 
+// Make the hour options for opening and closing dropdowns.
+// The form only lets admin choose full hours.
 function buildHourOptions(startHour, endHour) {
   return Array.from({ length: endHour - startHour + 1 }, (_, index) =>
     `${String(startHour + index).padStart(2, "0")}:00`,
@@ -35,6 +39,9 @@ function buildHourOptions(startHour, endHour) {
 const START_HOUR_OPTIONS = buildHourOptions(6, 22);
 const END_HOUR_OPTIONS = buildHourOptions(7, 23);
 
+// Turn a stored hour into the value used by the dropdown.
+// Valid numbers become full hour text.
+// Bad values become blank so validation can catch them.
 function formatHourInputValue(value) {
   const hour = Number.parseInt(String(value ?? ""), 10);
   if (Number.isNaN(hour)) {
@@ -44,6 +51,9 @@ function formatHourInputValue(value) {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
+// Read the selected dropdown value as an hour number.
+// The form uses it to compare opening and closing time.
+// Bad values are left for validation to handle.
 function parseHourInputValue(value) {
   const source = String(value || "").trim();
   if (!source) {
@@ -58,6 +68,8 @@ function parseHourInputValue(value) {
   return Number.parseInt(match[1], 10);
 }
 
+// Make the blank form for the create facility drawer.
+// Default values give admin a normal starting point.
 function getEmptyForm() {
   return {
     facility_id: "",
@@ -73,6 +85,8 @@ function getEmptyForm() {
   };
 }
 
+// Make the error message for create or edit failures.
+// Some backend errors need clearer wording for admin.
 function getUpsertErrorMessage(error) {
   const code = getErrorCode(error);
   if (code === "not-found") {
@@ -84,6 +98,8 @@ function getUpsertErrorMessage(error) {
   return getActionErrorMessage(error, "facility.save", "Unable to save this facility.");
 }
 
+// Make the error message for a failed delete action.
+// The text is shown inside the confirm dialog.
 function getDeleteErrorMessage(error) {
   const code = getErrorCode(error);
   if (code === "not-found") {
@@ -92,6 +108,9 @@ function getDeleteErrorMessage(error) {
   return getActionErrorMessage(error, "facility.delete", "Unable to delete this facility.");
 }
 
+// Main facility management page for admins.
+// It shows facility cards with status, sport type, and assigned staff.
+// It also controls the create drawer, edit drawer, and delete dialog.
 export default function AdminFacilities() {
   const { sessionProfile } = useAuth();
   const [items, setItems] = useState([]);
@@ -111,6 +130,9 @@ export default function AdminFacilities() {
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  // Reload facility cards and staff dropdown options.
+  // This runs after save and delete actions.
+  // Staff options only include active or unassigned staff accounts.
   async function refreshFacilities({ showLoader = false } = {}) {
     if (showLoader) {
       setLoading(true);
@@ -139,12 +161,16 @@ export default function AdminFacilities() {
     }
   }
 
-  // Load real data when this part opens or changes.
+  // Start live listeners for facilities and assignable staff.
+  // Facility changes update the cards.
+  // Staff changes update the assigned staff dropdown and displayed names.
   useEffect(() => {
     let active = true;
     let unsubscribeFacilities = () => {};
     let unsubscribeStaff = () => {};
 
+    // Listen to the two collections used by this page.
+    // Facilities and staff are separate because they change for different reasons.
     async function startSubscriptions() {
       setLoading(true);
 
@@ -208,7 +234,8 @@ export default function AdminFacilities() {
     };
   }, [sessionProfile]);
 
-  // Build the list that the user can see.
+  // Build the facility cards after search and sport filters.
+  // Filters only change what is shown on screen.
   const filteredItems = useMemo(() => {
     const query = searchInput.trim().toLowerCase();
     return items.filter((item) => {
@@ -247,6 +274,8 @@ export default function AdminFacilities() {
     });
   }, [form.start_time]);
 
+  // Clear facility filters and old page messages.
+  // The drawer stays as it is because filtering is separate from editing.
   function clearFilters() {
     setSearchInput("");
     setTypeFilter("all");
@@ -254,6 +283,9 @@ export default function AdminFacilities() {
     setPageMessage("");
   }
 
+  // Update a long text field and check its real character count.
+  // Description and usage guidelines both use this helper.
+  // Too long text shows a field error and the old value stays.
   function handleLimitedTextField(field, value, maxLength, label) {
     if (countMeaningfulCharacters(value) > maxLength) {
       setFormErrors((previous) => ({
@@ -269,6 +301,9 @@ export default function AdminFacilities() {
     setFormError("");
   }
 
+  // Update the opening time in the drawer form.
+  // If the old closing time is now wrong, clear it.
+  // This stops admin from saving a bad time range.
   function handleStartTimeChange(value) {
     const nextStartHour = parseHourInputValue(value);
     setForm((previous) => {
@@ -285,6 +320,9 @@ export default function AdminFacilities() {
     setFormError("");
   }
 
+  // Update the closing time in the drawer form.
+  // If the old opening time is now wrong, clear it.
+  // This keeps the time range valid before saving.
   function handleEndTimeChange(value) {
     const nextEndHour = parseHourInputValue(value);
     setForm((previous) => {
@@ -301,6 +339,8 @@ export default function AdminFacilities() {
     setFormError("");
   }
 
+  // Open the drawer for a new facility.
+  // The form starts from default values and old messages are cleared.
   function openCreateDrawer() {
     setDrawerMode("create");
     setForm(getEmptyForm());
@@ -311,6 +351,9 @@ export default function AdminFacilities() {
     setDrawerOpen(true);
   }
 
+  // Open the drawer for editing a facility.
+  // The form is filled from the selected card.
+  // Pending opening hours are shown when they exist.
   function openEditDrawer(item) {
     setDrawerMode("edit");
     setForm({
@@ -332,6 +375,8 @@ export default function AdminFacilities() {
     setDrawerOpen(true);
   }
 
+  // Close the drawer when no save is running.
+  // The form is reset so the next open starts clean.
   function closeDrawer() {
     if (saving) {
       return;
@@ -344,6 +389,8 @@ export default function AdminFacilities() {
     setFormError("");
   }
 
+  // Open the delete dialog for one facility.
+  // The selected facility is saved for the confirm action.
   function openDeleteModal(item) {
     setDeleteTarget(item);
     setDeleteError("");
@@ -351,6 +398,8 @@ export default function AdminFacilities() {
     setPageMessage("");
   }
 
+  // Close the delete dialog when no delete request is running.
+  // It stays open during submit so the action cannot be clicked twice.
   function closeDeleteModal() {
     if (deleting) {
       return;
@@ -360,6 +409,9 @@ export default function AdminFacilities() {
     setDeleteError("");
   }
 
+  // Check the facility form and build the backend payload.
+  // Create mode needs full facility details.
+  // Edit mode keeps fixed values from the selected facility and updates editable fields.
   function validateForm() {
     const nextErrors = {};
     const trimmedName = String(form.name || "").trim();
@@ -466,6 +518,9 @@ export default function AdminFacilities() {
     };
   }
 
+  // Save a new or edited facility.
+  // The form is checked first and then sent to the backend.
+  // After success, cards reload and the drawer closes.
   async function handleSave() {
     setFormError("");
     setPageError("");
@@ -501,6 +556,9 @@ export default function AdminFacilities() {
     }
   }
 
+  // Delete the selected facility or schedule its deletion.
+  // The backend decides whether it happens now or on a later date.
+  // The cards reload afterward so status text is current.
   async function handleDeleteConfirm() {
     if (!deleteTarget) {
       return;

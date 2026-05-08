@@ -1,4 +1,6 @@
-// This staff page shows Requests content.
+// Staff use this page to handle booking requests from members.
+// The screen has filters, request cards, and a detail area for the selected request.
+// Staff can approve, reject, or send a suggested change from this page.
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import "../pageStyles.css";
@@ -26,10 +28,16 @@ const STAFF_REQUEST_STATUSES = ["pending", "accepted", "rejected", "alternative 
 const STAFF_REQUEST_STATUS_SET = new Set(STAFF_REQUEST_STATUSES);
 const STATUS_FILTER_OPTIONS = STAFF_REQUEST_STATUSES.map((status) => ({ value: status, label: status }));
 
+// Put the newest requests at the top of the list.
+// Staff usually check the latest request first.
+// Empty dates are treated like blank text so sorting will not break.
 function sortStaffRequests(items = []) {
   return [...items].sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || "")));
 }
 
+// Make the short date text used on a request card.
+// The stored date is not changed.
+// Bad date values are returned as they came in so staff still see something.
 function toDateLabel(value = "") {
   if (!value) {
     return "";
@@ -46,10 +54,15 @@ function toDateLabel(value = "") {
   });
 }
 
+// Make the small time label at the bottom of a request card.
+// Staff use it to see when the member submitted the request.
 function getCardFooterLabel(item) {
   return formatStaffCardTimestamp(item.createdAt);
 }
 
+// Make the id and time line in the detail panel.
+// Finished requests show when they were completed.
+// Requests still waiting show when they were submitted.
 function getDetailTimestampLabel(item) {
   if (item.completedAt) {
     return `Request ID: ${item.id} / Completed ${formatStaffDateTime(item.completedAt)}`;
@@ -58,12 +71,17 @@ function getDetailTimestampLabel(item) {
   return `Request ID: ${item.id} / Submitted ${formatStaffDateTime(item.createdAt)}`;
 }
 
+// Make the member list shown in request details.
+// The applicant appears first and invited friends appear after.
+// Repeated names are removed so the panel stays clean.
 function getParticipants(item) {
   return [item.memberName, ...(Array.isArray(item.participantNames) ? item.participantNames : [])].filter(
     (participant, index, participants) => Boolean(participant) && participants.indexOf(participant) === index,
   );
 }
 
+// Make a clean modal state for reject and suggest actions.
+// The modal starts with no action type and no typed message.
 function getInitialDecisionState() {
   return {
     type: "",
@@ -71,6 +89,9 @@ function getInitialDecisionState() {
   };
 }
 
+// Convert the stored request status into the page status.
+// The stored suggested state is shown as alternative suggested for staff.
+// Other statuses keep their normal meaning.
 function toPageItem(item) {
   return {
     ...item,
@@ -78,6 +99,9 @@ function toPageItem(item) {
   };
 }
 
+// Main request review page for staff.
+// It looks like a filter bar above request cards, with a detail panel beside the list.
+// It keeps the list live and sends staff decisions to the booking action.
 export default function Requests() {
   const { sessionProfile } = useAuth();
   const [items, setItems] = useState([]);
@@ -104,13 +128,20 @@ export default function Requests() {
   );
   const maxFilterDate = useMemo(() => getDateInputMaxValue(7), []);
 
+  // Reload requests after staff approve, reject, or suggest a change.
+  // Facility options are loaded again because names or assignments can change.
+  // The same request stays open if it is still in the list.
   async function refresh(preferredId = "") {
     setLoading(true);
     try {
+      // Load request rows and facility names together.
+      // The list needs requests and the filter needs facility options.
       const [nextRequests, nextFacilities] = await Promise.all([
         getStaffRequests(sessionProfile),
         getAllFacilityFilterOptions(),
       ]);
+      // Prepare the page status before rendering.
+      // The suggested state becomes alternative suggested here.
       const mappedRequests = sortStaffRequests(
         nextRequests.map(toPageItem).filter((item) => STAFF_REQUEST_STATUS_SET.has(item.pageStatus)),
       );
@@ -118,6 +149,8 @@ export default function Requests() {
       setFacilityOptions(nextFacilities);
 
       setSelectedId((current) => {
+        // Keep the same detail panel open when possible.
+        // Close it if the request no longer belongs in the staff list.
         const candidate = preferredId || current;
         if (candidate && mappedRequests.some((item) => item.id === candidate)) {
           return candidate;
@@ -131,11 +164,15 @@ export default function Requests() {
     }
   }
 
-  // Load real data when this part opens or changes.
+  // Start live updates for the request page.
+  // Request changes update status text and action buttons.
+  // Member and facility changes update the names in the cards.
   useEffect(() => {
     let active = true;
     let unsubscribe = () => {};
 
+    // Load facility names for the dropdown.
+    // If this fails, the request list can still show without those options.
     async function updateFacilityOptions() {
       try {
         const nextFacilities = await getAllFacilityFilterOptions();
@@ -149,11 +186,16 @@ export default function Requests() {
       }
     }
 
+    // Start the request listener after the first facility load.
+    // Each update is shaped into page rows before React renders it.
     async function startSubscription() {
       setLoading(true);
       await updateFacilityOptions();
 
       try {
+        // The service watches requests, facilities, and members.
+        // Rows come back with real member names for staff work.
+        // This page only filters them and shows them.
         unsubscribe = await subscribeToStaffRequests(
           sessionProfile,
           (nextRequests) => {
@@ -166,6 +208,8 @@ export default function Requests() {
                 .map(toPageItem)
                 .filter((item) => STAFF_REQUEST_STATUS_SET.has(item.pageStatus)),
             );
+            // Close the detail panel when the selected row no longer belongs here.
+            // Another staff action can move a request out of this view.
             setItems(mappedRequests);
             setSelectedId((current) => (current && mappedRequests.some((item) => item.id === current) ? current : ""));
             setPageError("");
@@ -198,14 +242,20 @@ export default function Requests() {
     };
   }, [sessionProfile]);
 
-  // Build the list that the user can see.
+  // Apply the filter panel to the request cards.
+  // Staff can filter by date, facility, and status.
+  // The filtered list keeps the newest requests first.
   const visibleItems = useMemo(() => {
     return sortStaffRequests(
       items.filter((item) => {
+        // Hide request states that this page does not handle.
+        // This keeps odd backend states out of the staff list.
         if (!STAFF_REQUEST_STATUS_SET.has(item.pageStatus)) {
           return false;
         }
 
+        // Facility can match by id or display name.
+        // Some older rows still carry the name instead of the id.
         const dateMatch = !filters.date || item.date === filters.date;
         const facilityMatch =
           !filters.facility ||
@@ -236,6 +286,9 @@ export default function Requests() {
   useEffect(() => {
     let cancelled = false;
 
+    // Check whether the selected request still owns its time slots.
+    // The result controls the warning near the approve button.
+    // Staff use it before choosing approve, reject, or suggest.
     async function loadConflictSummary() {
       if (!selectedItem) {
         setConflictSummary(null);
@@ -243,6 +296,8 @@ export default function Requests() {
       }
 
       try {
+        // Ask the service for the latest slot state.
+        // A conflict means staff should not approve this request directly.
         const summary = await getStaffRequestConflictSummary(selectedItem.raw, sessionProfile);
         if (!cancelled) {
           setConflictSummary(summary);
@@ -267,6 +322,9 @@ export default function Requests() {
   useEffect(() => {
     let cancelled = false;
 
+    // Load open slots in the same facility.
+    // Staff can use these slots when writing a suggested change.
+    // This only matters for pending requests.
     async function loadAvailableSlots() {
       if (!selectedItem || selectedItem.pageStatus !== "pending") {
         setAvailableSlots(null);
@@ -294,12 +352,17 @@ export default function Requests() {
   useEffect(() => {
     let cancelled = false;
 
+    // Find other normal facilities with the same sport and open time.
+    // These are possible options when staff need to suggest a change.
+    // The search stops if the selected request changes.
     async function loadAlternativeFacilities() {
       if (!selectedItem || selectedItem.pageStatus !== "pending") {
         setAlternativeFacilities(null);
         return;
       }
       try {
+        // First collect facilities with the same sport.
+        // Staff should not suggest a different activity by mistake.
         const targetFacilityId = selectedItem.facilityId || selectedItem.raw?.facility_id;
         const startTime = `${selectedItem.startTime}`;
 
@@ -320,6 +383,8 @@ export default function Requests() {
         await Promise.all(
           potentialAlternatives.map(async (fac) => {
             try {
+              // Then check the time slots for that date.
+              // A normal facility can still have that hour locked.
               const slots = await getTimeSlotsByFacility(fac.id, selectedItem.date);
               const hasMatchingSlot = slots.some(
                 (slot) =>
@@ -331,7 +396,8 @@ export default function Requests() {
                 verifiedAlternatives.push(fac);
               }
             } catch (err) {
-              // Skip facility if slots fail to load
+              // Skip this facility when its slots cannot be loaded.
+              // It is better to hide an uncertain option than suggest a bad one.
             }
           })
         );
@@ -352,6 +418,9 @@ export default function Requests() {
     };
   }, [selectedItem]);
 
+  // Clear the filters and old page messages.
+  // The request cards go back to the default view.
+  // The decision modal is left alone because this button only controls filters.
   function clearFilters() {
     setFilters({
       date: "",
@@ -362,10 +431,16 @@ export default function Requests() {
     setPageMessage("");
   }
 
+  // Open or close the detail panel for a request.
+  // Clicking a new card shows that request.
+  // Clicking the same card again hides the detail panel.
   function toggleSelection(id) {
     setSelectedId((current) => (current === id ? "" : id));
   }
 
+  // Open the modal for rejecting or suggesting a change.
+  // The type decides what the submit button will send.
+  // Old modal errors are cleared before staff type a new message.
   function openDecision(type) {
     setDecision({
       type,
@@ -376,16 +451,23 @@ export default function Requests() {
     setPageError("");
   }
 
+  // Close the decision modal.
+  // The typed response and modal error are cleared.
   function closeDecision() {
     setDecision(getInitialDecisionState());
     setDecisionError("");
   }
 
+  // Approve the selected pending request.
+  // The backend action changes the real status and sends notifications.
+  // After success, the same request stays open as a read only record.
   async function handleApprove() {
     if (!selectedItem || selectedItem.pageStatus !== "pending") {
       return;
     }
 
+    // Approval does not need staff response text.
+    // The field is still sent so the payload shape stays the same.
     setPageError("");
     setPageMessage("");
     setProcessingAction("accepted");
@@ -410,11 +492,16 @@ export default function Requests() {
     }
   }
 
+  // Submit a rejection or suggested change.
+  // Staff must write a message so the member knows the reason.
+  // The same booking action receives both choices.
   async function submitDecision() {
     if (!selectedItem || selectedItem.pageStatus !== "pending" || !decision.type) {
       return;
     }
 
+    // Reject and suggest actions need a reason.
+    // Empty text is not useful for the member.
     if (!hasMeaningfulText(decision.text)) {
       setDecisionError(
         decision.type === "rejected"
@@ -430,6 +517,8 @@ export default function Requests() {
     setProcessingAction(decision.type);
 
     try {
+      // Send the new status and staff message to the booking action.
+      // The live listener will pick up the updated row afterward.
       await processBookingApproval(
         {
           request_id: selectedItem.id,
@@ -763,6 +852,7 @@ export default function Requests() {
   );
 }
 
+// Small warning icon used beside read-only request messages.
 function CalendarAlert() {
   return <AlertTriangle size={18} />;
 }

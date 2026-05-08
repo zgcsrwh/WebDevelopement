@@ -17,6 +17,7 @@ import {
   getUserContextOnLogin,
   normalizeUserContextPayload,
 } from "../services/authService";
+import { createAppError } from "../utils/errors";
 import FirestoreFunc from "./FirebaseFunc"
 
 
@@ -192,7 +193,7 @@ export function AuthProvider({ children }) {
 
       if (context.role === "Member" && !user.emailVerified) {
         await signOut(auth);
-        throw new Error("Please verify your email before signing in.");
+        throw createAppError("email-not-verified", "Email not verified");
       }
       if (!canUseAccountStatus(context.role, context.status)) {
         await signOut(auth);
