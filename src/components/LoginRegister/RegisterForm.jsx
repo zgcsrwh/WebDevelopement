@@ -6,6 +6,7 @@ import { useAuth } from "../../provider/AuthContext";
 import { getActionErrorMessage, getErrorCode } from "../../utils/errors";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VERIFICATION_WAIT_SECONDS = 60;
 
 function isStrongPassword(value) {
   return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(String(value || ""));
@@ -127,6 +128,7 @@ const RegisterForm = ({ onSwitch }) => {
   const [submitting, setSubmitting] = useState(false);
   const [checkingVerification, setCheckingVerification] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
+  const [lastVerificationEmail, setLastVerificationEmail] = useState("");
   const [hasInitialized, setHasInitialized] = useState(false);
 
   const {
@@ -149,6 +151,7 @@ const RegisterForm = ({ onSwitch }) => {
     setSubmitting(false);
     setCheckingVerification(false);
     setResendCountdown(0);
+    setLastVerificationEmail("");
   }, []);
 
   const showError = useCallback((message) => {
@@ -168,7 +171,6 @@ const RegisterForm = ({ onSwitch }) => {
   const resetVerificationProgress = useCallback(async () => {
     setVerificationSent(false);
     setEmailVerified(false);
-    setResendCountdown(0);
     setSuccess("");
     setError("");
     await discardPendingRegistration();
@@ -242,14 +244,25 @@ const RegisterForm = ({ onSwitch }) => {
     }
   }, [formData, signup, showSuccess, showError, resetLocalState, onSwitch]);
 
-  // Monitor email verification status
+  // Check email verification when the user comes back to this page.
+  // This avoids repeated Firebase Auth checks while the user is still reading the email.
   useEffect(() => {
     const { email, password } = formData;
     if (!verificationSent || emailVerified || !email.trim() || !password.trim()) return;
 
     let cancelled = false;
+    let running = false;
+    let lastCheckAt = 0;
 
-    const checkOnce = async () => {
+    const checkOnce = async (force = false) => {
+      const now = Date.now();
+      if (running || (!force && now - lastCheckAt < 15000)) {
+        return;
+      }
+
+      running = true;
+      lastCheckAt = now;
+
       try {
         setCheckingVerification(true);
         const response = await checkRegistrationVerification(email, password);
@@ -261,24 +274,27 @@ const RegisterForm = ({ onSwitch }) => {
           showSuccess("Email verified! Completing registration...");
           await completeRegistration();
         }
-      } catch {
-        // Silent polling error
+      } catch (err) {
+        if (cancelled) return;
+        const message = String(err?.code || err?.message || "").toLowerCase();
+        if (message.includes("too-many-requests") || message.includes("quota-exceeded")) {
+          setError("Firebase has blocked repeated checks for a short time. Please wait about a minute, then click Complete Registration.");
+          setSuccess("");
+        }
       } finally {
+        running = false;
         if (!cancelled) setCheckingVerification(false);
       }
     };
 
-    checkOnce();
-    const timer = setInterval(checkOnce, 4000);
-    const handleFocus = () => checkOnce();
-    const handleVisibility = () => document.visibilityState === "visible" && checkOnce();
+    const handleFocus = () => checkOnce(true);
+    const handleVisibility = () => document.visibilityState === "visible" && checkOnce(true);
 
     window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
@@ -316,30 +332,25 @@ const RegisterForm = ({ onSwitch }) => {
     }
 
     const { email, password } = formData;
+    const normalizedEmail = email.trim().toLowerCase();
+    if (resendCountdown > 0 && lastVerificationEmail === normalizedEmail) {
+      showError(`Please wait ${resendCountdown} seconds before sending another verification email.`);
+      return;
+    }
     setSubmitting(true);
 
     try {
       await beginEmailVerification(email, password);
       setVerificationSent(true);
-      setResendCountdown(60);
+      setLastVerificationEmail(normalizedEmail);
+      setResendCountdown(VERIFICATION_WAIT_SECONDS);
       showSuccess("Verification email sent. Please check your inbox and click the link. Registration will complete automatically after verification.");
     } catch (err) {
       if (err?.message?.includes("email-already-in-use")) {
-        try {
-          const response = await resendRegistrationVerification(email, password);
-          if (response.verified) {
-            setEmailVerified(true);
-            setVerificationSent(false);
-            showSuccess("Email verified! Completing registration...");
-            await completeRegistration();
-          } else {
-            setVerificationSent(true);
-            setResendCountdown(60);
-            showSuccess("Verification email sent. Please check your inbox.");
-          }
-        } catch (resendErr) {
-          showError(resolveVerificationError(resendErr, "Unable to resend verification email."));
-        }
+        setVerificationSent(true);
+        setLastVerificationEmail(normalizedEmail);
+        setResendCountdown((current) => Math.max(current, VERIFICATION_WAIT_SECONDS));
+        showSuccess("This email already has a pending verification. Please check your inbox, then click Complete Registration.");
       } else {
         showError(mapVerificationError(err));
       }
@@ -364,11 +375,41 @@ const RegisterForm = ({ onSwitch }) => {
         showSuccess("Email verified! Completing registration...");
         await completeRegistration();
       } else {
-        setResendCountdown(60);
+        setLastVerificationEmail(email.trim().toLowerCase());
+        setResendCountdown(VERIFICATION_WAIT_SECONDS);
         showSuccess("Verification email resent. Please check your inbox.");
       }
     } catch (err) {
       showError(resolveVerificationError(err, "Unable to resend verification email."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleCompleteRegistration() {
+    const { email, password } = formData;
+    setError("");
+    setSuccess("");
+    setSubmitting(true);
+
+    try {
+      const response = await checkRegistrationVerification(email, password);
+      if (response.verified) {
+        setEmailVerified(true);
+        setVerificationSent(false);
+        showSuccess("Email verified! Completing registration...");
+        await completeRegistration();
+        return;
+      }
+
+      showError("Please verify your email first, then click Complete Registration.");
+    } catch (err) {
+      const message = String(err?.code || err?.message || "").toLowerCase();
+      if (message.includes("too-many-requests") || message.includes("quota-exceeded")) {
+        showError("Firebase has blocked repeated checks for a short time. Please wait about a minute, then click Complete Registration.");
+      } else {
+        showError(resolveVerificationError(err, "Unable to check email verification right now."));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -466,6 +507,14 @@ const RegisterForm = ({ onSwitch }) => {
           </button>
         ) : (
           <div className={styles.verificationActions}>
+            <button
+              type="button"
+              className={styles.submitBtn}
+              onClick={handleCompleteRegistration}
+              disabled={submitting || checkingVerification}
+            >
+              {submitting || checkingVerification ? "Checking..." : "Complete Registration"}
+            </button>
             <button
               type="button"
               className={styles.submitBtn}

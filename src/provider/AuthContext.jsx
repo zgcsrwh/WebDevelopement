@@ -41,7 +41,8 @@ async function signInAndLoad(email, password) {
 
 async function assertEmailAvailableForMemberRegistration(email) {
   // Member registration cannot reuse a staff, admin, or existing member email.
-  const context = await getRegistrationEligibility(email);
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const context = await getRegistrationEligibility(normalizedEmail);
   if (context.canRegister) {
     return;
   }
@@ -89,11 +90,12 @@ export function AuthProvider({ children }) {
   async function beginEmailVerification(email, password) {
     setAuthLoading(true);
     try {
-      await assertEmailAvailableForMemberRegistration(email);
-      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      const normalizedEmail = String(email || "").trim().toLowerCase();
+      await assertEmailAvailableForMemberRegistration(normalizedEmail);
+      const credential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
       // Store the uid in a temporary document before profile creation.
       const uid = credential.user.uid;
-      FirestoreFunc.create("TempUser", {email:email, uid:uid});
+      await FirestoreFunc.create("TempUser", { email: normalizedEmail, uid });
 
       await sendEmailVerification(credential.user);
       setRegistrationPending(true);
@@ -106,10 +108,11 @@ export function AuthProvider({ children }) {
   async function resendRegistrationVerification(email, password) {
     setAuthLoading(true);
     try {
+      const normalizedEmail = String(email || "").trim().toLowerCase();
       let user = auth.currentUser;
-      if (!user || user.email !== email) {
-        await assertEmailAvailableForMemberRegistration(email);
-        user = await signInAndLoad(email, password);
+      if (!user || user.email !== normalizedEmail) {
+        await assertEmailAvailableForMemberRegistration(normalizedEmail);
+        user = await signInAndLoad(normalizedEmail, password);
       } else {
         await reload(user);
       }
@@ -128,9 +131,10 @@ export function AuthProvider({ children }) {
   async function checkRegistrationVerification(email, password) {
     setAuthLoading(true);
     try {
+      const normalizedEmail = String(email || "").trim().toLowerCase();
       let user = auth.currentUser;
-      if (!user || user.email !== email) {
-        user = await signInAndLoad(email, password);
+      if (!user || user.email !== normalizedEmail) {
+        user = await signInAndLoad(normalizedEmail, password);
       } else {
         await reload(user);
       }
@@ -145,19 +149,21 @@ export function AuthProvider({ children }) {
   async function signup(name, email, password, address, dateOfBirth) {
     setAuthLoading(true);
     try {
-      await assertEmailAvailableForMemberRegistration(email);
-      const user = await signInAndLoad(email, password);
+      const normalizedEmail = String(email || "").trim().toLowerCase();
+      await assertEmailAvailableForMemberRegistration(normalizedEmail);
+      const user = await signInAndLoad(normalizedEmail, password);
       if (!user.emailVerified) {
         await signOut(auth);
         throw new Error("Please verify your email before completing registration.");
       }
 
       // Read the temporary uid document before creating the member profile.
-      const tmpMember = await FirestoreFunc.filterSingle("TempUser", [{ field: "email", operator: "==", value: email }]);
-      const uid = tmpMember[0].uid;
+      const tmpMember = await FirestoreFunc.filterSingle("TempUser", [{ field: "email", operator: "==", value: normalizedEmail }]).catch(() => []);
+      const tmpRecord = tmpMember[0] || null;
+      const uid = tmpRecord?.uid || user.uid;
       await createUserProfile({
         name,
-        email,
+        email: normalizedEmail,
         password,
         address,
         dateOfBirth,
@@ -167,7 +173,9 @@ export function AuthProvider({ children }) {
       await signOut(auth);
 
       // Remove the temporary uid document after registration is complete.
-      await FirestoreFunc.remove("TempUser", tmpMember[0].id)
+      if (tmpRecord?.id) {
+        await FirestoreFunc.remove("TempUser", tmpRecord.id).catch(() => null);
+      }
 
       return { success: true };
     } finally {
