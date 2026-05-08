@@ -244,6 +244,8 @@ export default function AdminStaff() {
 
     if (!createForm.date_of_birth) {
       nextErrors.date_of_birth = "Date of birth is required.";
+    } else if (new Date(createForm.date_of_birth) > new Date()) {
+      nextErrors.date_of_birth = "Date of birth cannot be in the future.";
     }
 
     if (!createForm.address.trim()) {

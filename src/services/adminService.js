@@ -329,7 +329,7 @@ export async function createStaffAccount(form, actor) {
     "createStaffAccount",
     {
       name: String(form.name || "").trim(),
-      date_of_birth: toStoredDateString(form.date_of_birth),
+      date_of_birth: normalizeDateInput(form.date_of_birth),
       address: String(form.address || "").trim(),
       email: normalizeEmail(form.email),
       password: String(form.password || ""),
