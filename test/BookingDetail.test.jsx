@@ -67,7 +67,6 @@ describe("BookingDetail Component Unit Test", () => {
         await waitFor(() => {
             expect(screen.queryByText(/Loading booking details/i)).not.toBeInTheDocument();
         });
-        //screen.logTestingPlaygroundURL();
     }
 
   it("Case_BookingDetail_1: From page 'My Bookings' select a booking and click 'View details' - Pending bookings", async () => {
@@ -90,13 +89,13 @@ describe("BookingDetail Component Unit Test", () => {
 
   it("Case_BookingDetail_4: From page 'My Bookings' select a booking and click 'View details' - Alternative suggested", async () => {
     await navigateToDetailByStatus("alternative suggested");
-    
+ 
     // Title
-    expect(screen.getByText("Staff Feedback / Suggestion")).toBeInTheDocument();
+    expect(screen.getByText("Staff Feedback")).toBeInTheDocument();
     
     // Staff Response body (from mock data in TestCommonFunc)
     expect(screen.getByText("Suggested Description")).toBeInTheDocument();
-    
+  
     // Action button
     expect(screen.getByRole("link", { name: /Create New/i })).toBeInTheDocument();
   });
@@ -116,7 +115,6 @@ describe("BookingDetail Component Unit Test", () => {
   // Having problem
   it("Case_BookingDetail_7: From page 'My Bookings' select a booking and click 'View details' - No show", async () => {
     await navigateToDetailByStatus("no show");
-    screen.logTestingPlaygroundURL();
-    expect(screen.getByText("This booking was marked as no-show because no arrival was confirmed before the session started")).toBeInTheDocument();
+    expect(screen.getByText("This booking was marked as no-show because no arrival was confirmed before the session started.")).toBeInTheDocument();
   });
 });

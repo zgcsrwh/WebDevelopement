@@ -316,8 +316,9 @@ it("Case_BookingNew_8: Submit when ‘Total Attendees’ is empty, report error 
     const submitBtn = screen.getByRole("button", { name: /Submit Request/i });
     fireEvent.click(submitBtn);
 
-    // Validate the resulting error message
-    expect(await screen.findByText(/Please enter a short activity description before submitting the booking request/i)).toBeInTheDocument();
+    // Validate the resulting error messages (it appears in both the top alert and the field error)
+    const errorMessages = await screen.findAllByText(/Please enter a short activity description before submitting the booking request/i);
+    expect(errorMessages.length).toBe(2);
   });
 
   /*************************      Invite Partners           ***************************** */

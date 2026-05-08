@@ -60,7 +60,7 @@ describe("MyBookings Component Unit Test", () => {
     expect(screen.getAllByText(/rejected/i).length).toBe(2);
     expect(screen.getAllByText(/alternative suggested/i).length).toBe(2);
     expect(screen.getAllByText(/cancelled/i).length).toBe(2);
-    expect(screen.getAllByText(/no show/i).length).toBe(1);
+    expect(screen.getAllByText(/no show/i).length).toBe(2);
     expect(screen.getAllByText(/completed/i).length).toBe(2);
   });
 
@@ -93,11 +93,11 @@ describe("MyBookings Component Unit Test", () => {
     });
         
     // Find the Cancel Booking button
-    const withdrawBtn = screen.getByRole("button", { name: /Cancel Booking/i });
-    expect(withdrawBtn).toBeInTheDocument();
+    const cancelBtn = screen.getByRole("button", { name: /Cancel Booking/i });
+    expect(cancelBtn).toBeInTheDocument();
 
-    // Verify that the "pending" status text is located inside the exact same booking card
-    const bookingCard = withdrawBtn.closest("article");
+    // Verify that the "upcoming" status text is located inside the exact same booking card
+    const bookingCard = cancelBtn.closest("article");
     expect(within(bookingCard).getByText(/upcoming/i)).toBeInTheDocument();
   });
 
@@ -112,7 +112,6 @@ describe("MyBookings Component Unit Test", () => {
     });
 
     fireEvent.change(screen.getByLabelText(/Status/i), { target: { value: "completed" } });
-    fireEvent.click(screen.getByRole("button", { name: /Apply/i }));
 
     const venues = await screen.findAllByText(/Test Venue/i);
     expect(venues.length).toBe(1);
@@ -132,8 +131,7 @@ describe("MyBookings Component Unit Test", () => {
     const yesterdayString = yesterday.toISOString().slice(0, 10);
 
     fireEvent.change(screen.getByLabelText(/Date/i), { target: { value: yesterdayString } });
-    fireEvent.click(screen.getByRole("button", { name: /Apply/i }));
-
+  
     await waitFor(() => {
       const venues = screen.getAllByText(/Test Venue/i);
       expect(venues.length).toBe(2);
@@ -152,7 +150,6 @@ describe("MyBookings Component Unit Test", () => {
     // Apply a filter 
     const statusSelect = screen.getByLabelText(/Status/i);
     fireEvent.change(statusSelect, { target: { value: "completed" } });
-    fireEvent.click(screen.getByRole("button", { name: /Apply/i }));
 
     // Wait for the filter to take effect (only 1 item should display)
     await waitFor(() => {

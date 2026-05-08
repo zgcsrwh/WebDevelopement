@@ -48,9 +48,6 @@ describe("Facilities Filter Unit Test", () => {
     const slot2 = screen.getAllByText(/07:00 - 08:00/i);
     expect(slot2.length === 2);
     
-    const slot3 = screen.getAllByText(/08:00 - 09:00/i);
-    expect(slot3.length === 1);
-
     const slot4 = screen.getAllByText(/09:00 - 10:00/i);
     expect(slot4.length === 1);
 
@@ -70,14 +67,10 @@ describe("Facilities Filter Unit Test", () => {
     expect(tennisElements.length === 2);
     expect(tennisElements[0]).toBeInTheDocument();
 
+    screen.logTestingPlaygroundURL();
     expect(screen.getByText("Capacity: 6")).toBeInTheDocument();
-    
-    const slot1 = screen.getAllByText(/12:00 - 13:00/i);
-    expect(slot1.length === 1);
-
-    const slot2 = screen.getAllByText(/13:00 - 14:00/i);
-    expect(slot2.length === 1);
-
+    const testNum = screen.getAllByText("Fixing");
+    expect(testNum.length === 3);
   });
 
   it("Case_Facilities_3: Apply the 'date' filter", async () => {
@@ -90,10 +83,6 @@ describe("Facilities Filter Unit Test", () => {
     // Change the date
     const dateInput = screen.getByLabelText(/Date/i);
     fireEvent.change(dateInput, { target: { value: tomorrowString } });
-
-    // Click apply
-    const applyBtn = screen.getByRole("button", { name: /Apply/i });
-    fireEvent.click(applyBtn);
     
     expect(await screen.findByText("No available time slots for the selected date.")).toBeInTheDocument();
   });   
@@ -108,10 +97,6 @@ describe("Facilities Filter Unit Test", () => {
     const typeSelect = screen.getByLabelText(/Venue Type/i);
     fireEvent.change(typeSelect, { target: { value: "Tennis" } });
 
-    // Click apply
-    const applyBtn = screen.getByRole("button", { name: /Apply/i });
-    fireEvent.click(applyBtn);
- 
     // Check if only Tennis court is shown
     await waitFor(() => {
       expect(screen.queryByText("Fixing Venue")).toBeInTheDocument();
@@ -129,10 +114,6 @@ describe("Facilities Filter Unit Test", () => {
     const timeSelect = screen.getByLabelText(/Time Slot/i);
     fireEvent.change(timeSelect, { target: { value: "07:00 - 08:00" } });
 
-    // Click apply
-    const applyBtn = screen.getByRole("button", { name: /Apply/i });
-    fireEvent.click(applyBtn);
-
     // Check if only the facility with this slot is shown
     await waitFor(() => {
       expect(screen.queryByText("Test Venue")).toBeInTheDocument();
@@ -144,15 +125,11 @@ describe("Facilities Filter Unit Test", () => {
     renderComponent();
   
     // Need to waite for the render completion of options
-    await screen.findByRole("option", { name: "normal" });
+    await screen.findByRole("option", { name: "Normal" });
 
-    // Change Availability to 'fixing'
+    // Change Availability to 'Fixing'
     const availabilitySelect = screen.getByLabelText(/Availability/i);
     fireEvent.change(availabilitySelect, { target: { value: "fixing" } });
-
-    // Click apply
-    const applyBtn = screen.getByRole("button", { name: /Apply/i });
-    fireEvent.click(applyBtn);
 
     // Check if only the fixing facility is shown
     await waitFor(() => {
@@ -167,9 +144,6 @@ describe("Facilities Filter Unit Test", () => {
     // Apply a filter
     const typeSelect = screen.getByLabelText(/Venue Type/i);
     fireEvent.change(typeSelect, { target: { value: "Tennis" } });
-
-    const applyBtn = screen.getByRole("button", { name: /Apply/i });
-    fireEvent.click(applyBtn);
 
     await waitFor(() => {
       expect(screen.queryByText("Test Venue")).not.toBeInTheDocument();

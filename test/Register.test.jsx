@@ -6,6 +6,7 @@ import RegisterForm from "../src/components/LoginRegister/LoginForm";
 import LoginRegister from "../src/pages/LoginRegister"
 import { useAuth, AuthProvider} from "../src/provider/AuthContext";
 import { db } from "../src/provider/FirebaseConfig";
+import {testAuthen, clearCollection} from "./TestCommonFunc";
 
 //screen.logTestingPlaygroundURL();
 describe("RegisterForm Unit Test", () => {
@@ -333,8 +334,11 @@ describe("RegisterForm Unit Test", () => {
     fireEvent.click(registerTab);
     expect(await screen.findByPlaceholderText(/Re-enter password/i)).toBeInTheDocument();
 
+    // Build input
+    await testAuthen("member", "testMember@gmail.com");
+
     // input
-    fireEvent.change(screen.getByPlaceholderText(/example@mail.com/i), { target: { value: "emma.w@gmail.com" } });
+    fireEvent.change(screen.getByPlaceholderText(/example@mail.com/i), { target: { value: "testMember@gmail.com" } });
     fireEvent.change(screen.getByPlaceholderText(/At least 8 characters with letters and numbers/i), { target: { value: "1234EFGH" } });
     fireEvent.change(screen.getByPlaceholderText(/Re-enter password/i), { target: { value: "1234EFGH" } });
     fireEvent.change(screen.getByPlaceholderText(/Your name/i), { target: { value: "TestUser" } });
@@ -347,6 +351,8 @@ describe("RegisterForm Unit Test", () => {
     // expectation
     const errorMessage = await screen.findByText(/An account already exists for this email/i);
     expect(errorMessage).toBeInTheDocument();
+
+    await clearCollection("member");
     });  
 
   // Validate account conflicts - staff
@@ -357,8 +363,11 @@ describe("RegisterForm Unit Test", () => {
     fireEvent.click(registerTab);
     expect(await screen.findByPlaceholderText(/Re-enter password/i)).toBeInTheDocument();
 
+    // Build input
+    await testAuthen("staff", "testStaff@gmail.com");
+
     // input
-    fireEvent.change(screen.getByPlaceholderText(/example@mail.com/i), { target: { value: "elena.r@sportcenter.com" } });
+    fireEvent.change(screen.getByPlaceholderText(/example@mail.com/i), { target: { value: "testStaff@gmail.com" } });
     fireEvent.change(screen.getByPlaceholderText(/At least 8 characters with letters and numbers/i), { target: { value: "1234EFGH" } });
     fireEvent.change(screen.getByPlaceholderText(/Re-enter password/i), { target: { value: "1234EFGH" } });
     fireEvent.change(screen.getByPlaceholderText(/Your name/i), { target: { value: "TestUser" } });
@@ -371,6 +380,8 @@ describe("RegisterForm Unit Test", () => {
     // expectation
     const errorMessage = await screen.findByText(/This email belongs to a staff or admin account and cannot be used for member registration/i);
     expect(errorMessage).toBeInTheDocument();
+
+    await clearCollection("admin_staff");
     });  
 
   // Validate account conflicts - admin
@@ -381,8 +392,11 @@ describe("RegisterForm Unit Test", () => {
     fireEvent.click(registerTab);
     expect(await screen.findByPlaceholderText(/Re-enter password/i)).toBeInTheDocument();
 
+    // Build input
+    await testAuthen("admin", "testAdmin@gmail.com");
+
     // input
-    fireEvent.change(screen.getByPlaceholderText(/example@mail.com/i), { target: { value: "sarah.m@sportcenter.com" } });
+    fireEvent.change(screen.getByPlaceholderText(/example@mail.com/i), { target: { value: "testAdmin@gmail.com" } });
     fireEvent.change(screen.getByPlaceholderText(/At least 8 characters with letters and numbers/i), { target: { value: "1234EFGH" } });
     fireEvent.change(screen.getByPlaceholderText(/Re-enter password/i), { target: { value: "1234EFGH" } });
     fireEvent.change(screen.getByPlaceholderText(/Your name/i), { target: { value: "TestUser" } });
@@ -395,6 +409,8 @@ describe("RegisterForm Unit Test", () => {
     // expectation
     const errorMessage = await screen.findByText(/This email belongs to a staff or admin account and cannot be used for member registration/i);
     expect(errorMessage).toBeInTheDocument();
+
+    await clearCollection("admin_staff");
     });  
 
   // Validate account conflicts - admin

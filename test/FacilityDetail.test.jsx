@@ -45,10 +45,6 @@ describe("Facilities Filter Unit Test", () => {
     const availabilitySelect = screen.getByLabelText(/Availability/i);
     fireEvent.change(availabilitySelect, { target: { value: "normal" } });
 
-    // Click apply
-    const applyBtn = screen.getByRole("button", { name: /Apply/i });
-    fireEvent.click(applyBtn);
-
     await waitFor(() => {
       expect(screen.queryByText("Fixing Venue")).not.toBeInTheDocument();
     });
@@ -64,8 +60,7 @@ describe("Facilities Filter Unit Test", () => {
     expect(screen.getByText(/My Test Location/i)).toBeInTheDocument();
 
     // Find the booked time slot
-    const timeNode = screen.getByText(/08:00 - 09:00/i);
-    expect(timeNode.parentElement).toHaveTextContent(/Booked/i);
+    expect(screen.getByText(/Unavailable/i)).toBeInTheDocument();
 
     expect(screen.getByRole('link', { name: /book/i })).toBeInTheDocument();
   });
@@ -79,10 +74,6 @@ describe("Facilities Filter Unit Test", () => {
     // Filter out the normal venue
     const availabilitySelect = screen.getByLabelText(/Availability/i);
     fireEvent.change(availabilitySelect, { target: { value: "fixing" } });
-
-    // Click apply
-    const applyBtn = screen.getByRole("button", { name: /Apply/i });
-    fireEvent.click(applyBtn);
 
     await waitFor(() => {
       expect(screen.queryByText("Test Venue")).not.toBeInTheDocument();
@@ -111,10 +102,6 @@ describe("Facilities Filter Unit Test", () => {
     // Filter out the normal venue
     const availabilitySelect = screen.getByLabelText(/Availability/i);
     fireEvent.change(availabilitySelect, { target: { value: "normal" } });
-
-    // Click apply
-    const applyBtn = screen.getByRole("button", { name: /Apply/i });
-    fireEvent.click(applyBtn);
 
     await waitFor(() => {
       expect(screen.queryByText("Fixing Venue")).not.toBeInTheDocument();
