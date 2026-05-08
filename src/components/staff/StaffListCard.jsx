@@ -1,11 +1,11 @@
-// Reusable row card for staff lists, such as requests, check-in, and repairs.
-// Each page passes the cells it wants to show.
-// The card keeps keyboard and click behavior the same across staff pages.
+// Shared card used by staff request, check in, and repair pages.
+// It shows one business record with several small fields, such as date, member, facility, and status.
+// When staff choose the card, the parent page opens the matching detail panel.
 import "./StaffListCard.css";
 
-// Show one clickable staff list row.
-// It renders label/value cells in the grid layout chosen by the page.
-// It also highlights the selected row and lets Enter or Space open the row.
+// Staff click this card to open one record from the list.
+// Request, check in, and repair pages decide which fields appear on the card.
+// Keyboard selection works the same way as a mouse click.
 export default function StaffListCard({ isActive, onClick, gridTemplateColumns, cells }) {
   return (
     <article

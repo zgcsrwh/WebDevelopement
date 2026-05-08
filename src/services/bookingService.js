@@ -41,10 +41,12 @@ import { displayStatus } from "../utils/presentation";
 import { getLocalDateKey, getMaxLocalBookingDate } from "../utils/bookingSlotRules";
 import { callSubmitAction } from "./callableService";
 
+// Get today's local date for booking forms and filters.
 function getTodayDate() {
   return getLocalDateKey();
 }
 
+// Get the last date that members can choose for a new booking.
 function getMaxBookingDate() {
   return getMaxLocalBookingDate(7);
 }
@@ -76,11 +78,14 @@ function sortTimeSlots(slots = []) {
   });
 }
 
+// Sort time slot records by their start hour.
+// Pages use this after loading slots for one facility and date.
 function sortTimeSlotDocs(slots = []) {
   return [...slots].sort((left, right) => toHourNumber(left.start_time) - toHourNumber(right.start_time));
 }
 
-// Read the real time slot records for one facility and one date.
+// Load the time slot records for one facility and one date.
+// Booking pages and staff pages use these slots to show available times.
 async function getStoredTimeSlotsForFacilityDate(facilityId, selectedDate = getTodayDate()) {
   const safeDate = toStoredDateString(selectedDate).slice(0, 10);
   const slots = await getCollectionDocs("time_slot", [
@@ -91,14 +96,17 @@ async function getStoredTimeSlotsForFacilityDate(facilityId, selectedDate = getT
   return sortTimeSlotDocs(slots);
 }
 
+// Prepare text that appears in labels or filter searches.
 function normalizeText(value = "") {
   return String(value || "").trim();
 }
 
+// Make a simple compare key for names and labels.
 function normalizeKey(value = "") {
   return normalizeText(value).toLowerCase();
 }
 
+// Give the booking date limits used by the facility booking page.
 export async function getFacilityDateBounds() {
   return {
     minDate: getTodayDate(),
@@ -107,6 +115,7 @@ export async function getFacilityDateBounds() {
   };
 }
 
+// Load the sport type options shown in facility filters.
 export async function getFacilitySportTypes() {
   const facilityDocs = await getCollectionDocs("facility", [orderBy("sport_type", "asc")]);
   const uniqueTypes = new Map();
@@ -125,6 +134,7 @@ export async function getFacilitySportTypes() {
   return [...uniqueTypes.values()];
 }
 
+// Load all facility names for staff and member filter dropdowns.
 export async function getAllFacilityFilterOptions() {
   const facilityDocs = await getCollectionDocs("facility", [orderBy("name", "asc")]);
 
@@ -136,6 +146,8 @@ export async function getAllFacilityFilterOptions() {
     .filter((item) => item.id && item.name);
 }
 
+// Build time filter options for the selected sport type.
+// The options come from visible facility opening hours.
 export async function getFacilityTimeFilterOptions(selectedType = "All") {
   const [facilityDocs, repairs] = await Promise.all([
     getCollectionDocs("facility", [orderBy("sport_type", "asc")]),
@@ -184,6 +196,8 @@ export async function getFacilityTimeFilterOptions(selectedType = "All") {
   return ["All", ...sortTimeSlots([...timeOptions])];
 }
 
+// Check whether a member can cancel an accepted booking.
+// The member page uses this to decide whether to show the cancel action.
 export function isBookingCancellationAllowed(item, now = new Date()) {
   const source = item?.raw && typeof item.raw === "object" ? item.raw : item;
   const normalizedStatus = normalizeBookingStatusValue(source?.status);
@@ -202,6 +216,8 @@ export function isBookingCancellationAllowed(item, now = new Date()) {
   return new Date(bookingStart.getTime() - 2 * 60 * 60 * 1000) > now;
 }
 
+// Check whether staff can confirm arrival for a booking right now.
+// Check in opens shortly before the session starts.
 export function isBookingCheckInOpen(item, now = new Date()) {
   if (String(item?.status || "").toLowerCase() !== "accepted") {
     return false;
@@ -216,23 +232,27 @@ export function isBookingCheckInOpen(item, now = new Date()) {
   return now >= earliestCheckIn && now < bookingStart;
 }
 
+// Get the current user for booking actions.
+// Pages can also pass a user in when they already have one.
 async function resolveActor(actor) {
   return actor || getCurrentActor();
 }
 
+// Collect invited friend ids for booking pages and staff detail panels.
 function normalizeParticipantIds(item = {}) {
-  // Old exports used user_id_list, while newer records use participant_ids.
   return [...new Set([...(item.participant_ids || []), ...(item.user_id_list || [])].filter(Boolean))];
 }
 
 const MISSING_MEMBER_LABEL = "Member no longer available";
 
+// Check whether a member account can still be shown as a real person.
 function isActiveMember(member) {
   return Boolean(member) && String(member.status || "").toLowerCase() === "active";
 }
 
+// Choose the member name shown by the current page.
+// Staff pages use real names, while social member pages can use nicknames.
 function getMemberDisplayName(member, fallback = MISSING_MEMBER_LABEL, options = {}) {
-  // Deleted or inactive members should not leak raw Firestore ids to the page.
   if (!isActiveMember(member)) {
     return fallback;
   }
@@ -244,6 +264,7 @@ function getMemberDisplayName(member, fallback = MISSING_MEMBER_LABEL, options =
   return member.profile?.nickname || member.name || fallback;
 }
 
+// Prepare booking status text before pages compare request states.
 function normalizeBookingStatusValue(value = "") {
   const rawStatus = String(value || "").trim().toLowerCase();
 
@@ -264,8 +285,9 @@ const MEMBER_BOOKING_VISIBLE_STATUSES = new Set([
   "no_show",
 ]);
 
+// Build the booking status shown on member booking pages.
+// Members see accepted bookings as upcoming in their booking list.
 function normalizeMemberBookingPageStatus(value = "") {
-  // Member pages show accepted as upcoming and suggested as alternative suggested.
   const normalizedStatus = normalizeBookingStatusValue(value);
   const compactStatus = normalizedStatus.replace(/\s+/g, "");
 
@@ -288,6 +310,7 @@ function normalizeMemberBookingPageStatus(value = "") {
   return normalizedStatus;
 }
 
+// Add the member booking display status to one mapped booking.
 function applyMemberBookingDisplay(item) {
   const displayStatus = normalizeMemberBookingPageStatus(getMemberBookingDisplayStatus(item.raw || item));
   return {
@@ -297,6 +320,8 @@ function applyMemberBookingDisplay(item) {
   };
 }
 
+// Decide whether a booking should appear in the member booking list.
+// Invited friends do not see pending bookings there yet.
 function isMemberBookingVisibleToActor(item = {}) {
   const status = normalizeMemberBookingPageStatus(item.status || item.raw?.status);
 
@@ -311,17 +336,16 @@ function isMemberBookingVisibleToActor(item = {}) {
   return true;
 }
 
-// Make the request status used on staff request pages.
-// The stored suggested state is shown as alternative suggested.
-// Other statuses are cleaned up and returned with the same meaning.
+// Build the request status used on staff request pages.
+// Staff see suggested requests as alternative suggested in their workflow.
 export function getStaffRequestPageStatus(value = "") {
   const normalizedStatus = normalizeBookingStatusValue(value);
   return normalizedStatus === "suggested" ? "alternative suggested" : normalizedStatus;
 }
 
 // Work out the status shown on the staff check in page.
-// Accepted bookings turn into no show on screen after the start time passes.
-// This only changes the page display and does not write to the database.
+// Staff see accepted bookings turn into no show after the start time passes.
+// The check in page uses this status for its cards and buttons.
 export function getStaffCheckInPageStatus(item = {}, now = new Date()) {
   const source = item?.raw && typeof item.raw === "object" ? item.raw : item;
   const rawStatus = normalizeBookingStatusValue(source.status || item.status);
@@ -343,6 +367,8 @@ export function getStaffCheckInPageStatus(item = {}, now = new Date()) {
   return rawStatus || "";
 }
 
+// Sort booking records by activity date and start time.
+// Newer bookings appear first in member and staff lists.
 function sortBookings(items) {
   return [...items].sort((left, right) => {
     if (left.date !== right.date) {
@@ -352,6 +378,8 @@ function sortBookings(items) {
   });
 }
 
+// Make the facility object used by booking pages.
+// It also separates open and locked slot labels for the selected date.
 function mapFacility(item, slotItems = []) {
   const openSlots = slotItems
     .filter((slot) => String(slot.status || "").toLowerCase() === "open")
@@ -379,9 +407,9 @@ function mapFacility(item, slotItems = []) {
   };
 }
 
-// Turn one raw request document into the booking object used by the UI.
-// It adds facility names, staff names, member names, and time text.
-// Staff pages ask for real member names while social member pages can use display names.
+// Build the booking object used by booking cards and detail panels.
+// It adds facility names, staff names, member names, and readable time text.
+// Staff pages ask for real member names, while social member pages can use display names.
 function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "", options = {}) {
   const facility = facilityLookup.get(item.facility_id);
   const member = memberLookup.get(item.member_id);
@@ -421,9 +449,8 @@ function mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId = "
   };
 }
 
-// Load the lookup maps used to fill booking rows.
-// Request records mostly store ids.
-// These maps let the UI show readable member, facility, and staff names.
+// Load the name lists used to fill booking records.
+// Booking cards use these lists to show member, facility, and staff names.
 async function getLookups() {
   const [memberLookup, facilityLookup, staffLookup] = await Promise.all([
     getMemberLookup(),
@@ -433,7 +460,7 @@ async function getLookups() {
   return { memberLookup, facilityLookup, staffLookup };
 }
 
-// Read one request by id and throw a normal app error if it is missing.
+// Load one booking request before a page action uses it.
 // Staff actions use this before checking permission or slot state.
 async function getRequestByIdOrThrow(requestId) {
   const request = await getDocById("request", requestId);
@@ -443,6 +470,8 @@ async function getRequestByIdOrThrow(requestId) {
   return request;
 }
 
+// Check the main fields for a facility booking form.
+// It makes sure the date, time, activity text, and attendee count are valid.
 async function validateFacilityBookingInput(facility, payload) {
   if (!payload.facility_id) {
     throw createAppError("invalid-argument", "Please select a facility.");
@@ -481,6 +510,8 @@ async function validateFacilityBookingInput(facility, payload) {
   }
 }
 
+// Check that invited friends are allowed for this member booking.
+// Only accepted and active friends can be submitted as participants.
 async function validateInvitedPartners(actor, participantIds) {
   if (!participantIds.length) {
     return;
@@ -505,6 +536,8 @@ async function validateInvitedPartners(actor, participantIds) {
   }
 }
 
+// Check whether the applicant or any invited friend already has a booking then.
+// This helps the form stop overlapping accepted or pending bookings.
 function hasParticipantConflict(requests, involvedIds, selectedHours, currentRequestId = "") {
   for (const request of requests) {
     if (currentRequestId && request.id === currentRequestId) {
@@ -530,6 +563,8 @@ function hasParticipantConflict(requests, involvedIds, selectedHours, currentReq
   return false;
 }
 
+// Run the participant conflict check for one booking date.
+// It loads requests on that date and compares all involved member ids.
 async function validateParticipantConflicts(actor, payload, selectedHours, currentRequestId = "") {
   const allRequestsForDate = await getCollectionDocs("request", [where("date", "==", payload.date)]);
   const involvedIds = new Set([actor.id, ...normalizeParticipantIds(payload)]);
@@ -542,14 +577,16 @@ async function validateParticipantConflicts(actor, payload, selectedHours, curre
   }
 }
 
-// Add page friendly fields to raw request records.
+// Add page friendly fields to booking request records.
 // Member pages, staff request pages, and check in pages all use this mapper.
-// Options decide which kind of member name should be shown.
+// Options decide whether the page should show real names or social display names.
 async function decorateRequests(items, actorId = "", options = {}) {
   const { memberLookup, facilityLookup, staffLookup } = await getLookups();
   return sortBookings(items).map((item) => mapBooking(item, memberLookup, facilityLookup, staffLookup, actorId, options));
 }
 
+// Load facilities for the member booking pages and staff suggestion panel.
+// The result includes the display status and available time slots for the selected date.
 export async function getFacilities(selectedDate = getTodayDate(), options = {}) {
   const [facilityDocs, repairs] = await Promise.all([
     getCollectionDocs("facility", [orderBy("sport_type", "asc")]),
@@ -572,32 +609,6 @@ export async function getFacilities(selectedDate = getTodayDate(), options = {})
   );
 
   const nonDeletedFacilities = nextFacilities.filter((item) => item.status !== "deleted");
-  if (typeof window !== "undefined" && import.meta.env.DEV) {
-    console.debug("[FacilitiesDebug:getFacilities]", {
-      selectedDate,
-      rawFacilityCount: facilityDocs.length,
-      rawFacilities: facilityDocs.map((item) => ({
-        id: item.id,
-        name: item.name,
-        sport_type: item.sport_type,
-        status: item.status,
-        staff_id: item.staff_id,
-        start_time: item.start_time,
-        end_time: item.end_time,
-        scheduled_change: item.scheduled_change || item.scheduledChange || null,
-      })),
-      repairCount: repairs.length,
-      mappedFacilities: nextFacilities.map((item) => ({
-        id: item.id,
-        name: item.name,
-        sportType: item.sportType,
-        status: item.status,
-        startTime: item.startTime,
-        endTime: item.endTime,
-        availableSlotCount: item.availableSlots.length,
-      })),
-    });
-  }
 
   if (options.includeHidden) {
     return nonDeletedFacilities;
@@ -606,6 +617,8 @@ export async function getFacilities(selectedDate = getTodayDate(), options = {})
   return nonDeletedFacilities.filter((item) => isFacilityVisible(item.status));
 }
 
+// Load one facility for the booking detail page.
+// The returned facility includes its status and slot labels for the selected date.
 export async function getFacilityById(id, selectedDate = getTodayDate()) {
   const [facility, repairs] = await Promise.all([
     getDocById("facility", id),
@@ -624,6 +637,8 @@ export async function getFacilityById(id, selectedDate = getTodayDate()) {
   return mapFacility(facilityWithEffectiveStatus, slots);
 }
 
+// Load time slots for one facility and date.
+// The booking form and staff suggestion panel use the returned time labels.
 export async function getTimeSlotsByFacility(facilityId, selectedDate = getTodayDate()) {
   const facility = await getDocById("facility", facilityId);
   if (!facility) {
@@ -637,6 +652,8 @@ export async function getTimeSlotsByFacility(facilityId, selectedDate = getToday
   }));
 }
 
+// Load bookings shown on the member My Bookings page.
+// The list includes owned bookings and accepted invited bookings when they should be visible.
 export async function getBookings(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
@@ -651,6 +668,8 @@ export async function getBookings(actor) {
   return decoratedItems.map(applyMemberBookingDisplay).filter(isMemberBookingVisibleToActor);
 }
 
+// Load one booking for a member detail page.
+// Owners and visible invited participants can open the booking.
 export async function getBookingById(id, actor) {
   const resolvedActor = await resolveActor(actor);
   const request = await getRequestByIdOrThrow(id);
@@ -677,10 +696,13 @@ export async function getBookingById(id, actor) {
   return displayBooking;
 }
 
+// Create a new booking request with the member booking form data.
+// It checks the facility, invited friends, time slots, and participant conflicts.
 async function submitBookingRequestDirect(payload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
 
+  // The selected facility must still be bookable on the chosen date.
   const facility = await getFacilityById(payload.facility_id, payload.date);
   if (!facility) {
     throw createAppError("not-found");
@@ -692,12 +714,14 @@ async function submitBookingRequestDirect(payload, actor) {
 
   await validateFacilityBookingInput(facility, payload);
 
+  // Invited friends count as attendees, so the form cannot invite too many people.
   const participantIds = normalizeParticipantIds(payload);
   if (participantIds.length > Number(payload.attendent || 0) - 1) {
     throw createAppError("invalid-argument", "Invited friends cannot exceed the attendee count minus yourself.");
   }
   await validateInvitedPartners(resolvedActor, participantIds);
 
+  // The selected slots must all be open before the request can be created.
   const selectedHours = buildHourRange(payload.start_time, payload.end_time);
   const persistedFacility = await getDocById("facility", payload.facility_id);
   const slots = persistedFacility
@@ -715,6 +739,7 @@ async function submitBookingRequestDirect(payload, actor) {
 
   await validateParticipantConflicts(resolvedActor, payload, selectedHours);
 
+  // The request and slot locks are saved together so the booking stays consistent.
   const requestRef = doc(getCollectionRef("request"));
   const involvedIds = new Set([resolvedActor.id, ...participantIds]);
 
@@ -766,6 +791,8 @@ async function submitBookingRequestDirect(payload, actor) {
   return { success: true, request_id: requestRef.id };
 }
 
+// Submit a booking request from the new booking page.
+// Members send the booking form and any invited friend ids through this action.
 export async function submitBookingRequest(payload, actor) {
   const participantIds = [
     ...new Set([...(payload.user_id_list || []), ...(payload.participant_ids || [])].filter(Boolean)),
@@ -786,10 +813,13 @@ export async function submitBookingRequest(payload, actor) {
   return callSubmitAction("submitBookingRequest", callablePayload);
 }
 
+// Modify a pending booking request from the member booking detail page.
+// It keeps the same facility and invited friends, but changes date, time, and attendee count.
 async function modifyPendingBookingDirect(payload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
 
+  // Only the owner can edit a request that is still waiting for a decision.
   const requestId = payload.request_id || payload.id;
   const existingRequest = await getRequestByIdOrThrow(requestId);
   if (existingRequest.member_id !== resolvedActor.id) {
@@ -810,6 +840,8 @@ async function modifyPendingBookingDirect(payload, actor) {
     throw createAppError("failed-precondition", "This facility is currently unavailable for booking.");
   }
 
+  // Build the updated booking request before checking the edit.
+  // The activity text and invited friends stay with the original request.
   const participantIds = normalizeParticipantIds(existingRequest);
   const nextPayload = {
     facility_id: existingRequest.facility_id,
@@ -833,6 +865,7 @@ async function modifyPendingBookingDirect(payload, actor) {
   }
   await validateParticipantConflicts(resolvedActor, nextPayload, selectedHours, requestId);
 
+  // Save the new request time and move the locked slots in one action.
   await runDbTransaction(async (transaction) => {
     const requestRef = getDocumentRef("request", requestId);
     const requestSnapshot = await transaction.get(requestRef);
@@ -919,6 +952,8 @@ async function modifyPendingBookingDirect(payload, actor) {
   return { success: true };
 }
 
+// Send a pending booking edit from the member booking detail page.
+// The page only sends the fields that the member is allowed to change.
 export async function modifyPendingBooking(payload, actor) {
   return callSubmitAction(
     "modifyPendingBooking",
@@ -934,29 +969,29 @@ export async function modifyPendingBooking(payload, actor) {
 
 // Load booking requests that this staff member can review.
 // Staff only see their assigned requests and admins see all requests.
-// Rows use real member names because approval work needs real identity.
+// Requests use member names needed by the staff approval screens.
 export async function getStaffRequests(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
-  // Read request rows first and then filter by staff assignment.
-  // This keeps staff and admin loading on the same path.
+  // Load requests first, then keep the ones that belong to this staff page.
+  // Admin can see all staff work from the same screen.
   const allRequests = await getCollectionDocs("request");
   const relevantRequests = filterRequestsForStaff(allRequests, resolvedActor);
 
-  // Staff pages show real member names instead of profile nicknames.
-  // Booking approval and check in are staff work, not social matching.
+  // Staff pages ask for real member names before the request list renders.
+  // Approval and check in pages use these names in cards and details.
   return decorateRequests(relevantRequests, resolvedActor.id, { memberNameMode: "real" });
 }
 
 // Keep only requests assigned to this staff member.
-// Admin users skip this because they manage all staff work.
+// Admin users keep every request because they manage all staff work.
 function filterRequestsForStaff(items = [], actor = {}) {
   return items.filter((item) => (actor.role === "Admin" ? true : item.staff_id === actor.id));
 }
 
 // Keep bookings that belong on the staff check in page.
-// Accepted and finished rows live here.
+// Accepted and finished bookings live here.
 // Pending requests stay on the approval page.
 function filterCheckInRequestsForStaff(items = [], actor = {}) {
   return filterRequestsForStaff(items, actor).filter((item) => {
@@ -967,7 +1002,7 @@ function filterCheckInRequestsForStaff(items = [], actor = {}) {
 
 // Listen for live changes used by the staff request page.
 // Request changes update status and buttons.
-// Facility and member changes refresh names on the cards.
+// Facility and member changes refresh names shown for each request.
 export async function subscribeToStaffRequests(actor, onNext, onError) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
@@ -977,9 +1012,8 @@ export async function subscribeToStaffRequests(actor, onNext, onError) {
   let active = true;
   let version = 0;
 
-  // Rebuild request rows from the newest snapshot.
-  // The version number skips older async results that finish late.
-  // This keeps old data from replacing fresh data.
+  // Rebuild request data when live updates arrive.
+  // Staff should only see the latest request list when several updates happen quickly.
   async function emit() {
     if (!hasRequestSnapshot) {
       return;
@@ -988,8 +1022,8 @@ export async function subscribeToStaffRequests(actor, onNext, onError) {
     const currentVersion = ++version;
 
     try {
-      // Refresh member and facility lookups while mapping rows.
-      // The callback receives rows ready for the staff page.
+      // Refresh member and facility names while preparing request records.
+      // The staff page receives cards that are ready to display.
       const decorated = await decorateRequests(
         filterRequestsForStaff(latestRequests, resolvedActor),
         resolvedActor.id,
@@ -1020,7 +1054,7 @@ export async function subscribeToStaffRequests(actor, onNext, onError) {
       },
       onError,
     ),
-    // Facility and member changes update names in the same rows.
+    // Facility and member changes update names in the same request data.
     // This matters when names change while staff keep the page open.
     subscribeToCollection("facility", [], () => void emit(), onError),
     subscribeToCollection("member", [], () => void emit(), onError),
@@ -1060,8 +1094,8 @@ export async function getStaffRequestConflictSummary(requestOrId, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
-  // The page may pass a raw request or just an id.
-  // Both forms are shaped the same way before checks run.
+  // Staff pages can pass the selected request card or only its id.
+  // The request is prepared before the approval checks run.
   const request =
     typeof requestOrId === "object" && requestOrId !== null
       ? requestOrId.raw && typeof requestOrId.raw === "object"
@@ -1116,7 +1150,7 @@ export async function getStaffRequestConflictSummary(requestOrId, actor) {
   }
 
   // Pending requests must still own every slot in their selected time range.
-  // Missing slots mean staff should suggest another option or reject.
+  // Staff need this result before choosing approve, reject, or suggest.
   const requiredHours = buildHourRange(request.start_time, request.end_time);
   const facilitySlots = await getCollectionDocs("time_slot", [where("facility_id", "==", request.facility_id)]);
   const slotsForDate = facilitySlots.filter((slot) => slot.date === request.date);
@@ -1164,25 +1198,25 @@ export async function getRequestFeedbackTemplate(status) {
 }
 
 // Load bookings used by the staff check in page.
-// It keeps accepted and finished rows for this staff member.
-// Returned rows use real names for members and invited participants.
+// It keeps accepted and finished bookings for this staff member.
+// Returned bookings include the member names shown on the check in page.
 export async function getStaffCheckIns(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
   // The check in page only needs accepted and finished requests.
-  // Pending requests are still waiting for approval.
+  // Pending requests stay on the staff approval page.
   const allRequests = await getCollectionDocs("request");
   const checkInRequests = filterCheckInRequestsForStaff(allRequests, resolvedActor);
 
-  // Staff view keeps real names for members and participants.
-  // Check in is staff work, not a social matching feature.
+  // Prepare real member and participant names before the check in page renders.
+  // Staff use the mapped booking list directly in the cards.
   return decorateRequests(checkInRequests, resolvedActor.id, { memberNameMode: "real" });
 }
 
 // Listen for live changes used by the staff check in page.
 // Booking changes update status and buttons.
-// Facility and member changes update row labels.
+// Facility and member changes update the labels shown for each booking.
 export async function subscribeToStaffCheckIns(actor, onNext, onError) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
@@ -1193,9 +1227,8 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
   let active = true;
   let version = 0;
 
-  // Rebuild check in rows from the newest snapshot.
-  // The version number skips older async results that finish late.
-  // This keeps stale check in data off the page.
+  // Rebuild check in booking data when live updates arrive.
+  // Staff should only see the latest booking list when several updates happen quickly.
   async function emit() {
     if (!hasRequestSnapshot) {
       return;
@@ -1204,8 +1237,8 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
     const currentVersion = ++version;
 
     try {
-      // Map again with current facility and member data.
-      // Staff should see updated real names without refreshing the page.
+      // Map again with current facility and member names.
+      // The check in page updates without a manual refresh.
       const decorated = await decorateRequests(
         filterCheckInRequestsForStaff(latestRequests, resolvedActor),
         resolvedActor.id,
@@ -1234,8 +1267,8 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
       },
       onError,
     ),
-    // Facility and member changes update row labels.
-    // This keeps facility names and real member names current.
+    // Facility and member changes update the labels shown for each booking.
+    // Booking cards keep the newest facility and member names.
     subscribeToCollection("facility", [], () => void emit(), onError),
     subscribeToCollection("member", [], () => void emit(), onError),
   ];
@@ -1247,8 +1280,7 @@ export async function subscribeToStaffCheckIns(actor, onNext, onError) {
 }
 
 // Send the check in action when staff confirm a member arrival.
-// This function only builds the payload.
-// The backend decides if the booking is allowed to be checked in.
+// The check in page sends the selected request id for this action.
 export async function checkInBooking(idOrPayload, actor) {
   const payload =
     typeof idOrPayload === "object" && idOrPayload !== null
@@ -1258,6 +1290,8 @@ export async function checkInBooking(idOrPayload, actor) {
   return callSubmitAction("checkInBooking", payload);
 }
 
+// Withdraw a booking request that is still pending.
+// The member page sends only the request id for this action.
 export async function withdrawPendingBooking(idOrPayload, actor) {
   void actor;
 
@@ -1269,6 +1303,8 @@ export async function withdrawPendingBooking(idOrPayload, actor) {
   return callSubmitAction("withdrawPendingBooking", payload);
 }
 
+// Cancel an accepted booking from the member booking detail page.
+// It checks ownership, the two hour rule, and then releases the slots.
 async function cancelConfirmedBookingDirect(idOrPayload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
@@ -1304,6 +1340,8 @@ async function cancelConfirmedBookingDirect(idOrPayload, actor) {
   return { success: true };
 }
 
+// Send a confirmed booking cancellation from the member booking detail page.
+// The cancel action receives the selected request id.
 export async function cancelConfirmedBooking(idOrPayload, actor) {
   const payload =
     typeof idOrPayload === "object" && idOrPayload !== null
@@ -1313,15 +1351,14 @@ export async function cancelConfirmedBooking(idOrPayload, actor) {
   return callSubmitAction("cancelConfirmedBooking", payload);
 }
 
-// Local backup for staff approval actions if the callable is unavailable.
-// It follows the same rules as the staff request page.
-// Normal frontend flow still calls the backend callable first.
+// Process a staff decision for a pending booking request.
+// It supports approve, reject, and suggest from the staff request page.
 async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted", staffResponse = "", actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
-  // The page can pass a payload object or a request id with separate values.
-  // Shape that input first so the rest of the function is simpler.
+  // The staff page can pass a request object or a request id with separate fields.
+  // The selected decision is prepared before the approval checks run.
   const payload =
     typeof idOrPayload === "object" && idOrPayload !== null
       ? idOrPayload
@@ -1343,8 +1380,8 @@ async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted"
 
   let request = null;
   await runDbTransaction(async (transaction) => {
-    // The transaction stops two staff actions from processing the same pending request.
-    // The request is read again inside the transaction before status changes.
+    // Read the request again before changing it.
+    // This stops two staff actions from processing the same pending request.
     const requestRef = getDocumentRef("request", id);
     const requestSnapshot = await transaction.get(requestRef);
 
@@ -1390,9 +1427,8 @@ async function processBookingApprovalDirect(idOrPayload, nextStatus = "accepted"
   return { success: true };
 }
 
-// Send approve, reject, or suggest actions to the booking callable.
-// The callable writes the real status and any notifications.
-// The frontend only prepares the request id, status, and staff response.
+// Send approve, reject, or suggest actions from the staff request page.
+// It prepares the selected request id, next status, and staff response.
 export async function processBookingApproval(idOrPayload, nextStatus = "accepted", staffResponse = "", actor) {
   const payload =
     typeof idOrPayload === "object" && idOrPayload !== null

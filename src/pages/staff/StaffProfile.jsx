@@ -4,9 +4,8 @@
 import "../../components/profile/StaffProfile.css";
 import OperatorProfilePage from "../../components/profile/OperatorProfilePage";
 
-// Render the shared profile form as a staff page.
-// The form itself handles saving details and changing passwords.
-// This wrapper only chooses the staff label and staff layout.
+// Staff open the shared profile form from this page.
+// The form lets them update personal details and change password in the staff layout.
 export default function StaffProfile() {
   return <OperatorProfilePage roleVariant="staff" roleLabel="Staff" />;
 }

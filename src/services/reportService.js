@@ -26,20 +26,21 @@ import { createAppError } from "../utils/errors";
 import { callSubmitAction } from "./callableService";
 import { countMeaningfulCharacters, hasMeaningfulText } from "../utils/text";
 
+// Get the current user for repair actions.
+// Pages can pass a user in, but this keeps the service working when they do not.
 async function resolveActor(actor) {
   return actor || getCurrentActor();
 }
 
-// Read the staff id from a facility object.
-// Some callers pass mapped facility data and some pass raw database data.
-// This keeps staff repair checks working with both shapes.
+// Find the assigned staff member for a facility.
+// The staff repair page uses this to decide which tickets a staff member can see.
 function getAssignedFacilityStaffId(facility = {}) {
   return facility?.staffId || facility?.staff_id || facility?.raw?.staff_id || "";
 }
 
 // Check whether a staff member can see or update a repair ticket.
-// Access is allowed when the ticket or the facility is assigned to that staff member.
-// Admin access is handled outside this helper.
+// A staff member can work on the ticket when the facility belongs to them.
+// Admin pages do their own access check before using repair ticket data.
 function canStaffAccessRepair(item = {}, facility = {}, staffId = "") {
   if (!staffId) {
     return false;
@@ -48,9 +49,8 @@ function canStaffAccessRepair(item = {}, facility = {}, staffId = "") {
   return item.staff_id === staffId || getAssignedFacilityStaffId(facility) === staffId;
 }
 
-// Turn one raw repair record into the ticket object used by the UI.
-// It adds facility names, real member names, staff names, and clean status text.
-// Staff pages use this object instead of raw database fields.
+// Turn one repair record into the ticket object used by the UI.
+// It adds the names and status text that staff pages show in cards and details.
 function mapRepairTicket(item, memberLookup, facilityLookup, staffLookup) {
   const facility = facilityLookup.get(item.facility_id);
   const member = memberLookup.get(item.member_id);
@@ -78,14 +78,12 @@ function mapRepairTicket(item, memberLookup, facilityLookup, staffLookup) {
 }
 
 // Load repair tickets that the current user can see.
-// Members only see reports they created.
-// Staff see assigned facility tickets and admins see all tickets.
+// Members see their own reports, staff see assigned tickets, and admins see all tickets.
 export async function getRepairTickets(actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member", "Staff", "Admin"]);
 
-  // Load tickets with member, facility, and staff lookup maps.
-  // Repair rows store ids, and the page needs readable names.
+  // Build lookup maps first because repair cards need names instead of ids.
   const [items, memberLookup, facilityLookup, staffLookup] = await Promise.all([
     getCollectionDocs("repair", [orderBy("created_at", "desc")]),
     getMemberLookup(),
@@ -93,8 +91,7 @@ export async function getRepairTickets(actor) {
     getStaffLookup(),
   ]);
 
-  // Apply role based visibility before mapping display fields.
-  // Staff should not see tickets outside their assigned facilities.
+  // Filter by role before the page receives the ticket list.
   const filteredItems = items.filter((item) => {
     if (resolvedActor.role === "Member") {
       return item.member_id === resolvedActor.id;
@@ -110,6 +107,8 @@ export async function getRepairTickets(actor) {
   return filteredItems.map((item) => mapRepairTicket(item, memberLookup, facilityLookup, staffLookup));
 }
 
+// Load one repair ticket for a detail view.
+// The same role checks are used before the ticket is returned.
 export async function getRepairTicketById(id, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member", "Staff", "Admin"]);
@@ -146,15 +145,13 @@ export async function subscribeToRepairTickets(actor, onNext, onError) {
   let active = true;
   let version = 0;
 
-  // Reload mapped tickets after any watched collection changes.
-  // The version number skips old reloads that finish late.
-  // This keeps stale ticket data off the page.
+  // Reload repair tickets after any watched page data changes.
+  // Staff should only see the latest ticket list when several updates happen quickly.
   async function emit() {
     const currentVersion = ++version;
 
     try {
-      // Use getRepairTickets again for every live update.
-      // This keeps live updates using the same filters as the first load.
+      // Reload through the same repair list that staff and members already use.
       const items = await getRepairTickets(resolvedActor);
       if (active && currentVersion === version) {
         onNext?.(items);
@@ -167,11 +164,9 @@ export async function subscribeToRepairTickets(actor, onNext, onError) {
   }
 
   const unsubscribers = [
-    // Repair changes update status and description.
-    // Any repair update can affect the staff ticket list.
+    // Repair changes update the ticket status and description.
     subscribeToCollection("repair", [], () => void emit(), onError),
-    // Facility and member changes update names shown in the staff table.
-    // Facility assignment changes can also change ticket access.
+    // Facility and member changes can change names and staff access.
     subscribeToCollection("facility", [], () => void emit(), onError),
     subscribeToCollection("member", [], () => void emit(), onError),
   ];
@@ -182,6 +177,8 @@ export async function subscribeToRepairTickets(actor, onNext, onError) {
   };
 }
 
+// Load facility options for the member repair form.
+// Members use this list when choosing where to report a problem.
 export async function getReportFacilities() {
   const items = await getCollectionDocs("facility", [orderBy("name", "asc")]);
   return items
@@ -190,6 +187,8 @@ export async function getReportFacilities() {
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
+// Create a repair ticket from the member repair form.
+// It checks the selected facility and the description before making the ticket data.
 async function submitRepairTicketDirect(payload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Member"]);
@@ -229,6 +228,8 @@ async function submitRepairTicketDirect(payload, actor) {
   return { success: true, repairt_id: repairId };
 }
 
+// Submit a new repair ticket from the member repair form.
+// Members send the chosen facility, issue text, and repair type through this action.
 export async function submitRepairTicket(payload, actor) {
   return callSubmitAction(
     "submitRepairTicket",
@@ -240,15 +241,14 @@ export async function submitRepairTicket(payload, actor) {
   );
 }
 
-// Local backup for resolving a repair ticket if the callable is unavailable.
-// Normal frontend flow calls the backend callable first.
-// This backup keeps the same staff permission checks and pending only rule.
+// Resolve a repair ticket from the staff repair page.
+// Staff can only resolve tickets from their facilities when the ticket is still pending.
 async function updateTicketStatusDirect(payload, actor) {
   const resolvedActor = await resolveActor(actor);
   assertRole(resolvedActor, ["Staff", "Admin"]);
 
   // Staff can only resolve tickets they are allowed to access.
-  // The repair id may come from the payload or the mapped ticket object.
+  // The selected repair ticket is loaded before the page action continues.
   const repairId = payload.repairt_id || payload.id;
   const repair = await getDocById("repair", repairId);
   if (!repair) {
@@ -263,8 +263,8 @@ async function updateTicketStatusDirect(payload, actor) {
   }
 
   const nextStatus = Array.isArray(payload.status) ? payload.status[0] : payload.status;
-  // This staff workflow only moves a pending ticket to resolved.
-  // Other status changes belong in a different backend workflow.
+  // Staff use this workflow only to mark a pending ticket as resolved.
+  // Other repair status changes are handled outside this repair page.
   if (String(nextStatus || "").toLowerCase() !== "resolved") {
     throw createAppError("invalid-argument", "Repairs can only be moved to resolved in this workflow.");
   }
@@ -275,8 +275,8 @@ async function updateTicketStatusDirect(payload, actor) {
   }
 
   await runDbTransaction(async (transaction) => {
-    // Read the ticket again inside the transaction.
-    // The facility is read again too because it can change while staff are viewing the page.
+    // Read the ticket and facility again before changing the status.
+    // Staff should not resolve a ticket that changed while they were reading it.
     const repairRef = getDocumentRef("repair", repairId);
     const repairSnapshot = await transaction.get(repairRef);
     const facilityRef = getDocumentRef("facility", repair.facility_id);
@@ -307,9 +307,8 @@ async function updateTicketStatusDirect(payload, actor) {
   return { success: true };
 }
 
-// Send a staff repair status update to the backend callable.
-// The callable owns the real database update.
-// The frontend only sends the repair id and target status.
+// Send a staff repair status update from the repair page.
+// Staff send the selected repair id and the status they chose.
 export async function updateTicketStatus(payload, actor) {
   return callSubmitAction(
     "updateTicketStatus",
