@@ -21,8 +21,7 @@ import { FilterField, FilterPanel } from "../../components/common/FilterControls
 import PageLayout from "../../components/common/PageLayout";
 import StaffListCard from "../../components/staff/StaffListCard";
 
-const ALL_STATUS_VALUE = "all";
-const CHECK_IN_STATUS_OPTIONS = ["accepted", "completed", "cancelled", "no_show"];
+const CHECK_IN_STATUS_OPTIONS = ["accepted"];
 const CHECK_IN_PAGE_STATUSES = new Set(CHECK_IN_STATUS_OPTIONS);
 
 const todayKey = new Date().toISOString().slice(0, 10);
@@ -176,7 +175,6 @@ export default function CheckIn() {
     requestId: "",
     facility: "",
     date: "",
-    status: ALL_STATUS_VALUE,
   });
   const [pageMessage, setPageMessage] = useState("");
   const [pageError, setPageError] = useState("");
@@ -324,7 +322,7 @@ export default function CheckIn() {
   }, [items, now]);
 
   // Apply the filter form to today's check in bookings.
-  // Staff can search by member name, request id, facility, and status.
+  // Staff can search by member name, request id, and facility.
   const visibleItems = useMemo(() => {
     const normalizedSearch = filters.search.trim().toLowerCase();
     const normalizedRequestId = filters.requestId.trim().toLowerCase();
@@ -336,11 +334,10 @@ export default function CheckIn() {
         const requestIdMatch = !normalizedRequestId || item.id.toLowerCase().includes(normalizedRequestId);
         const facilityMatch = !filters.facility || item.facilityId === filters.facility || item.facilityName === filters.facility;
         const dateMatch = item.date === todayKey;
-        const statusMatch = filters.status === ALL_STATUS_VALUE || item.pageStatus === filters.status;
-        return searchMatch && requestIdMatch && facilityMatch && statusMatch;
+        return searchMatch && requestIdMatch && facilityMatch && dateMatch;
       }),
     );
-  }, [filters.search, filters.requestId, filters.facility, filters.status, pageItems]);
+  }, [filters.search, filters.requestId, filters.facility, pageItems]);
 
   useEffect(() => {
     if (!visibleItems.length) {
@@ -369,7 +366,6 @@ export default function CheckIn() {
       requestId: "",
       facility: "",
       date: "",
-      status: ALL_STATUS_VALUE,
     });
     setPageError("");
     setPageMessage("");
@@ -428,7 +424,7 @@ export default function CheckIn() {
       {/* Staff use these filters to find the booking they need to check in. */}
       <FilterPanel
         className="staff-checkin-filters"
-        columns={4}
+        columns={3}
         onClear={clearFilters}
       >
           <FilterField id="staff-checkin-member" label="Member Name">
@@ -472,25 +468,6 @@ export default function CheckIn() {
               <option value="">All Facilities</option>
               {facilityOptions.map((facility) => (
                 <option key={facility.id} value={facility.id}>{facility.name}</option>
-              ))}
-            </select>
-          </FilterField>
-
-          <FilterField id="staff-checkin-status" label="Status">
-            <select
-              id="staff-checkin-status"
-              value={filters.status}
-              onChange={(event) => {
-                setFilters((previous) => ({ ...previous, status: event.target.value }));
-                setPageError("");
-                setPageMessage("");
-              }}
-            >
-              <option value={ALL_STATUS_VALUE}>All Status</option>
-              {CHECK_IN_STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>
-                  {displayStatus(status)}
-                </option>
               ))}
             </select>
           </FilterField>

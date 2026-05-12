@@ -13,7 +13,7 @@ import "./FacilitiesMap.css";
 import PageLayout from "../../components/common/PageLayout";
 import { FilterField, FilterPanel } from "../../components/common/FilterControls";
 import { ROUTE_PATHS, getBookingNewRoute } from "../../constants/routes";
-import { getFacilities, getTimeSlotsByFacility } from "../../services/bookingService";
+import { getFacilities, getFacilityDateBounds, getTimeSlotsByFacility } from "../../services/bookingService";
 import { getFrontendBookableSlotStatus, getLocalDateKey } from "../../utils/bookingSlotRules";
 
 // Southampton center coordinates
@@ -141,6 +141,7 @@ export default function FacilitiesMap() {
   const [error, setError] = useState("");
   const [selectedType, setSelectedType] = useState("All");
   const [clockTick, setClockTick] = useState(Date.now());
+  const [selectedDate, setSelectedDate] = useState("");
 
   // Get unique sport types from facilities
   const sportTypes = useMemo(() => {
@@ -166,17 +167,35 @@ export default function FacilitiesMap() {
       setGeocodingStatus("Loading map data, please wait...");
 
       try {
-        // Load facilities from Firebase
-        const today = getLocalDateKey();
-        const facilities = await getFacilities(today);
+        let targetDate = getLocalDateKey();
+        try {
+          const bounds = await getFacilityDateBounds();
+          if (bounds && bounds.defaultDate) {
+            targetDate = bounds.defaultDate;
+          }
+        } catch (boundsError) {
+          // Fallback to local date key if bounds fetch fails
+        }
+
+        if (!isActive) return;
+        setSelectedDate(targetDate);
+
+        // Load facilities from Firebase and fetch their time slots
+        const facilities = await getFacilities(targetDate);
+        const facilitiesWithSlots = await Promise.all(
+          facilities.map(async (item) => ({
+            ...item,
+            memberTimeSlots: await getTimeSlotsByFacility(item.id, targetDate),
+          }))
+        );
 
         if (!isActive) return;
         
-        setAllFacilities(facilities);
+        setAllFacilities(facilitiesWithSlots);
         setGeocodingStatus("Loading map data, please wait...");
         
         // Try to geocode venues
-        const locations = await processAndGroupFacilities(facilities);
+        const locations = await processAndGroupFacilities(facilitiesWithSlots);
         
         if (!isActive) return;
         
@@ -239,14 +258,14 @@ function getIconForSportTypes(sportTypes) {
       return false;
     }
 
-    const today = getLocalDateKey();
+    const dateKey = selectedDate || getLocalDateKey();
     const now = new Date(clockTick);
-    return (facility.memberTimeSlots || []).some((slot) => getFrontendBookableSlotStatus(slot, today, now).bookable);
+    return (facility.memberTimeSlots || []).some((slot) => getFrontendBookableSlotStatus(slot, dateKey, now).bookable);
   }
 
   function handleBookFacility(facility) {
-    const today = getLocalDateKey();
-    navigate(getBookingNewRoute({ facilityId: facility.id, date: today }));
+    const dateKey = selectedDate || getLocalDateKey();
+    navigate(getBookingNewRoute({ facilityId: facility.id, date: dateKey }));
   }
 
   /********************************************************************************************** */
