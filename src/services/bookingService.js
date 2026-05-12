@@ -229,7 +229,8 @@ export function isBookingCheckInOpen(item, now = new Date()) {
   }
 
   const earliestCheckIn = new Date(bookingStart.getTime() - 15 * 60 * 1000);
-  return now >= earliestCheckIn && now < bookingStart;
+  const latestCheckIn = new Date(bookingStart.getTime() + 15 * 60 * 1000);
+  return now >= earliestCheckIn && now <= latestCheckIn;
 }
 
 // Get the current user for booking actions.

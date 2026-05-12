@@ -84,11 +84,12 @@ exports.checkInBooking = functions.https.onCall(async (data, context) => {
 
     const now = new Date();
     const earliestCheckIn = new Date(bookingStart.getTime() - 15 * 60 * 1000);
+    const latestCheckIn = new Date(bookingStart.getTime() + 15 * 60 * 1000);
 
-    if (now < earliestCheckIn || now >= bookingStart) {
+    if (now < earliestCheckIn || now > latestCheckIn) {
       throw new functions.https.HttpsError(
         "failed-precondition",
-        "Check-in is only available from 15 minutes before the booking starts until the booking starts."
+        "Check-in is only available from 15 minutes before to 15 minutes after the booking starts."
       );
     }
 
