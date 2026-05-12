@@ -2,7 +2,7 @@
  * checkInBooking - Staff confirms check-in
  *
  * Called when Staff clicks "Confirm Arrival"
- * Updates accepted booking to in_progress
+ * Updates accepted booking to completed
  */
 
 const functions = require("firebase-functions");
@@ -95,7 +95,7 @@ exports.checkInBooking = functions.https.onCall(async (data, context) => {
 
     // 10. Update request
     transaction.update(requestRef, {
-      status: "in_progress",
+      status: "completed",
       updated_at: FieldValue.serverTimestamp(),
     });
   });
@@ -123,7 +123,7 @@ exports.checkInBooking = functions.https.onCall(async (data, context) => {
             member_id: recipientId,
             message: `Your booking at ${requestData.date} ${requestData.start_time}-${requestData.end_time} has been checked in.`,
             type: "facility_request",
-            status_context: "in_progress",
+            status_context: "completed",
             reference_id: requestData.id,
             is_read: false,
             created_at: FieldValue.serverTimestamp(),
