@@ -358,7 +358,7 @@ export function getStaffCheckInPageStatus(item = {}, now = new Date()) {
     if (Number.isNaN(bookingStartTime.getTime())) {
       return "accepted";
     }
-    return now < bookingStartTime ? "accepted" : "no_show";
+    return now.getTime() < bookingStartTime.getTime() + 15 * 60 * 1000 ? "accepted" : "no_show";
   }
   if (rawStatus === "no show" || rawStatus === "no_show") {
     return "no_show";
