@@ -24,7 +24,7 @@ import { FilterField, FilterPanel } from "../../components/common/FilterControls
 import PageLayout from "../../components/common/PageLayout";
 import StaffListCard from "../../components/staff/StaffListCard";
 
-const STAFF_REQUEST_STATUSES = ["pending", "accepted", "rejected", "alternative suggested", "cancelled"];
+const STAFF_REQUEST_STATUSES = ["pending", "accepted", "rejected", "alternative suggested", "cancelled", "no show"];
 const STAFF_REQUEST_STATUS_SET = new Set(STAFF_REQUEST_STATUSES);
 const STATUS_FILTER_OPTIONS = STAFF_REQUEST_STATUSES.map((status) => ({ value: status, label: status }));
 
@@ -229,6 +229,7 @@ export default function Requests() {
           return false;
         }
 
+        console.log
         const dateMatch = !filters.date || item.date === filters.date;
         const facilityMatch =
           !filters.facility ||
