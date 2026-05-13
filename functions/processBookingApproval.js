@@ -190,7 +190,8 @@ exports.processBookingApproval = functions.https.onCall(async (data, context) =>
         type: "facility_request",
         status_context: normalizedStatus,
         reference_id: requestId,
-        is_read: false
+        is_read: false,
+        created_at: FieldValue.serverTimestamp()
       });
     }
     await batch.commit();
